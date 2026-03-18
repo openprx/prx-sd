@@ -3,6 +3,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 /// File manager integration asset files, embedded at compile time.
+#[cfg(target_os = "linux")]
 mod assets {
     pub const NAUTILUS_SCRIPT: &str =
         include_str!("../../../../packaging/filemanager/nautilus/prx-sd-scan");
