@@ -92,6 +92,7 @@ jobs:
     name: Linux Packages — ${{ matrix.arch }}
     needs: build-binaries
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.arch == 'arm64' }}
     strategy:
       fail-fast: false
       matrix:
@@ -246,10 +247,19 @@ jobs:
           %{_bindir}/sd
           SPEC_EOF
 
-          rpmbuild -bb ~/rpmbuild/SPECS/prx-sd.spec \
-            --define "_rpmdir $(pwd)/target/rpm" \
-            --define "_target_cpu ${RPM_ARCH}" \
-            --target "${RPM_ARCH}-linux"
+          # For cross-arch (aarch64 on x86_64 runner), we need to define platform macros
+          if [ "${RPM_ARCH}" != "x86_64" ]; then
+            rpmbuild -bb ~/rpmbuild/SPECS/prx-sd.spec \
+              --define "_rpmdir $(pwd)/target/rpm" \
+              --define "_target_cpu ${RPM_ARCH}" \
+              --define "_target_os linux" \
+              --define "__os_install_post %{nil}" \
+              --target "${RPM_ARCH}"
+          else
+            rpmbuild -bb ~/rpmbuild/SPECS/prx-sd.spec \
+              --define "_rpmdir $(pwd)/target/rpm" \
+              --target "${RPM_ARCH}"
+          fi
 
       - name: Upload RPM
         uses: actions/upload-artifact@v4
@@ -498,7 +508,7 @@ jobs:
     name: Update Homebrew Tap
     needs: create-release
     runs-on: ubuntu-latest
-    if: success()
+    if: always() && needs.create-release.result == 'success'
 
     steps:
       - uses: actions/checkout@v4
@@ -586,7 +596,7 @@ jobs:
     name: Update Scoop Bucket
     needs: create-release
     runs-on: ubuntu-latest
-    if: success()
+    if: always() && needs.create-release.result == 'success'
 
     steps:
       - uses: actions/checkout@v4
