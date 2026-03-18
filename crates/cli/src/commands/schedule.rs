@@ -39,7 +39,9 @@ fn sanitize_path(path: &str) -> Result<&str> {
 /// Which scheduler backend to use.
 #[derive(Debug, Clone, Copy)]
 enum Backend {
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     SystemdTimer,
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     Cron,
     #[cfg(target_os = "macos")]
     Launchd,
@@ -100,11 +102,13 @@ fn sd_binary_path() -> String {
 
 // ─── systemd timer ──────────────────────────────────────────────────────────
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn systemd_unit_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
     std::path::PathBuf::from(home).join(".config/systemd/user")
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn install_systemd_timer(scan_path: &str, frequency: &str, data_dir: &Path) -> Result<()> {
     let scan_path = sanitize_path(scan_path)?;
     let (calendar, _) = parse_frequency(frequency)?;
@@ -172,6 +176,7 @@ fn install_systemd_timer(scan_path: &str, frequency: &str, data_dir: &Path) -> R
     Ok(())
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn remove_systemd_timer() -> Result<()> {
     let _ = std::process::Command::new("systemctl")
         .args(["--user", "disable", "--now", "prx-sd-scan.timer"])
@@ -196,6 +201,7 @@ fn remove_systemd_timer() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn show_systemd_status() -> Result<()> {
     let output = std::process::Command::new("systemctl")
         .args(["--user", "status", "prx-sd-scan.timer"])
@@ -224,6 +230,7 @@ fn show_systemd_status() -> Result<()> {
 
 // ─── cron ───────────────────────────────────────────────────────────────────
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn install_cron_job(scan_path: &str, frequency: &str, data_dir: &Path) -> Result<()> {
     let scan_path = sanitize_path(scan_path)?;
     let (_, cron_expr) = parse_frequency(frequency)?;
@@ -275,6 +282,7 @@ fn install_cron_job(scan_path: &str, frequency: &str, data_dir: &Path) -> Result
     Ok(())
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn remove_cron_job() -> Result<()> {
     let existing = std::process::Command::new("crontab")
         .arg("-l")
@@ -306,6 +314,7 @@ fn remove_cron_job() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn show_cron_status() -> Result<()> {
     let output = std::process::Command::new("crontab").arg("-l").output();
 
@@ -530,7 +539,9 @@ fn show_task_scheduler_status() -> Result<()> {
 pub async fn run_add(scan_path: &str, frequency: &str, data_dir: &Path) -> Result<()> {
     let backend = detect_backend();
     match backend {
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         Backend::SystemdTimer => install_systemd_timer(scan_path, frequency, data_dir),
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         Backend::Cron => install_cron_job(scan_path, frequency, data_dir),
         #[cfg(target_os = "macos")]
         Backend::Launchd => install_launchd_job(scan_path, frequency, data_dir),
@@ -542,7 +553,9 @@ pub async fn run_add(scan_path: &str, frequency: &str, data_dir: &Path) -> Resul
 pub async fn run_remove() -> Result<()> {
     let backend = detect_backend();
     match backend {
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         Backend::SystemdTimer => remove_systemd_timer(),
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         Backend::Cron => remove_cron_job(),
         #[cfg(target_os = "macos")]
         Backend::Launchd => remove_launchd_job(),
@@ -554,7 +567,9 @@ pub async fn run_remove() -> Result<()> {
 pub async fn run_status() -> Result<()> {
     let backend = detect_backend();
     match backend {
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         Backend::SystemdTimer => show_systemd_status(),
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         Backend::Cron => show_cron_status(),
         #[cfg(target_os = "macos")]
         Backend::Launchd => show_launchd_status(),
