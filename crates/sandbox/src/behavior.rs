@@ -333,19 +333,13 @@ fn match_privilege_escalation(result: &SandboxResult) -> bool {
             || s.name == "setregid"
     });
 
-    // Check for capability manipulation.
-    let has_cap_change = result
-        .syscalls
-        .iter()
-        .any(|s| s.name == "capset" || s.name == "prctl");
-
     // Check for SUID/SGID file creation (chmod with setuid bit).
     let has_suid_create = result
         .file_operations
         .iter()
         .any(|f| matches!(f.op, FileOpType::Chmod) && f.path.contains("suid"));
 
-    has_setuid || has_suid_create || (has_cap_change && has_setuid)
+    has_setuid || has_suid_create
 }
 
 /// Pattern: SSH to other hosts, network scanning behavior.

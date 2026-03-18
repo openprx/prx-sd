@@ -278,7 +278,7 @@ fn count_pages(text: &str) -> u32 {
         let abs = search_from + pos;
         // Make sure this is "/Type /Page" and not "/Type /Pages"
         let after = abs + "/Type /Page".len();
-        if after >= text.len() || !text.as_bytes().get(after).is_some_and(|&b| b == b's') {
+        if after >= text.len() || text.as_bytes().get(after).is_none_or(|&b| b != b's') {
             count += 1;
         }
         search_from = abs + 1;

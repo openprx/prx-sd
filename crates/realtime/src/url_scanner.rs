@@ -223,9 +223,7 @@ fn extract_domain_from_url(url: &str) -> Option<String> {
         .or_else(|| url.strip_prefix("http://"))?;
 
     // Take everything before the first `/`, `?`, `#`, or `:` (port).
-    let host = after_scheme
-        .split(|c: char| matches!(c, '/' | '?' | '#' | ':'))
-        .next()?;
+    let host = after_scheme.split(['/', '?', '#', ':']).next()?;
 
     if host.is_empty() {
         return None;

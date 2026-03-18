@@ -132,6 +132,7 @@ async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     path: PathBuf,
     recursive: bool,

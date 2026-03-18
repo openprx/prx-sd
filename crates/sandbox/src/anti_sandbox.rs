@@ -397,14 +397,12 @@ fn extract_strings(data: &[u8], min_len: usize) -> Vec<String> {
     let mut current = String::new();
 
     for &byte in data {
-        if byte >= 0x20 && byte < 0x7F {
+        if (0x20..0x7F).contains(&byte) {
             current.push(byte as char);
+        } else if current.len() >= min_len {
+            strings.push(std::mem::take(&mut current));
         } else {
-            if current.len() >= min_len {
-                strings.push(std::mem::take(&mut current));
-            } else {
-                current.clear();
-            }
+            current.clear();
         }
     }
     if current.len() >= min_len {
