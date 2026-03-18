@@ -514,18 +514,16 @@ fn extract_field(line: &str, key: &str) -> Option<String> {
             || line
                 .as_bytes()
                 .get(abs_pos.wrapping_sub(1))
-                .map_or(false, |&b| {
-                    b == b' ' || b == b'\t' || b == b':' || b == b'('
-                });
+                .is_some_and(|&b| b == b' ' || b == b'\t' || b == b':' || b == b'(');
 
         if is_token_start {
             let value_start = abs_pos + key.len();
             let rest = &line[value_start..];
 
             // Value may be quoted
-            return if rest.starts_with('"') {
-                let end = rest[1..].find('"').map(|i| i + 1).unwrap_or(rest.len());
-                Some(rest[1..end].to_string())
+            return if let Some(stripped) = rest.strip_prefix('"') {
+                let end = stripped.find('"').unwrap_or(stripped.len());
+                Some(stripped[..end].to_string())
             } else {
                 let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
                 Some(rest[..end].to_string())

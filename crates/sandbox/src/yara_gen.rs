@@ -155,14 +155,12 @@ fn extract_ascii_strings(data: &[u8], min_len: usize) -> Vec<String> {
     let mut current = String::new();
 
     for &byte in data {
-        if byte >= 0x20 && byte < 0x7F {
+        if (0x20..0x7F).contains(&byte) {
             current.push(byte as char);
+        } else if current.len() >= min_len {
+            strings.push(std::mem::take(&mut current));
         } else {
-            if current.len() >= min_len {
-                strings.push(std::mem::take(&mut current));
-            } else {
-                current.clear();
-            }
+            current.clear();
         }
     }
     if current.len() >= min_len {
@@ -181,7 +179,7 @@ fn extract_wide_strings(data: &[u8], min_len: usize) -> Vec<String> {
     while i + 1 < data.len() {
         let lo = data[i];
         let hi = data[i + 1];
-        if hi == 0 && lo >= 0x20 && lo < 0x7F {
+        if hi == 0 && (0x20..0x7F).contains(&lo) {
             current.push(lo as char);
             i += 2;
         } else {
@@ -217,7 +215,7 @@ fn looks_like_ip(s: &str) -> bool {
         if p.is_empty() || p.len() > 3 {
             return false;
         }
-        p.chars().all(|c| c.is_ascii_digit()) && p.parse::<u16>().map_or(false, |n| n <= 255)
+        p.chars().all(|c| c.is_ascii_digit()) && p.parse::<u16>().is_ok_and(|n| n <= 255)
     })
 }
 

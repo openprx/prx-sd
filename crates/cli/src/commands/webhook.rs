@@ -212,10 +212,7 @@ pub async fn run_list(data_dir: &Path) -> Result<()> {
         return Ok(());
     }
 
-    println!(
-        "{:<20} {:<10} {:<10} {}",
-        "NAME", "FORMAT", "ENABLED", "URL"
-    );
+    println!("{:<20} {:<10} {:<10} URL", "NAME", "FORMAT", "ENABLED");
     println!("{}", "-".repeat(72));
 
     for ep in &config.webhooks {

@@ -9,10 +9,14 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::{SandboxConfig, SandboxResult};
+#[cfg(target_os = "linux")]
+use crate::SandboxConfig;
+use crate::SandboxResult;
+#[cfg(target_os = "linux")]
+use anyhow::Context;
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
@@ -58,6 +62,7 @@ impl Default for EnhancedSandboxConfig {
 /// Multi-layer sandbox that orchestrates resource limits, namespace isolation,
 /// seccomp filtering, ptrace tracing, and behavior analysis.
 pub struct EnhancedSandbox {
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     config: EnhancedSandboxConfig,
 }
 

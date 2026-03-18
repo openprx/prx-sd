@@ -136,7 +136,7 @@ fn parse_hash_file(content: &str, expected_kind: Option<HashKind>) -> Result<Has
 
 /// Decode a hex string into raw bytes.
 pub fn decode_hex(hex: &str) -> Option<Vec<u8>> {
-    if hex.len() % 2 != 0 {
+    if !hex.len().is_multiple_of(2) {
         return None;
     }
     let mut bytes = Vec::with_capacity(hex.len() / 2);

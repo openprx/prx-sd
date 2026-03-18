@@ -211,11 +211,7 @@ impl MlModel {
             }
         }
 
-        if self.elf_fallback || cfg!(not(feature = "onnx")) {
-            fallback_elf_score(features)
-        } else {
-            fallback_elf_score(features)
-        }
+        fallback_elf_score(features)
     }
 
     /// Whether either model is using ONNX (not fallback).
@@ -282,7 +278,11 @@ fn fallback_pe_score(f: &[f32; PE_FEATURE_DIM]) -> MlPrediction {
     }
 
     let prob = score.clamp(0.0, 1.0);
-    let confidence = if prob > 0.7 || prob < 0.2 { 0.6 } else { 0.4 };
+    let confidence = if !(0.2..=0.7).contains(&prob) {
+        0.6
+    } else {
+        0.4
+    };
 
     MlPrediction {
         malicious_probability: prob,
@@ -336,7 +336,11 @@ fn fallback_elf_score(f: &[f32; ELF_FEATURE_DIM]) -> MlPrediction {
     }
 
     let prob = score.clamp(0.0, 1.0);
-    let confidence = if prob > 0.7 || prob < 0.2 { 0.6 } else { 0.4 };
+    let confidence = if !(0.2..=0.7).contains(&prob) {
+        0.6
+    } else {
+        0.4
+    };
 
     MlPrediction {
         malicious_probability: prob,

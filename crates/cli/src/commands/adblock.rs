@@ -266,7 +266,7 @@ pub async fn run_log(data_dir: &Path, count: usize) -> Result<()> {
 
     let lines: Vec<&str> = content.lines().collect();
     let total = lines.len();
-    let start = if total > count { total - count } else { 0 };
+    let start = total.saturating_sub(count);
 
     println!(
         "{} (showing last {} of {})",
