@@ -1,0 +1,18 @@
+[package]
+name = "prx-sd-updater"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+prx-sd-signatures = { workspace = true }
+reqwest = { workspace = true }
+ed25519-dalek = { workspace = true }
+zstd = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }

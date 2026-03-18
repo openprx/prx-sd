@@ -1,0 +1,15 @@
+[package]
+name = "prx-sd-parsers"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+goblin = { workspace = true }
+zip = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+md-5 = { workspace = true }
