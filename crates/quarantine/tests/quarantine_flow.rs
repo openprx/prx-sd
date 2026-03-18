@@ -5,9 +5,7 @@
 
 use std::fs;
 
-use prx_sd_quarantine::{
-    batch_delete, batch_restore, cleanup_expired, Quarantine, QuarantineId,
-};
+use prx_sd_quarantine::{batch_delete, batch_restore, cleanup_expired, Quarantine, QuarantineId};
 
 /// Create a fresh quarantine vault in a temp directory.
 fn setup_vault() -> (tempfile::TempDir, Quarantine) {
@@ -46,9 +44,7 @@ fn test_quarantine_restore_flow() {
 
     // Restore the file.
     let restore_path = tmp.path().join("restored.exe");
-    vault
-        .restore(id, &restore_path)
-        .expect("restore failed");
+    vault.restore(id, &restore_path).expect("restore failed");
 
     // Restored file should have identical content.
     let restored_content = fs::read(&restore_path).expect("read restored file");
@@ -81,8 +77,7 @@ fn test_quarantine_stats() {
     let stats = vault.stats().expect("stats failed");
     assert_eq!(stats.count, 3, "should have 3 quarantined files");
     assert_eq!(
-        stats.total_size,
-        650,
+        stats.total_size, 650,
         "total size should be 100 + 200 + 350 = 650"
     );
 }
@@ -161,9 +156,7 @@ fn test_cleanup_expired() {
     for i in 0..4 {
         let path = tmp.path().join(format!("expired_{i}.bin"));
         fs::write(&path, format!("expired content {i}")).unwrap();
-        vault
-            .quarantine(&path, "Expired.Test")
-            .expect("quarantine");
+        vault.quarantine(&path, "Expired.Test").expect("quarantine");
     }
 
     assert_eq!(vault.list().unwrap().len(), 4);

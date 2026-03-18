@@ -235,8 +235,7 @@ impl PtraceTracer {
     ///
     /// Returns a list of all system calls that were observed.
     pub fn trace_child(cmd: &Path, args: &[&str], timeout: Duration) -> Result<Vec<SyscallEvent>> {
-        let c_cmd = CString::new(cmd.as_os_str().as_bytes())
-            .context("invalid command path")?;
+        let c_cmd = CString::new(cmd.as_os_str().as_bytes()).context("invalid command path")?;
 
         // Build the full argv: [cmd, args...]
         let mut argv: Vec<CString> = Vec::with_capacity(args.len() + 1);
@@ -268,18 +267,12 @@ impl PtraceTracer {
                 tracing::error!("execvp failed: {e}");
                 std::process::exit(127);
             }
-            ForkResult::Parent { child } => {
-                Self::trace_loop(child, timeout, start)
-            }
+            ForkResult::Parent { child } => Self::trace_loop(child, timeout, start),
         }
     }
 
     /// Main tracing loop in the parent process.
-    fn trace_loop(
-        child: Pid,
-        timeout: Duration,
-        start: Instant,
-    ) -> Result<Vec<SyscallEvent>> {
+    fn trace_loop(child: Pid, timeout: Duration, start: Instant) -> Result<Vec<SyscallEvent>> {
         let mut events = Vec::new();
         let mut in_syscall = false;
         let mut current_nr: u64 = 0;

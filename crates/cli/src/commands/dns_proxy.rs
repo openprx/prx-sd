@@ -39,10 +39,17 @@ pub async fn run(listen: &str, upstream: &str, log_path: &str, data_dir: &Path) 
         "Ctrl+C".bold(),
     );
 
-    let proxy = DnsProxy::new(config, data_dir).context("failed to initialise DNS proxy")?;
-
-    // Run the blocking event loop on a dedicated thread so tokio can still
-    // handle Ctrl+C.
-    let handle = tokio::task::spawn_blocking(move || proxy.run());
-    handle.await.context("DNS proxy task panicked")?
+    // Construct and run DnsProxy entirely inside a dedicated OS thread.
+    // adblock::Engine contains Rc (not Send), so the proxy cannot be
+    // moved across threads — it must be created where it runs.
+    let data_dir_owned = data_dir.to_path_buf();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    std::thread::spawn(move || {
+        let result = DnsProxy::new(config, &data_dir_owned)
+            .context("failed to initialise DNS proxy")
+            .and_then(|proxy| proxy.run());
+        let _ = tx.send(result);
+    });
+    rx.await
+        .context("DNS proxy thread terminated unexpectedly")?
 }

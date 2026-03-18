@@ -50,9 +50,7 @@ pub fn block_entropy(data: &[u8], block_size: usize) -> Vec<f64> {
         return Vec::new();
     }
 
-    data.chunks(block_size)
-        .map(shannon_entropy)
-        .collect()
+    data.chunks(block_size).map(shannon_entropy).collect()
 }
 
 #[cfg(test)]

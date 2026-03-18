@@ -100,7 +100,11 @@ async fn import_multiple_hashes_scan_detects_all() {
         .iter()
         .filter(|r| r.threat_level == ThreatLevel::Malicious)
         .collect();
-    assert_eq!(malicious.len(), 2, "both malware samples should be detected");
+    assert_eq!(
+        malicious.len(),
+        2,
+        "both malware samples should be detected"
+    );
 }
 
 #[tokio::test]

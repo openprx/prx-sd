@@ -6,7 +6,9 @@ use tokio::signal;
 
 use prx_sd_core::{ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_realtime::event::FileEvent;
-use prx_sd_realtime::protected_dirs::{ProtectedDirsConfig, ProtectedDirsEnforcer, ProtectionVerdict};
+use prx_sd_realtime::protected_dirs::{
+    ProtectedDirsConfig, ProtectedDirsEnforcer, ProtectionVerdict,
+};
 use prx_sd_realtime::ransomware::{RansomwareConfig, RansomwareDetector, RansomwareVerdict};
 
 /// Convert a `notify::Event` into zero or more [`FileEvent`]s.
@@ -93,10 +95,7 @@ fn send_notification(title: &str, body: &str) {
         let _ = std::process::Command::new("osascript")
             .args([
                 "-e",
-                &format!(
-                    "display notification \"{}\" with title \"{}\"",
-                    body, title
-                ),
+                &format!("display notification \"{}\" with title \"{}\"", body, title),
             ])
             .spawn();
     }
@@ -163,7 +162,10 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
 
     let manifest: UpdateManifest = match client.get(&manifest_url).send().await {
         Ok(resp) => match resp.error_for_status() {
-            Ok(resp) => resp.json().await.context("failed to parse update manifest")?,
+            Ok(resp) => resp
+                .json()
+                .await
+                .context("failed to parse update manifest")?,
             Err(e) => {
                 tracing::warn!(error = %e, "update server returned error");
                 return Ok(false);
@@ -276,26 +278,22 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
     let config = build_config(data_dir);
     let mut engine = ScanEngine::new(config).context("failed to initialise scan engine")?;
 
-    println!(
-        "{} Scan engine initialized",
-        ">>>".green().bold()
-    );
+    println!("{} Scan engine initialized", ">>>".green().bold());
 
     // 3. Start file system watcher.
     let (tx, mut rx) = tokio::sync::mpsc::channel::<notify::Event>(4096);
 
-    let mut watcher =
-        notify::recommended_watcher(move |res: std::result::Result<notify::Event, notify::Error>| {
-            match res {
-                Ok(event) => {
-                    let _ = tx.blocking_send(event);
-                }
-                Err(e) => {
-                    tracing::error!("watcher error: {e}");
-                }
+    let mut watcher = notify::recommended_watcher(
+        move |res: std::result::Result<notify::Event, notify::Error>| match res {
+            Ok(event) => {
+                let _ = tx.blocking_send(event);
             }
-        })
-        .context("failed to create file system watcher")?;
+            Err(e) => {
+                tracing::error!("watcher error: {e}");
+            }
+        },
+    )
+    .context("failed to create file system watcher")?;
 
     use notify::{RecursiveMode, Watcher};
     for p in &paths {

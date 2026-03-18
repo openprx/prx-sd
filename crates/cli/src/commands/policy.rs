@@ -19,8 +19,7 @@ fn show_policy(data_dir: &Path) -> Result<()> {
         RemediationPolicy::default()
     };
 
-    let json = serde_json::to_string_pretty(&policy)
-        .context("failed to serialize policy")?;
+    let json = serde_json::to_string_pretty(&policy).context("failed to serialize policy")?;
     println!("{json}");
     Ok(())
 }
@@ -55,20 +54,16 @@ fn set_policy(data_dir: &Path, key: &str, value: &str) -> Result<()> {
             policy.on_suspicious = parse_action_list(value)?;
         }
         "kill_processes" | "policy.kill_processes" => {
-            policy.kill_processes = value.parse::<bool>()
-                .context("expected true or false")?;
+            policy.kill_processes = value.parse::<bool>().context("expected true or false")?;
         }
         "clean_persistence" | "policy.clean_persistence" => {
-            policy.clean_persistence = value.parse::<bool>()
-                .context("expected true or false")?;
+            policy.clean_persistence = value.parse::<bool>().context("expected true or false")?;
         }
         "network_isolation" | "policy.network_isolation" => {
-            policy.network_isolation = value.parse::<bool>()
-                .context("expected true or false")?;
+            policy.network_isolation = value.parse::<bool>().context("expected true or false")?;
         }
         "audit_logging" | "policy.audit_logging" => {
-            policy.audit_logging = value.parse::<bool>()
-                .context("expected true or false")?;
+            policy.audit_logging = value.parse::<bool>().context("expected true or false")?;
         }
         _ => {
             anyhow::bail!(
@@ -114,7 +109,12 @@ fn parse_action_list(value: &str) -> Result<Vec<prx_sd_remediation::policy::Acti
     Ok(actions)
 }
 
-pub async fn run(action: &str, key: Option<&str>, value: Option<&str>, data_dir: &Path) -> Result<()> {
+pub async fn run(
+    action: &str,
+    key: Option<&str>,
+    value: Option<&str>,
+    data_dir: &Path,
+) -> Result<()> {
     match action {
         "show" => show_policy(data_dir),
         "reset" => reset_policy(data_dir),

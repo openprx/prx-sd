@@ -178,8 +178,7 @@ mod tests {
             user: "attacker".to_string(),
         };
         let json = serde_json::to_string(&info).expect("serialize");
-        let deserialized: ProcessInfo =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: ProcessInfo = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.pid, info.pid);
         assert_eq!(deserialized.name, info.name);
         assert_eq!(deserialized.cmdline, info.cmdline);

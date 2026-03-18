@@ -495,11 +495,7 @@ fn analyze_ole2_macros(data: &[u8]) -> Result<OfficeAnalysis> {
 }
 
 /// Scan byte content for VBA macro patterns and produce an [`OfficeAnalysis`].
-fn scan_vba_content(
-    content: &[u8],
-    has_macros: bool,
-    has_external_links: bool,
-) -> OfficeAnalysis {
+fn scan_vba_content(content: &[u8], has_macros: bool, has_external_links: bool) -> OfficeAnalysis {
     let text_lossy = String::from_utf8_lossy(content);
     let text_lower = text_lossy.to_lowercase();
 
@@ -754,7 +750,10 @@ mod tests {
         content.push_str("\nEnd Sub");
 
         let analysis = scan_vba_content(content.as_bytes(), true, false);
-        assert!(analysis.obfuscation_score > 0, "obfuscation score should be > 0");
+        assert!(
+            analysis.obfuscation_score > 0,
+            "obfuscation score should be > 0"
+        );
         assert!(
             analysis.obfuscation_score >= 25,
             "expected >= 25, got {}",
@@ -791,8 +790,13 @@ mod tests {
 
     #[test]
     fn macro_count_estimation() {
-        let content = b"Sub Foo()\nEnd Sub\nFunction Bar()\nEnd Function\nPrivate Sub Baz()\nEnd Sub";
+        let content =
+            b"Sub Foo()\nEnd Sub\nFunction Bar()\nEnd Function\nPrivate Sub Baz()\nEnd Sub";
         let analysis = scan_vba_content(content, true, false);
-        assert!(analysis.macro_count >= 3, "expected >= 3, got {}", analysis.macro_count);
+        assert!(
+            analysis.macro_count >= 3,
+            "expected >= 3, got {}",
+            analysis.macro_count
+        );
     }
 }

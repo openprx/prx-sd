@@ -79,8 +79,8 @@ pub fn extract_pe_features(info: &PeInfo, data: &[u8]) -> [f32; PE_FEATURE_DIM] 
     const IMAGE_SCN_MEM_WRITE: u32 = 0x8000_0000;
     const IMAGE_SCN_CNT_CODE: u32 = 0x0000_0020;
     f[13] = if info.sections.iter().any(|s| {
-        let is_code =
-            s.characteristics & IMAGE_SCN_CNT_CODE != 0 || s.characteristics & IMAGE_SCN_MEM_EXECUTE != 0;
+        let is_code = s.characteristics & IMAGE_SCN_CNT_CODE != 0
+            || s.characteristics & IMAGE_SCN_MEM_EXECUTE != 0;
         let is_write = s.characteristics & IMAGE_SCN_MEM_WRITE != 0;
         is_code && is_write
     }) {
@@ -111,18 +111,10 @@ pub fn extract_pe_features(info: &PeInfo, data: &[u8]) -> [f32; PE_FEATURE_DIM] 
     }
 
     // [24] num_zero_size_sections
-    f[24] = info
-        .sections
-        .iter()
-        .filter(|s| s.raw_size == 0)
-        .count() as f32;
+    f[24] = info.sections.iter().filter(|s| s.raw_size == 0).count() as f32;
 
     // [25] num_high_entropy_sections (>7.0)
-    f[25] = info
-        .sections
-        .iter()
-        .filter(|s| s.entropy > 7.0)
-        .count() as f32;
+    f[25] = info.sections.iter().filter(|s| s.entropy > 7.0).count() as f32;
 
     // [26-57] section entropy histogram (32 bins across [0,8])
     fill_entropy_histogram(&info.sections, &mut f[26..58], 32);
@@ -189,17 +181,20 @@ pub fn extract_elf_features(info: &ElfInfo, data: &[u8]) -> [f32; ELF_FEATURE_DI
     }
 
     // [11-16] suspicious Linux API counts
-    let linux_apis: [&str; 6] = ["ptrace", "mprotect", "memfd_create", "execveat", "socket", "connect"];
+    let linux_apis: [&str; 6] = [
+        "ptrace",
+        "mprotect",
+        "memfd_create",
+        "execveat",
+        "socket",
+        "connect",
+    ];
     for (idx, api) in linux_apis.iter().enumerate() {
         f[11 + idx] = info.symbols.iter().filter(|s| s.contains(api)).count() as f32;
     }
 
     // [17] num_high_entropy_sections
-    f[17] = info
-        .sections
-        .iter()
-        .filter(|s| s.entropy > 7.0)
-        .count() as f32;
+    f[17] = info.sections.iter().filter(|s| s.entropy > 7.0).count() as f32;
 
     // [18-41] section entropy histogram (24 bins)
     fill_entropy_histogram(&info.sections, &mut f[18..42], 24);
@@ -219,7 +214,9 @@ pub fn extract_elf_features(info: &ElfInfo, data: &[u8]) -> [f32; ELF_FEATURE_DI
     };
 
     // [44] has_crypto_symbols
-    let crypto_names = ["AES", "aes_", "SHA256", "sha256", "EVP_", "crypto_", "CRYPTO_"];
+    let crypto_names = [
+        "AES", "aes_", "SHA256", "sha256", "EVP_", "crypto_", "CRYPTO_",
+    ];
     f[44] = if info
         .symbols
         .iter()
@@ -352,10 +349,7 @@ mod tests {
             ],
             imports: vec![ImportInfo {
                 dll: "kernel32.dll".to_string(),
-                functions: vec![
-                    "GetProcAddress".to_string(),
-                    "VirtualAllocEx".to_string(),
-                ],
+                functions: vec!["GetProcAddress".to_string(), "VirtualAllocEx".to_string()],
             }],
             exports: vec!["DllMain".to_string()],
             imphash: "abcd1234".to_string(),
@@ -482,7 +476,10 @@ mod tests {
         let mut hist = [0.0f32; 32];
         fill_entropy_histogram(&sections, &mut hist, 32);
         let sum: f32 = hist.iter().sum();
-        assert!((sum - 1.0).abs() < 0.01, "histogram should sum to ~1.0, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 0.01,
+            "histogram should sum to ~1.0, got {sum}"
+        );
     }
 
     #[test]

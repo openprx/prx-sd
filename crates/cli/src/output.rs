@@ -27,10 +27,7 @@ pub fn print_scan_result(result: &ScanResult, colored: bool) {
         }
     };
 
-    let threat_info = result
-        .threat_name
-        .as_deref()
-        .unwrap_or("-");
+    let threat_info = result.threat_name.as_deref().unwrap_or("-");
 
     let detection = result
         .detection_type
@@ -77,10 +74,7 @@ pub fn print_scan_summary(results: &[ScanResult], elapsed_ms: u64) {
         println!("  Suspicious:    {suspicious}");
     }
     if malicious > 0 {
-        println!(
-            "  Malicious:     {}",
-            format!("{malicious}").red().bold()
-        );
+        println!("  Malicious:     {}", format!("{malicious}").red().bold());
     } else {
         println!("  Malicious:     {malicious}");
     }

@@ -44,18 +44,9 @@ pub fn parse_pe(data: &[u8]) -> Result<PeInfo> {
     let is_dll = pe.is_lib;
     let entry_point = pe.entry as u64;
 
-    let timestamp = pe
-        .header
-        .coff_header
-        .time_date_stamp;
+    let timestamp = pe.header.coff_header.time_date_stamp;
 
-    debug!(
-        is_64bit,
-        is_dll,
-        entry_point,
-        timestamp,
-        "parsed PE header"
-    );
+    debug!(is_64bit, is_dll, entry_point, timestamp, "parsed PE header");
 
     // Sections
     let sections: Vec<SectionInfo> = pe
@@ -362,7 +353,10 @@ mod tests {
             .find(|s| s.name == ".text")
             .expect("should have .text section");
         assert_eq!(text_section.raw_size, 512);
-        assert!(text_section.entropy > 0.0, "section with data should have non-zero entropy");
+        assert!(
+            text_section.entropy > 0.0,
+            "section with data should have non-zero entropy"
+        );
     }
 
     #[test]
@@ -372,11 +366,14 @@ mod tests {
         let section_raw_offset = {
             let pe_offset = u32::from_le_bytes([data[0x3C], data[0x3D], data[0x3E], data[0x3F]]);
             let coff = pe_offset as usize + 4;
-            let opt_size =
-                u16::from_le_bytes([data[coff + 16], data[coff + 17]]) as usize;
+            let opt_size = u16::from_le_bytes([data[coff + 16], data[coff + 17]]) as usize;
             let sec = coff + 20 + opt_size;
-            u32::from_le_bytes([data[sec + 20], data[sec + 21], data[sec + 22], data[sec + 23]])
-                as usize
+            u32::from_le_bytes([
+                data[sec + 20],
+                data[sec + 21],
+                data[sec + 22],
+                data[sec + 23],
+            ]) as usize
         };
         for i in 0..512 {
             data[section_raw_offset + i] = 0;

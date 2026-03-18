@@ -56,77 +56,307 @@ pub struct SuspiciousApiEntry {
 /// malicious behaviour the import is in isolation.
 pub static WINDOWS_SUSPICIOUS_APIS: &[SuspiciousApiEntry] = &[
     // ── Process Injection ──────────────────────────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "VirtualAlloc",            weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "VirtualAllocEx",          weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "WriteProcessMemory",      weight: 8 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "ReadProcessMemory",       weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "CreateRemoteThread",      weight: 9 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "CreateRemoteThreadEx",    weight: 9 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "NtUnmapViewOfSection",    weight: 8 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "QueueUserAPC",            weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "NtWriteVirtualMemory",    weight: 8 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "RtlCreateUserThread",     weight: 8 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "SetWindowsHookEx",        weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::ProcessInjection, name: "NtAllocateVirtualMemory", weight: 6 },
-
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "VirtualAlloc",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "VirtualAllocEx",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "WriteProcessMemory",
+        weight: 8,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "ReadProcessMemory",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "CreateRemoteThread",
+        weight: 9,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "CreateRemoteThreadEx",
+        weight: 9,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "NtUnmapViewOfSection",
+        weight: 8,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "QueueUserAPC",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "NtWriteVirtualMemory",
+        weight: 8,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "RtlCreateUserThread",
+        weight: 8,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "SetWindowsHookEx",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::ProcessInjection,
+        name: "NtAllocateVirtualMemory",
+        weight: 6,
+    },
     // ── Anti-Debug ─────────────────────────────────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "IsDebuggerPresent",              weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "CheckRemoteDebuggerPresent",     weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "NtQueryInformationProcess",      weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "OutputDebugStringA",             weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "OutputDebugStringW",             weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "NtSetInformationThread",         weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::AntiDebug, name: "NtQuerySystemInformation",       weight: 5 },
-
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "IsDebuggerPresent",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "CheckRemoteDebuggerPresent",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "NtQueryInformationProcess",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "OutputDebugStringA",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "OutputDebugStringW",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "NtSetInformationThread",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::AntiDebug,
+        name: "NtQuerySystemInformation",
+        weight: 5,
+    },
     // ── Persistence ────────────────────────────────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "RegSetValueExA",               weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "RegSetValueExW",               weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "RegOpenKeyExA",                weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "RegOpenKeyExW",                weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "CreateServiceA",               weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "CreateServiceW",               weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "RegCreateKeyExA",              weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::Persistence, name: "RegCreateKeyExW",              weight: 4 },
-
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "RegSetValueExA",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "RegSetValueExW",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "RegOpenKeyExA",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "RegOpenKeyExW",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "CreateServiceA",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "CreateServiceW",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "RegCreateKeyExA",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Persistence,
+        name: "RegCreateKeyExW",
+        weight: 4,
+    },
     // ── Network Exfiltration / C2 ──────────────────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "InternetOpenA",               weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "InternetOpenW",               weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "InternetOpenUrlA",            weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "InternetOpenUrlW",            weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "URLDownloadToFileA",          weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "URLDownloadToFileW",          weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "HttpSendRequestA",            weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "HttpSendRequestW",            weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "WinHttpOpen",                 weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "WinHttpSendRequest",          weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::NetworkExfil, name: "WSAStartup",                  weight: 3 },
-
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "InternetOpenA",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "InternetOpenW",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "InternetOpenUrlA",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "InternetOpenUrlW",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "URLDownloadToFileA",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "URLDownloadToFileW",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "HttpSendRequestA",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "HttpSendRequestW",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "WinHttpOpen",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "WinHttpSendRequest",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::NetworkExfil,
+        name: "WSAStartup",
+        weight: 3,
+    },
     // ── Crypto (ransomware indicators) ─────────────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptEncrypt",                      weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptDecrypt",                      weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptAcquireContextA",              weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptAcquireContextW",              weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptGenKey",                       weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptImportKey",                    weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "CryptDestroyKey",                   weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "BCryptEncrypt",                     weight: 6 },
-    SuspiciousApiEntry { category: ApiCategory::Crypto, name: "BCryptDecrypt",                     weight: 5 },
-
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptEncrypt",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptDecrypt",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptAcquireContextA",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptAcquireContextW",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptGenKey",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptImportKey",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "CryptDestroyKey",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "BCryptEncrypt",
+        weight: 6,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Crypto,
+        name: "BCryptDecrypt",
+        weight: 5,
+    },
     // ── Privilege Escalation ───────────────────────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::Privilege, name: "AdjustTokenPrivileges",          weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::Privilege, name: "OpenProcessToken",               weight: 5 },
-    SuspiciousApiEntry { category: ApiCategory::Privilege, name: "LookupPrivilegeValueA",          weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::Privilege, name: "LookupPrivilegeValueW",          weight: 4 },
-    SuspiciousApiEntry { category: ApiCategory::Privilege, name: "ImpersonateLoggedOnUser",        weight: 7 },
-    SuspiciousApiEntry { category: ApiCategory::Privilege, name: "DuplicateToken",                 weight: 5 },
-
+    SuspiciousApiEntry {
+        category: ApiCategory::Privilege,
+        name: "AdjustTokenPrivileges",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Privilege,
+        name: "OpenProcessToken",
+        weight: 5,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Privilege,
+        name: "LookupPrivilegeValueA",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Privilege,
+        name: "LookupPrivilegeValueW",
+        weight: 4,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Privilege,
+        name: "ImpersonateLoggedOnUser",
+        weight: 7,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::Privilege,
+        name: "DuplicateToken",
+        weight: 5,
+    },
     // ── Filesystem (suspicious usage patterns) ─────────────────────────
-    SuspiciousApiEntry { category: ApiCategory::FileSystem, name: "DeleteFileA",                   weight: 2 },
-    SuspiciousApiEntry { category: ApiCategory::FileSystem, name: "DeleteFileW",                   weight: 2 },
-    SuspiciousApiEntry { category: ApiCategory::FileSystem, name: "MoveFileExA",                   weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::FileSystem, name: "MoveFileExW",                   weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::FileSystem, name: "CreateFileMapping",             weight: 3 },
-    SuspiciousApiEntry { category: ApiCategory::FileSystem, name: "MapViewOfFile",                 weight: 3 },
+    SuspiciousApiEntry {
+        category: ApiCategory::FileSystem,
+        name: "DeleteFileA",
+        weight: 2,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::FileSystem,
+        name: "DeleteFileW",
+        weight: 2,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::FileSystem,
+        name: "MoveFileExA",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::FileSystem,
+        name: "MoveFileExW",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::FileSystem,
+        name: "CreateFileMapping",
+        weight: 3,
+    },
+    SuspiciousApiEntry {
+        category: ApiCategory::FileSystem,
+        name: "MapViewOfFile",
+        weight: 3,
+    },
 ];
 
 /// Suspicious Linux syscalls / libc calls commonly abused by malware.
@@ -158,9 +388,7 @@ pub static LINUX_SUSPICIOUS_CALLS: &[&str] = &[
 ///
 /// Returns a vector of `(category, api_name, weight)` tuples for every
 /// imported function that matches the known-suspicious catalogue.
-pub fn check_suspicious_imports(
-    imports: &[ImportInfo],
-) -> Vec<(ApiCategory, String, u32)> {
+pub fn check_suspicious_imports(imports: &[ImportInfo]) -> Vec<(ApiCategory, String, u32)> {
     let mut hits = Vec::new();
 
     for imp in imports {

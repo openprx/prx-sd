@@ -12,11 +12,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
     println!();
 
     // Version.
-    println!(
-        "  {:<22} {}",
-        "Version:".bold(),
-        env!("CARGO_PKG_VERSION")
-    );
+    println!("  {:<22} {}", "Version:".bold(), env!("CARGO_PKG_VERSION"));
 
     // Data directory.
     println!("  {:<22} {}", "Data directory:".bold(), data_dir.display());
@@ -25,43 +21,33 @@ pub async fn run(data_dir: &Path) -> Result<()> {
     let sig_dir = data_dir.join("signatures");
     if sig_dir.exists() {
         match SignatureDatabase::open(&sig_dir) {
-            Ok(db) => {
-                match db.get_stats() {
-                    Ok(stats) => {
-                        println!(
-                            "  {:<22} {}",
-                            "Signature DB version:".bold(),
-                            stats.version
-                        );
-                        println!(
-                            "  {:<22} {}",
-                            "SHA-256 hash count:".bold(),
-                            stats.hash_count
-                        );
-                        println!(
-                            "  {:<22} {}",
-                            "MD5 hash count:".bold(),
-                            stats.md5_count
-                        );
-                        if let Some(ts) = stats.last_update {
-                            let dt = chrono::DateTime::from_timestamp(ts, 0)
-                                .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-                                .unwrap_or_else(|| ts.to_string());
-                            println!("  {:<22} {}", "Last DB update:".bold(), dt);
-                        } else {
-                            println!("  {:<22} {}", "Last DB update:".bold(), "never".dimmed());
-                        }
-                    }
-                    Err(e) => {
-                        println!(
-                            "  {:<22} {} ({})",
-                            "Signature DB:".bold(),
-                            "error reading stats".red(),
-                            e
-                        );
+            Ok(db) => match db.get_stats() {
+                Ok(stats) => {
+                    println!("  {:<22} {}", "Signature DB version:".bold(), stats.version);
+                    println!(
+                        "  {:<22} {}",
+                        "SHA-256 hash count:".bold(),
+                        stats.hash_count
+                    );
+                    println!("  {:<22} {}", "MD5 hash count:".bold(), stats.md5_count);
+                    if let Some(ts) = stats.last_update {
+                        let dt = chrono::DateTime::from_timestamp(ts, 0)
+                            .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                            .unwrap_or_else(|| ts.to_string());
+                        println!("  {:<22} {}", "Last DB update:".bold(), dt);
+                    } else {
+                        println!("  {:<22} {}", "Last DB update:".bold(), "never".dimmed());
                     }
                 }
-            }
+                Err(e) => {
+                    println!(
+                        "  {:<22} {} ({})",
+                        "Signature DB:".bold(),
+                        "error reading stats".red(),
+                        e
+                    );
+                }
+            },
             Err(e) => {
                 println!(
                     "  {:<22} {} ({})",
@@ -72,11 +58,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             }
         }
     } else {
-        println!(
-            "  {:<22} {}",
-            "Signature DB:".bold(),
-            "not found".yellow()
-        );
+        println!("  {:<22} {}", "Signature DB:".bold(), "not found".yellow());
     }
 
     // YARA rules.
@@ -92,17 +74,9 @@ pub async fn run(data_dir: &Path) -> Result<()> {
                         .is_some_and(|ext| ext == "yar" || ext == "yara")
             })
             .count();
-        println!(
-            "  {:<22} {} file(s)",
-            "YARA rules:".bold(),
-            rule_count
-        );
+        println!("  {:<22} {} file(s)", "YARA rules:".bold(), rule_count);
     } else {
-        println!(
-            "  {:<22} {}",
-            "YARA rules:".bold(),
-            "not found".yellow()
-        );
+        println!("  {:<22} {}", "YARA rules:".bold(), "not found".yellow());
     }
 
     // Quarantine stats.
@@ -115,9 +89,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             for entry in entries.flatten() {
                 let path = entry.path();
                 // Count blob files (those without .meta.json extension).
-                if path.is_file()
-                    && !path.to_string_lossy().ends_with(".meta.json")
-                {
+                if path.is_file() && !path.to_string_lossy().ends_with(".meta.json") {
                     file_count += 1;
                     total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
                 }
@@ -131,17 +103,17 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             output::format_bytes(total_size)
         );
     } else {
-        println!(
-            "  {:<22} {}",
-            "Quarantine:".bold(),
-            "empty".dimmed()
-        );
+        println!("  {:<22} {}", "Quarantine:".bold(), "empty".dimmed());
     }
 
     // Platform info.
     println!();
     println!("  {:<22} {}", "OS:".bold(), std::env::consts::OS);
-    println!("  {:<22} {}", "Architecture:".bold(), std::env::consts::ARCH);
+    println!(
+        "  {:<22} {}",
+        "Architecture:".bold(),
+        std::env::consts::ARCH
+    );
 
     Ok(())
 }

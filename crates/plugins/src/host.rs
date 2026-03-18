@@ -47,8 +47,7 @@ mod inner {
             // Clamp memory: 1 page = 64 KiB
             let max_pages = (manifest.permissions.max_memory_mb as u64 * 1024 * 1024) / 65536;
             config.memory_reservation(max_pages * 65536);
-            let engine =
-                Engine::new(&config).context("failed to create wasmtime engine")?;
+            let engine = Engine::new(&config).context("failed to create wasmtime engine")?;
 
             let wasm_path = plugin_dir.join(&manifest.wasm_file);
             let module = Module::from_file(&engine, &wasm_path)
@@ -141,7 +140,11 @@ mod inner {
             let mut store = Store::new(&self.engine, state);
 
             // Convert max_exec_ms into fuel. Rough heuristic: 1 000 fuel per ms.
-            let fuel = self.manifest.permissions.max_exec_ms.saturating_mul(1_000_000);
+            let fuel = self
+                .manifest
+                .permissions
+                .max_exec_ms
+                .saturating_mul(1_000_000);
             store.set_fuel(fuel)?;
 
             let mut linker: Linker<PluginState> = Linker::new(&self.engine);
@@ -170,9 +173,9 @@ mod inner {
                     // current memory region.
                     let current_size = memory.data_size(&store);
                     let needed = current_size + file_data.len();
-                    let pages_needed =
-                        (needed as u64).saturating_sub(memory.data_size(&store) as u64)
-                            .div_ceil(65536);
+                    let pages_needed = (needed as u64)
+                        .saturating_sub(memory.data_size(&store) as u64)
+                        .div_ceil(65536);
                     if pages_needed > 0 {
                         memory
                             .grow(&mut store, pages_needed)
@@ -212,10 +215,7 @@ mod inner {
                     plugin_name: self.info.name.clone(),
                     threat_name: format!("Plugin.{}", self.info.name),
                     score,
-                    detail: format!(
-                        "Plugin '{}' returned threat score {score}",
-                        self.info.name
-                    ),
+                    detail: format!("Plugin '{}' returned threat score {score}", self.info.name),
                 });
             }
 

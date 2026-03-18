@@ -62,10 +62,7 @@ pub async fn run(
     let base_url = server_url.unwrap_or_else(|| load_server_url(data_dir));
     let local_version = read_local_version(data_dir);
 
-    println!(
-        "{} Checking for signature updates...",
-        ">>>".cyan().bold()
-    );
+    println!("{} Checking for signature updates...", ">>>".cyan().bold());
     println!("  Server:        {}", base_url);
     println!("  Local version: {}", local_version);
 

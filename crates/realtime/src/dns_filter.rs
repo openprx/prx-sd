@@ -12,9 +12,13 @@ use anyhow::{Context, Result};
 /// Platform-specific default path to the hosts file.
 fn default_hosts_path() -> &'static str {
     #[cfg(target_os = "windows")]
-    { r"C:\Windows\System32\drivers\etc\hosts" }
+    {
+        r"C:\Windows\System32\drivers\etc\hosts"
+    }
     #[cfg(not(target_os = "windows"))]
-    { "/etc/hosts" }
+    {
+        "/etc/hosts"
+    }
 }
 
 // ── Marker comment used to identify prx-sd entries in /etc/hosts ─────────────
@@ -263,8 +267,14 @@ mod tests {
         filter.add_domain("EVIL.COM.");
 
         // Should match regardless of case or trailing dot.
-        assert!(matches!(filter.check("evil.com"), DnsVerdict::Blocked { .. }));
-        assert!(matches!(filter.check("Evil.Com."), DnsVerdict::Blocked { .. }));
+        assert!(matches!(
+            filter.check("evil.com"),
+            DnsVerdict::Blocked { .. }
+        ));
+        assert!(matches!(
+            filter.check("Evil.Com."),
+            DnsVerdict::Blocked { .. }
+        ));
     }
 
     #[test]
@@ -272,7 +282,10 @@ mod tests {
         let mut filter = DnsFilter::new();
         filter.add_domain("malware.net");
         assert_eq!(filter.domain_count(), 1);
-        assert!(matches!(filter.check("malware.net"), DnsVerdict::Blocked { .. }));
+        assert!(matches!(
+            filter.check("malware.net"),
+            DnsVerdict::Blocked { .. }
+        ));
 
         filter.remove_domain("malware.net");
         assert_eq!(filter.domain_count(), 0);
@@ -303,9 +316,18 @@ mod tests {
 
         let filter = DnsFilter::load_blocklist(&blocklist_path).expect("load");
         assert_eq!(filter.domain_count(), 3);
-        assert!(matches!(filter.check("bad-domain.com"), DnsVerdict::Blocked { .. }));
-        assert!(matches!(filter.check("another-bad.org"), DnsVerdict::Blocked { .. }));
-        assert!(matches!(filter.check("spaced.net"), DnsVerdict::Blocked { .. }));
+        assert!(matches!(
+            filter.check("bad-domain.com"),
+            DnsVerdict::Blocked { .. }
+        ));
+        assert!(matches!(
+            filter.check("another-bad.org"),
+            DnsVerdict::Blocked { .. }
+        ));
+        assert!(matches!(
+            filter.check("spaced.net"),
+            DnsVerdict::Blocked { .. }
+        ));
         assert_eq!(filter.check("safe.com"), DnsVerdict::Allow);
     }
 
@@ -321,18 +343,16 @@ mod tests {
         let hosts_path = dir.path().join("hosts");
 
         // Write a minimal initial hosts file.
-        std::fs::write(
-            &hosts_path,
-            "127.0.0.1 localhost\n::1 localhost\n",
-        )
-        .expect("write hosts");
+        std::fs::write(&hosts_path, "127.0.0.1 localhost\n::1 localhost\n").expect("write hosts");
 
         let mut filter = DnsFilter::new();
         filter.add_domain("evil.com");
         filter.add_domain("malware.net");
 
         // Install blocking.
-        filter.install_hosts_blocking_at(&hosts_path).expect("install");
+        filter
+            .install_hosts_blocking_at(&hosts_path)
+            .expect("install");
         assert!(filter.is_hosts_active());
 
         let content = std::fs::read_to_string(&hosts_path).expect("read");
@@ -341,7 +361,9 @@ mod tests {
         assert!(content.contains("0.0.0.0 malware.net # prx-sd-dns-filter"));
 
         // Remove blocking.
-        filter.remove_hosts_blocking_at(&hosts_path).expect("remove");
+        filter
+            .remove_hosts_blocking_at(&hosts_path)
+            .expect("remove");
         assert!(!filter.is_hosts_active());
 
         let content = std::fs::read_to_string(&hosts_path).expect("read");
@@ -360,8 +382,12 @@ mod tests {
         filter.add_domain("evil.com");
 
         // Install twice.
-        filter.install_hosts_blocking_at(&hosts_path).expect("install 1");
-        filter.install_hosts_blocking_at(&hosts_path).expect("install 2");
+        filter
+            .install_hosts_blocking_at(&hosts_path)
+            .expect("install 1");
+        filter
+            .install_hosts_blocking_at(&hosts_path)
+            .expect("install 2");
 
         let content = std::fs::read_to_string(&hosts_path).expect("read");
         // Should only have one entry for evil.com, not two.

@@ -28,9 +28,7 @@ pub fn batch_restore(quarantine: &Quarantine, ids: &[QuarantineId]) -> Vec<Resul
 /// Each deletion is independent; failures for one file do not prevent
 /// deletion of the others. Returns one `Result` per ID.
 pub fn batch_delete(quarantine: &Quarantine, ids: &[QuarantineId]) -> Vec<Result<()>> {
-    ids.iter()
-        .map(|id| quarantine.delete(*id))
-        .collect()
+    ids.iter().map(|id| quarantine.delete(*id)).collect()
 }
 
 /// Delete quarantined files older than `max_age_days` days.

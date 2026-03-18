@@ -60,8 +60,7 @@ impl EmailConfig {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let content =
-            std::fs::read_to_string(&path).context("failed to read email_config.json")?;
+        let content = std::fs::read_to_string(&path).context("failed to read email_config.json")?;
         let config: Self =
             serde_json::from_str(&content).context("failed to parse email_config.json")?;
         Ok(config)
@@ -70,8 +69,8 @@ impl EmailConfig {
     /// Persist email configuration to `data_dir/email_config.json`.
     pub fn save(&self, data_dir: &Path) -> Result<()> {
         let path = data_dir.join(EMAIL_CONFIG_FILE);
-        let json = serde_json::to_string_pretty(self)
-            .context("failed to serialize email config")?;
+        let json =
+            serde_json::to_string_pretty(self).context("failed to serialize email config")?;
         std::fs::write(&path, json).context("failed to write email_config.json")?;
         Ok(())
     }
@@ -212,7 +211,10 @@ fn get_hostname() -> String {
 pub async fn run_configure(data_dir: &Path) -> Result<()> {
     let config_path = data_dir.join(EMAIL_CONFIG_FILE);
     if config_path.exists() {
-        println!("Email configuration already exists at: {}", config_path.display());
+        println!(
+            "Email configuration already exists at: {}",
+            config_path.display()
+        );
         println!("Edit the file directly or delete it and re-run this command.");
         let config = EmailConfig::load(data_dir)?;
         println!("\nCurrent settings:");
@@ -228,7 +230,10 @@ pub async fn run_configure(data_dir: &Path) -> Result<()> {
 
     let config = EmailConfig::default();
     config.save(data_dir)?;
-    println!("Created default email configuration at: {}", config_path.display());
+    println!(
+        "Created default email configuration at: {}",
+        config_path.display()
+    );
     println!("Edit the file to set your SMTP credentials and recipients.");
     println!("Then run 'sd email-alert test' to verify connectivity.");
     Ok(())
@@ -255,10 +260,7 @@ pub async fn run_test(data_dir: &Path) -> Result<()> {
         action_taken: "Test - no action taken".to_owned(),
     };
 
-    println!(
-        "Sending test alert to {} recipient(s)...",
-        config.to.len()
-    );
+    println!("Sending test alert to {} recipient(s)...", config.to.len());
 
     send_threat_alert(&config, &alert).await?;
     println!("Test email sent successfully.");

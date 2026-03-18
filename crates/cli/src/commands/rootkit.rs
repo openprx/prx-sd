@@ -78,11 +78,7 @@ fn print_result(result: &RootkitScanResult) {
 
     // LD_PRELOAD.
     if let Some(ref detail) = result.ld_preload_hijack {
-        println!(
-            "  {} LD_PRELOAD hijack: {}",
-            "[!!]".yellow().bold(),
-            detail
-        );
+        println!("  {} LD_PRELOAD hijack: {}", "[!!]".yellow().bold(), detail);
     } else {
         println!("  {} No LD_PRELOAD hijacking", "[OK]".green());
     }

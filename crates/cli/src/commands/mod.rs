@@ -10,11 +10,11 @@ pub mod integration;
 #[cfg(target_os = "linux")]
 pub mod memscan;
 pub mod policy;
-#[cfg(target_os = "linux")]
-pub mod rootkit;
 pub mod quarantine;
 pub mod realtime;
 pub mod report;
+#[cfg(target_os = "linux")]
+pub mod rootkit;
 pub mod scan;
 pub mod scan_usb;
 pub mod schedule;

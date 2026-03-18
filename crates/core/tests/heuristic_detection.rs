@@ -11,10 +11,7 @@ use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_signatures::SignatureDatabase;
 
 /// Build a `ScanEngine` with empty signatures and no YARA rules.
-fn setup_heuristic_only_engine(
-    tmp: &tempfile::TempDir,
-    threshold: u32,
-) -> ScanEngine {
+fn setup_heuristic_only_engine(tmp: &tempfile::TempDir, threshold: u32) -> ScanEngine {
     let sigs_dir = tmp.path().join("signatures");
     let yara_dir = tmp.path().join("yara");
     let quarantine_dir = tmp.path().join("quarantine");
@@ -51,7 +48,8 @@ fn generate_high_entropy_data(size: usize) -> Vec<u8> {
 /// Create a synthetic PE with high entropy + suspicious APIs (should trigger).
 fn make_suspicious_pe(apis: &[&str], high_entropy: bool) -> Vec<u8> {
     let mut pe = vec![0u8; 8192];
-    pe[0] = b'M'; pe[1] = b'Z';
+    pe[0] = b'M';
+    pe[1] = b'Z';
     pe[0x3C..0x40].copy_from_slice(&0x80u32.to_le_bytes());
     pe[0x80..0x84].copy_from_slice(b"PE\x00\x00");
     pe[0x84..0x86].copy_from_slice(&0x8664u16.to_le_bytes()); // AMD64
@@ -60,14 +58,14 @@ fn make_suspicious_pe(apis: &[&str], high_entropy: bool) -> Vec<u8> {
     pe[0x94..0x96].copy_from_slice(&0xF0u16.to_le_bytes()); // OptionalHeader size
     pe[0x96..0x98].copy_from_slice(&0x22u16.to_le_bytes()); // characteristics
     pe[0x98..0x9A].copy_from_slice(&0x20Bu16.to_le_bytes()); // PE32+
-    // Section header at 0x188
+                                                             // Section header at 0x188
     pe[0x188..0x190].copy_from_slice(b".text\x00\x00\x00");
     pe[0x1C4..0x1C8].copy_from_slice(&0xE0000020u32.to_le_bytes()); // R+W+X
-    // Write APIs
+                                                                    // Write APIs
     let mut off = 0x200;
     for api in apis {
         let bytes = api.as_bytes();
-        pe[off..off+bytes.len()].copy_from_slice(bytes);
+        pe[off..off + bytes.len()].copy_from_slice(bytes);
         off += bytes.len() + 1;
     }
     // Fill with entropy if requested
@@ -89,7 +87,12 @@ async fn pe_with_injection_apis_triggers_heuristic() {
     let engine = setup_heuristic_only_engine(&tmp, 60);
 
     let pe = make_suspicious_pe(
-        &["VirtualAllocEx", "WriteProcessMemory", "CreateRemoteThread", "cmd.exe"],
+        &[
+            "VirtualAllocEx",
+            "WriteProcessMemory",
+            "CreateRemoteThread",
+            "cmd.exe",
+        ],
         true,
     );
     let path = tmp.path().join("injector.exe");
@@ -99,7 +102,8 @@ async fn pe_with_injection_apis_triggers_heuristic() {
     assert!(
         result.threat_level >= ThreatLevel::Suspicious,
         "PE with injection APIs should be flagged, got {:?}: {:?}",
-        result.threat_level, result.details
+        result.threat_level,
+        result.details
     );
 }
 
@@ -128,7 +132,11 @@ async fn low_entropy_text_file_is_clean() {
     let engine = setup_heuristic_only_engine(&tmp, 60);
 
     let path = tmp.path().join("readme.txt");
-    fs::write(&path, "This is a normal readme file with typical text content.").unwrap();
+    fs::write(
+        &path,
+        "This is a normal readme file with typical text content.",
+    )
+    .unwrap();
 
     let result = engine.scan_file(&path).await.expect("scan");
     assert_eq!(result.threat_level, ThreatLevel::Clean);
@@ -164,8 +172,13 @@ fn pe_bytes_with_multiple_apis_flagged() {
     let engine = setup_heuristic_only_engine(&tmp, 60);
 
     let pe = make_suspicious_pe(
-        &["VirtualAllocEx", "WriteProcessMemory", "CreateRemoteThread",
-          "InternetOpenA", "URLDownloadToFile"],
+        &[
+            "VirtualAllocEx",
+            "WriteProcessMemory",
+            "CreateRemoteThread",
+            "InternetOpenA",
+            "URLDownloadToFile",
+        ],
         true,
     );
     let result = engine.scan_bytes(&pe, "suspicious-pe");

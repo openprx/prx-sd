@@ -100,13 +100,11 @@ fn yara_rule_detects_via_scan_bytes() {
     );
     assert_eq!(result.threat_level, ThreatLevel::Malicious);
     assert_eq!(result.detection_type, Some(DetectionType::YaraRule));
-    assert!(
-        result
-            .threat_name
-            .as_deref()
-            .unwrap_or("")
-            .contains("TestEvil"),
-    );
+    assert!(result
+        .threat_name
+        .as_deref()
+        .unwrap_or("")
+        .contains("TestEvil"),);
 }
 
 #[test]
@@ -115,7 +113,9 @@ fn clean_bytes_not_matched_by_yara() {
 
     let result = engine.scan_bytes(b"completely benign content", "clean-buf");
     assert_eq!(result.threat_level, ThreatLevel::Clean);
-    assert!(result.detection_type.is_none() || result.detection_type != Some(DetectionType::YaraRule));
+    assert!(
+        result.detection_type.is_none() || result.detection_type != Some(DetectionType::YaraRule)
+    );
 }
 
 #[test]
@@ -145,10 +145,5 @@ fn yara_directory_scan_mixed_files() {
         1,
         "exactly one file should be flagged as Malicious"
     );
-    assert!(
-        malicious[0]
-            .path
-            .to_string_lossy()
-            .contains("evil.bin"),
-    );
+    assert!(malicious[0].path.to_string_lossy().contains("evil.bin"),);
 }

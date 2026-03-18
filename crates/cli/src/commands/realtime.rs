@@ -6,7 +6,9 @@ use tokio::signal;
 
 use prx_sd_core::{ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_realtime::event::FileEvent;
-use prx_sd_realtime::protected_dirs::{ProtectedDirsConfig, ProtectedDirsEnforcer, ProtectionVerdict};
+use prx_sd_realtime::protected_dirs::{
+    ProtectedDirsConfig, ProtectedDirsEnforcer, ProtectionVerdict,
+};
 use prx_sd_realtime::ransomware::{RansomwareConfig, RansomwareDetector, RansomwareVerdict};
 
 /// Convert a `notify::Event` into zero or more [`FileEvent`]s.
@@ -84,23 +86,26 @@ pub async fn run(
     }
 
     if daemon {
-        println!("  {} running in foreground (daemon fork not implemented)", "Note:".yellow());
+        println!(
+            "  {} running in foreground (daemon fork not implemented)",
+            "Note:".yellow()
+        );
     }
 
     // Use the notify-based cross-platform watcher.
     // The prx-sd-realtime crate is a placeholder, so we use `notify` directly.
     let (tx, mut rx) = tokio::sync::mpsc::channel::<notify::Event>(4096);
 
-    let mut watcher = notify::recommended_watcher(move |res: std::result::Result<notify::Event, notify::Error>| {
-        match res {
+    let mut watcher = notify::recommended_watcher(
+        move |res: std::result::Result<notify::Event, notify::Error>| match res {
             Ok(event) => {
                 let _ = tx.blocking_send(event);
             }
             Err(e) => {
                 tracing::error!("watcher error: {e}");
             }
-        }
-    })
+        },
+    )
     .context("failed to create file system watcher")?;
 
     use notify::{RecursiveMode, Watcher};

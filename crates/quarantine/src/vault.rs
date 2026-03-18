@@ -75,8 +75,8 @@ impl Quarantine {
     /// Returns the unique [`QuarantineId`] assigned to the quarantined file.
     pub fn quarantine(&self, path: &Path, threat_name: &str) -> Result<QuarantineId> {
         let id = Uuid::new_v4();
-        let data = fs::read(path)
-            .with_context(|| format!("failed to read file: {}", path.display()))?;
+        let data =
+            fs::read(path).with_context(|| format!("failed to read file: {}", path.display()))?;
 
         // Compute SHA-256 of original contents.
         let mut hasher = Sha256::new();
@@ -91,16 +91,20 @@ impl Quarantine {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt the file contents.
-        let cipher = Aes256Gcm::new_from_slice(&self.key)
-            .context("failed to create AES-256-GCM cipher")?;
+        let cipher =
+            Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
         let ciphertext = cipher
             .encrypt(nonce, data.as_ref())
             .map_err(|e| anyhow::anyhow!("encryption failed: {e}"))?;
 
         // Write encrypted data.
         let encrypted_path = self.vault_dir.join(format!("{id}.enc"));
-        fs::write(&encrypted_path, &ciphertext)
-            .with_context(|| format!("failed to write encrypted file: {}", encrypted_path.display()))?;
+        fs::write(&encrypted_path, &ciphertext).with_context(|| {
+            format!(
+                "failed to write encrypted file: {}",
+                encrypted_path.display()
+            )
+        })?;
 
         // Write metadata.
         let meta = QuarantineMeta {
@@ -140,12 +144,16 @@ impl Quarantine {
         let meta = self.load_meta(id)?;
 
         let encrypted_path = self.vault_dir.join(format!("{id}.enc"));
-        let ciphertext = fs::read(&encrypted_path)
-            .with_context(|| format!("failed to read encrypted file: {}", encrypted_path.display()))?;
+        let ciphertext = fs::read(&encrypted_path).with_context(|| {
+            format!(
+                "failed to read encrypted file: {}",
+                encrypted_path.display()
+            )
+        })?;
 
         let nonce = Nonce::from_slice(&meta.nonce);
-        let cipher = Aes256Gcm::new_from_slice(&self.key)
-            .context("failed to create AES-256-GCM cipher")?;
+        let cipher =
+            Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
         let plaintext = cipher
             .decrypt(nonce, ciphertext.as_ref())
             .map_err(|e| anyhow::anyhow!("decryption failed: {e}"))?;

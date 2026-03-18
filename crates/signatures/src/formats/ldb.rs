@@ -10,7 +10,7 @@
 //! - **LogicalExpression**: e.g., `0&1`, `0|1&2`, `0&1|2`.
 //! - **SubSigN**: hex patterns or other subsignature specifiers.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 
 /// A parsed LDB logical signature.
 #[derive(Debug, Clone)]
@@ -62,10 +62,7 @@ pub fn parse_ldb(content: &str) -> Result<Vec<LdbSignature>> {
         let subsignatures: Vec<String> = parts[3..].iter().map(|s| s.to_string()).collect();
 
         if subsignatures.is_empty() {
-            bail!(
-                "LDB line {}: no subsignatures provided",
-                line_num + 1
-            );
+            bail!("LDB line {}: no subsignatures provided", line_num + 1);
         }
 
         signatures.push(LdbSignature {

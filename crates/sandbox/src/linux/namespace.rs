@@ -28,10 +28,7 @@ pub struct NamespaceSandbox {
 impl NamespaceSandbox {
     /// Create a new namespace sandbox from the given configuration.
     pub fn new(config: &SandboxConfig) -> Result<Self> {
-        let root_dir = std::env::temp_dir().join(format!(
-            "prx-sandbox-{}",
-            std::process::id()
-        ));
+        let root_dir = std::env::temp_dir().join(format!("prx-sandbox-{}", std::process::id()));
 
         std::fs::create_dir_all(&root_dir)
             .with_context(|| format!("failed to create sandbox root: {}", root_dir.display()))?;
@@ -53,12 +50,7 @@ impl NamespaceSandbox {
     /// Uses `libc::clone` with `CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWUSER`
     /// to create a fully isolated child process. The child sets up its mount namespace,
     /// applies seccomp filters, and then exec's the target binary.
-    pub fn execute(
-        &self,
-        cmd: &Path,
-        args: &[&str],
-        timeout: Duration,
-    ) -> Result<SandboxResult> {
+    pub fn execute(&self, cmd: &Path, args: &[&str], timeout: Duration) -> Result<SandboxResult> {
         let cmd_str = cmd.to_string_lossy().to_string();
         let args_owned: Vec<String> = args.iter().map(|a| a.to_string()).collect();
         let root_dir = self.root_dir.clone();
@@ -112,7 +104,8 @@ impl NamespaceSandbox {
             // Clean up the leaked closure on error.
             // SAFETY: clone failed, so clone_callback was never called and the pointer is still valid.
             let _ = unsafe { Box::from_raw(child_fn_ptr) };
-            return Err(std::io::Error::last_os_error()).context("clone() with namespace flags failed");
+            return Err(std::io::Error::last_os_error())
+                .context("clone() with namespace flags failed");
         }
 
         let pid = nix::unistd::Pid::from_raw(child_pid);
@@ -189,7 +182,9 @@ impl NamespaceSandbox {
 
         // Apply seccomp filter for additional protection.
         let seccomp = super::seccomp::SeccompFilter::new();
-        seccomp.apply().context("failed to apply seccomp in namespace child")?;
+        seccomp
+            .apply()
+            .context("failed to apply seccomp in namespace child")?;
 
         // Build C strings for execve.
         let c_cmd = CString::new(cmd).context("invalid command for execve")?;
@@ -210,8 +205,8 @@ impl NamespaceSandbox {
         use std::ffi::CString;
 
         // Mount tmpfs on the sandbox root.
-        let c_root = CString::new(root_dir.as_os_str().as_encoded_bytes())
-            .context("invalid root path")?;
+        let c_root =
+            CString::new(root_dir.as_os_str().as_encoded_bytes()).context("invalid root path")?;
         let c_tmpfs = CString::new("tmpfs").context("CString creation failed")?;
         let c_none = CString::new("").context("CString creation failed")?;
 
@@ -240,8 +235,9 @@ impl NamespaceSandbox {
         // Process bind mounts.
         for (src, dest) in bind_mounts {
             let target = root_dir.join(dest);
-            std::fs::create_dir_all(&target)
-                .with_context(|| format!("failed to create bind mount target: {}", target.display()))?;
+            std::fs::create_dir_all(&target).with_context(|| {
+                format!("failed to create bind mount target: {}", target.display())
+            })?;
 
             let c_src = CString::new(src.as_os_str().as_encoded_bytes())
                 .with_context(|| format!("invalid bind mount source: {}", src.display()))?;
@@ -260,7 +256,11 @@ impl NamespaceSandbox {
             };
             if ret != 0 {
                 return Err(std::io::Error::last_os_error()).with_context(|| {
-                    format!("bind mount {} -> {} failed", src.display(), target.display())
+                    format!(
+                        "bind mount {} -> {} failed",
+                        src.display(),
+                        target.display()
+                    )
                 });
             }
         }

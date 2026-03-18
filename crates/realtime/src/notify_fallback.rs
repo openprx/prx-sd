@@ -101,10 +101,7 @@ impl FileSystemMonitor for NotifyMonitor {
         self.running.store(true, Ordering::Release);
         self.watcher = Some(watcher);
 
-        tracing::info!(
-            "notify monitor started, watching {} path(s)",
-            paths.len()
-        );
+        tracing::info!("notify monitor started, watching {} path(s)", paths.len());
 
         Ok(())
     }

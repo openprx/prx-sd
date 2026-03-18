@@ -106,10 +106,10 @@ fn match_credential_theft(result: &SandboxResult) -> bool {
         ".ssh/id_dsa",
         ".ssh/authorized_keys",
         ".ssh/known_hosts",
-        "Login Data",          // Chrome passwords
-        "logins.json",         // Firefox passwords
-        "key3.db",             // Firefox key store
-        "key4.db",             // Firefox key store
+        "Login Data",  // Chrome passwords
+        "logins.json", // Firefox passwords
+        "key3.db",     // Firefox key store
+        "key4.db",     // Firefox key store
         ".aws/credentials",
         ".config/gcloud",
         ".kube/config",
@@ -117,7 +117,7 @@ fn match_credential_theft(result: &SandboxResult) -> bool {
         ".gnupg/",
         ".netrc",
         "/etc/krb5.keytab",
-        "wallet.dat",          // cryptocurrency wallets
+        "wallet.dat", // cryptocurrency wallets
     ];
 
     result.file_operations.iter().any(|f| {
@@ -216,9 +216,7 @@ fn match_persistence_install(result: &SandboxResult) -> bool {
 
     result.file_operations.iter().any(|f| {
         matches!(f.op, FileOpType::Write | FileOpType::Create)
-            && PERSISTENCE_PATHS
-                .iter()
-                .any(|pp| f.path.contains(pp))
+            && PERSISTENCE_PATHS.iter().any(|pp| f.path.contains(pp))
     })
 }
 
@@ -306,9 +304,10 @@ fn match_data_exfiltration(result: &SandboxResult) -> bool {
         .count()
         >= 3;
 
-    let has_network_send = result.network_attempts.iter().any(|n| {
-        n.port > 0 || !n.address.is_empty()
-    });
+    let has_network_send = result
+        .network_attempts
+        .iter()
+        .any(|n| n.port > 0 || !n.address.is_empty());
 
     // Also check for sendto/write-to-socket syscalls after file reads.
     let has_send_syscall = result
@@ -341,9 +340,10 @@ fn match_privilege_escalation(result: &SandboxResult) -> bool {
         .any(|s| s.name == "capset" || s.name == "prctl");
 
     // Check for SUID/SGID file creation (chmod with setuid bit).
-    let has_suid_create = result.file_operations.iter().any(|f| {
-        matches!(f.op, FileOpType::Chmod) && f.path.contains("suid")
-    });
+    let has_suid_create = result
+        .file_operations
+        .iter()
+        .any(|f| matches!(f.op, FileOpType::Chmod) && f.path.contains("suid"));
 
     has_setuid || has_suid_create || (has_cap_change && has_setuid)
 }
@@ -365,10 +365,7 @@ fn match_lateral_movement(result: &SandboxResult) -> bool {
     });
 
     // Check for SSH port connections (port 22).
-    let has_ssh_connect = result
-        .network_attempts
-        .iter()
-        .any(|n| n.port == 22);
+    let has_ssh_connect = result.network_attempts.iter().any(|n| n.port == 22);
 
     // Check for port scanning behavior: many connections to different ports.
     let unique_ports: std::collections::HashSet<u16> = result

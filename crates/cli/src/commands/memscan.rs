@@ -37,8 +37,7 @@ pub async fn run(pid: Option<u32>, json: bool, data_dir: &Path) -> Result<()> {
     let elapsed = start.elapsed().as_millis() as u64;
 
     if json {
-        let out = serde_json::to_string_pretty(&results)
-            .context("failed to serialize results")?;
+        let out = serde_json::to_string_pretty(&results).context("failed to serialize results")?;
         println!("{out}");
     } else {
         print_results(&results);

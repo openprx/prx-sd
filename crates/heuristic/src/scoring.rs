@@ -139,9 +139,9 @@ mod tests {
     #[test]
     fn combined_findings_malicious() {
         let findings = vec![
-            Finding::HighEntropy(7.9),           // 30
+            Finding::HighEntropy(7.9),             // 30
             Finding::PackerDetected("UPX".into()), // 20
-            Finding::AntiDebug,                  // 20
+            Finding::AntiDebug,                    // 20
         ];
         let (score, level) = aggregate_score(&findings);
         assert_eq!(score, 70);
@@ -152,7 +152,10 @@ mod tests {
     fn score_capped_at_100() {
         let findings = vec![
             Finding::HighEntropy(7.9),
-            Finding::PackedSection { name: "s".into(), entropy: 7.8 },
+            Finding::PackedSection {
+                name: "s".into(),
+                entropy: 7.8,
+            },
             Finding::PackerDetected("UPX".into()),
             Finding::AntiDebug,
             Finding::WritableCodeSection,

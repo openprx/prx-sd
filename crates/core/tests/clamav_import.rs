@@ -14,9 +14,7 @@ use prx_sd_signatures::{import_cvd_bytes, SignatureDatabase};
 ///
 /// Returns `(cvd_bytes, md5_hex, sig_name)` where `md5_hex` is the hex-encoded
 /// MD5 hash embedded in the HDB file.
-fn build_synthetic_cvd(
-    samples: &[(&[u8], &str)],
-) -> (Vec<u8>, Vec<(String, String)>) {
+fn build_synthetic_cvd(samples: &[(&[u8], &str)]) -> (Vec<u8>, Vec<(String, String)>) {
     // Compute MD5 hex strings for each sample.
     let entries: Vec<(String, String)> = samples
         .iter()
@@ -119,9 +117,7 @@ async fn import_cvd_then_scan_with_sha256_fallback() {
     let malware_data = b"cvd_integration_test_malware_payload";
 
     // Import via CVD (MD5 path).
-    let (cvd_bytes, _entries) = build_synthetic_cvd(&[
-        (malware_data, "ClamAV.Test.Payload"),
-    ]);
+    let (cvd_bytes, _entries) = build_synthetic_cvd(&[(malware_data, "ClamAV.Test.Payload")]);
     let stats = import_cvd_bytes(&cvd_bytes, &db).expect("import CVD");
     assert_eq!(stats.md5_imported, 1);
 
@@ -146,13 +142,11 @@ async fn import_cvd_then_scan_with_sha256_fallback() {
     let result = engine.scan_file(&evil_path).await.expect("scan");
     assert_eq!(result.threat_level, ThreatLevel::Malicious);
     assert_eq!(result.detection_type, Some(DetectionType::Hash));
-    assert!(
-        result
-            .threat_name
-            .as_deref()
-            .unwrap_or("")
-            .contains("ClamAV.Test.Payload"),
-    );
+    assert!(result
+        .threat_name
+        .as_deref()
+        .unwrap_or("")
+        .contains("ClamAV.Test.Payload"),);
 }
 
 #[test]

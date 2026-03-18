@@ -4,7 +4,7 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::fs;
 
 /// Helper: create a temp data directory with the minimal structure
@@ -133,11 +133,7 @@ fn info_command_exits_success() {
     let data_dir = setup_data_dir();
 
     sd_cmd()
-        .args([
-            "--data-dir",
-            data_dir.path().to_str().unwrap(),
-            "info",
-        ])
+        .args(["--data-dir", data_dir.path().to_str().unwrap(), "info"])
         .assert()
         .success();
 }
@@ -357,8 +353,14 @@ fn scan_with_report_generates_html() {
     assert!(report_path.exists(), "HTML report file must exist");
     let html = fs::read_to_string(&report_path).unwrap();
     assert!(html.contains("<!DOCTYPE html>"), "report must be HTML");
-    assert!(html.contains("PRX-SD Scan Report"), "report must have title");
-    assert!(html.contains("Total Files"), "report must show summary stats");
+    assert!(
+        html.contains("PRX-SD Scan Report"),
+        "report must have title"
+    );
+    assert!(
+        html.contains("Total Files"),
+        "report must show summary stats"
+    );
 }
 
 /// 5. Policy show → set → show (verify change) → reset.

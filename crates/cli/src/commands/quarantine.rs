@@ -51,9 +51,7 @@ fn cmd_list(data_dir: &Path) -> Result<()> {
                 id.to_string().chars().take(8).collect::<String>(),
                 meta.original_path.display().to_string(),
                 meta.threat_name.clone(),
-                meta.quarantine_time
-                    .format("%Y-%m-%dT%H:%M:%S")
-                    .to_string(),
+                meta.quarantine_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
                 output::format_bytes(meta.file_size),
             ]
         })
@@ -127,11 +125,7 @@ fn cmd_delete(data_dir: &Path, id: &str) -> Result<()> {
     }
 
     q.delete(*full_id)?;
-    println!(
-        "{} Deleted quarantine entry {}",
-        "OK".green().bold(),
-        id
-    );
+    println!("{} Deleted quarantine entry {}", "OK".green().bold(), id);
     Ok(())
 }
 

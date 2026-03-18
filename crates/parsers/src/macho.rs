@@ -89,9 +89,7 @@ fn parse_single_macho(macho: &goblin::mach::MachO, data: &[u8]) -> Result<MachOI
 
                     let offset = section.offset as usize;
                     let size = section.size as usize;
-                    let section_data = data
-                        .get(offset..offset.saturating_add(size))
-                        .unwrap_or(&[]);
+                    let section_data = data.get(offset..offset.saturating_add(size)).unwrap_or(&[]);
                     let entropy = shannon_entropy(section_data);
 
                     SectionInfo {

@@ -173,9 +173,7 @@ impl SignatureDatabase {
             .meta_db
             .get(&rtxn, META_KEY_VERSION)?
             .map(|bytes| {
-                let arr: [u8; 8] = bytes
-                    .try_into()
-                    .unwrap_or([0u8; 8]);
+                let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
                 u64::from_le_bytes(arr)
             })
             .unwrap_or(0);
@@ -204,22 +202,15 @@ impl SignatureDatabase {
             .meta_db
             .get(&rtxn, META_KEY_VERSION)?
             .map(|bytes| {
-                let arr: [u8; 8] = bytes
-                    .try_into()
-                    .unwrap_or([0u8; 8]);
+                let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
                 u64::from_le_bytes(arr)
             })
             .unwrap_or(0);
 
-        let last_update = self
-            .meta_db
-            .get(&rtxn, META_KEY_LAST_UPDATE)?
-            .map(|bytes| {
-                let arr: [u8; 8] = bytes
-                    .try_into()
-                    .unwrap_or([0u8; 8]);
-                i64::from_le_bytes(arr)
-            });
+        let last_update = self.meta_db.get(&rtxn, META_KEY_LAST_UPDATE)?.map(|bytes| {
+            let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
+            i64::from_le_bytes(arr)
+        });
 
         Ok(DbStats {
             hash_count,

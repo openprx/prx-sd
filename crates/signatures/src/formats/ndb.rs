@@ -11,7 +11,7 @@
 //! - **Offset**: `*` (any), absolute number, `EP+n`/`EP-n`, `EOF-n`, `SE<section>`.
 //! - **HexSignature**: hex-encoded byte pattern.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 
 /// A parsed NDB hex signature.
 #[derive(Debug, Clone)]
@@ -64,9 +64,13 @@ pub fn parse_ndb(content: &str) -> Result<Vec<NdbSignature>> {
 
         let name = parts[0].to_string();
 
-        let target_type = parts[1]
-            .parse::<u32>()
-            .with_context(|| format!("NDB line {}: invalid target type '{}'", line_num + 1, parts[1]))?;
+        let target_type = parts[1].parse::<u32>().with_context(|| {
+            format!(
+                "NDB line {}: invalid target type '{}'",
+                line_num + 1,
+                parts[1]
+            )
+        })?;
 
         let offset = parse_offset(parts[2])
             .with_context(|| format!("NDB line {}: invalid offset '{}'", line_num + 1, parts[2]))?;
@@ -122,7 +126,9 @@ fn parse_offset(s: &str) -> Result<NdbOffset> {
     }
 
     // Absolute offset (plain number)
-    let n = s.parse::<u64>().with_context(|| format!("invalid offset: '{s}'"))?;
+    let n = s
+        .parse::<u64>()
+        .with_context(|| format!("invalid offset: '{s}'"))?;
     Ok(NdbOffset::Absolute(n))
 }
 

@@ -76,12 +76,7 @@ impl EnhancedSandbox {
     /// 4. Trace syscalls via ptrace.
     /// 5. Analyse the collected trace.
     #[cfg(target_os = "linux")]
-    pub fn execute(
-        &self,
-        path: &Path,
-        args: &[&str],
-        timeout: Duration,
-    ) -> Result<SandboxResult> {
+    pub fn execute(&self, path: &Path, args: &[&str], timeout: Duration) -> Result<SandboxResult> {
         let start = std::time::Instant::now();
 
         // Build a basic SandboxConfig for the underlying namespace sandbox.
@@ -96,8 +91,7 @@ impl EnhancedSandbox {
         Self::set_resource_limits(&self.config)?;
 
         // Use the existing namespace sandbox for the heavy lifting.
-        let mut ns_sandbox =
-            crate::linux::namespace::NamespaceSandbox::new(&sandbox_config)?;
+        let mut ns_sandbox = crate::linux::namespace::NamespaceSandbox::new(&sandbox_config)?;
 
         // Add writable paths as bind mounts.
         for wpath in &self.config.writable_paths {
@@ -147,11 +141,7 @@ impl EnhancedSandbox {
         use libc::{RLIMIT_AS, RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_NOFILE, RLIMIT_NPROC};
 
         let limits: Vec<(libc::__rlimit_resource_t, libc::rlim_t, &str)> = vec![
-            (
-                RLIMIT_AS,
-                config.memory_limit_mb * 1024 * 1024,
-                "RLIMIT_AS",
-            ),
+            (RLIMIT_AS, config.memory_limit_mb * 1024 * 1024, "RLIMIT_AS"),
             (RLIMIT_CPU, config.cpu_time_limit_secs, "RLIMIT_CPU"),
             (
                 RLIMIT_NPROC,

@@ -13,9 +13,7 @@ use prx_sd_quarantine::Quarantine;
 use crate::audit::AuditLogger;
 use crate::common::find_processes_using_file;
 use crate::policy::{ActionType, RemediationPolicy};
-use crate::{
-    PersistenceType, RemediationAction, RemediationResult, ThreatAuditRecord,
-};
+use crate::{PersistenceType, RemediationAction, RemediationResult, ThreatAuditRecord};
 
 /// Main remediation engine that coordinates all post-detection actions.
 pub struct RemediationEngine {
@@ -64,10 +62,7 @@ impl RemediationEngine {
         // 1. Check whitelist
         // Compute hash for whitelist check
         let hash = compute_sha256(file_path);
-        if self
-            .policy
-            .is_whitelisted(file_path, hash.as_deref())
-        {
+        if self.policy.is_whitelisted(file_path, hash.as_deref()) {
             tracing::info!(
                 path = %file_path.display(),
                 "file is whitelisted, skipping remediation"
@@ -109,9 +104,7 @@ impl RemediationEngine {
                     }
                 }
                 ActionType::Delete => self.delete_file(file_path),
-                ActionType::Block => {
-                    RemediationResult::success(RemediationAction::Blocked)
-                }
+                ActionType::Block => RemediationResult::success(RemediationAction::Blocked),
                 ActionType::NetworkIsolate => {
                     if self.policy.network_isolation {
                         self.isolate_network()
@@ -479,20 +472,18 @@ impl RemediationEngine {
         {
             match crate::linux::isolate_network_iptables() {
                 Ok(()) => RemediationResult::success(RemediationAction::NetworkIsolated),
-                Err(e) => RemediationResult::failure(
-                    RemediationAction::NetworkIsolated,
-                    format!("{}", e),
-                ),
+                Err(e) => {
+                    RemediationResult::failure(RemediationAction::NetworkIsolated, format!("{}", e))
+                }
             }
         }
         #[cfg(target_os = "macos")]
         {
             match crate::macos::isolate_network_pf() {
                 Ok(()) => RemediationResult::success(RemediationAction::NetworkIsolated),
-                Err(e) => RemediationResult::failure(
-                    RemediationAction::NetworkIsolated,
-                    format!("{}", e),
-                ),
+                Err(e) => {
+                    RemediationResult::failure(RemediationAction::NetworkIsolated, format!("{}", e))
+                }
             }
         }
         #[cfg(target_os = "windows")]
@@ -678,11 +669,9 @@ mod tests {
     fn create_engine(dir: &std::path::Path) -> RemediationEngine {
         let vault_dir = dir.join("vault");
         let audit_dir = dir.join("audit");
-        let quarantine =
-            Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
+        let quarantine = Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
         let policy = RemediationPolicy::default();
-        RemediationEngine::new(policy, quarantine, audit_dir)
-            .expect("create engine")
+        RemediationEngine::new(policy, quarantine, audit_dir).expect("create engine")
     }
 
     #[test]
@@ -698,14 +687,12 @@ mod tests {
         let dir = tempfile::tempdir().expect("create tempdir");
         let vault_dir = dir.path().join("vault");
         let audit_dir = dir.path().join("audit");
-        let quarantine =
-            Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
+        let quarantine = Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
         let policy = RemediationPolicy {
             whitelist_paths: vec!["/safe/dir".to_string()],
             ..RemediationPolicy::default()
         };
-        let engine = RemediationEngine::new(policy, quarantine, audit_dir)
-            .expect("create engine");
+        let engine = RemediationEngine::new(policy, quarantine, audit_dir).expect("create engine");
 
         let results = engine
             .handle_threat(
@@ -718,10 +705,7 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
-        assert!(matches!(
-            results[0].action,
-            RemediationAction::Whitelisted
-        ));
+        assert!(matches!(results[0].action, RemediationAction::Whitelisted));
     }
 
     #[tokio::test]
@@ -734,8 +718,7 @@ mod tests {
         let malware_path = dir.path().join("malware.exe");
         std::fs::write(&malware_path, b"fake malware content").expect("write test file");
 
-        let quarantine =
-            Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
+        let quarantine = Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
         let policy = RemediationPolicy {
             // Simplify to just Report + AddToBlocklist for testability
             on_malicious: vec![
@@ -746,8 +729,7 @@ mod tests {
             clean_persistence: false,
             ..RemediationPolicy::default()
         };
-        let engine = RemediationEngine::new(policy, quarantine, audit_dir)
-            .expect("create engine");
+        let engine = RemediationEngine::new(policy, quarantine, audit_dir).expect("create engine");
 
         let results = engine
             .handle_threat(&malware_path, "TestMalware", "malicious", "hash")
@@ -770,11 +752,9 @@ mod tests {
         let suspicious_file = dir.path().join("suspicious.exe");
         std::fs::write(&suspicious_file, b"suspicious content").expect("write");
 
-        let quarantine =
-            Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
+        let quarantine = Arc::new(Quarantine::new(vault_dir).expect("create quarantine"));
         let policy = RemediationPolicy::default();
-        let engine = RemediationEngine::new(policy, quarantine, audit_dir)
-            .expect("create engine");
+        let engine = RemediationEngine::new(policy, quarantine, audit_dir).expect("create engine");
 
         let results = engine
             .handle_threat(

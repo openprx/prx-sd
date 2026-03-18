@@ -12,7 +12,7 @@
 //!
 //! `FileSize` may be `*` (match any size) or a decimal byte count.
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 
 /// A parsed hash-based signature entry.
 #[derive(Debug, Clone)]

@@ -51,8 +51,7 @@ impl WebhookConfig {
                 webhooks: Vec::new(),
             });
         }
-        let content =
-            std::fs::read_to_string(&path).context("failed to read webhooks.json")?;
+        let content = std::fs::read_to_string(&path).context("failed to read webhooks.json")?;
         let config: Self =
             serde_json::from_str(&content).context("failed to parse webhooks.json")?;
         Ok(config)
@@ -61,8 +60,8 @@ impl WebhookConfig {
     /// Persist webhook configuration to `data_dir/webhooks.json`.
     pub fn save(&self, data_dir: &Path) -> Result<()> {
         let path = data_dir.join(WEBHOOK_FILE);
-        let json = serde_json::to_string_pretty(self)
-            .context("failed to serialize webhook config")?;
+        let json =
+            serde_json::to_string_pretty(self).context("failed to serialize webhook config")?;
         std::fs::write(&path, json).context("failed to write webhooks.json")?;
         Ok(())
     }
@@ -233,21 +232,13 @@ pub async fn run_list(data_dir: &Path) -> Result<()> {
 }
 
 /// Add a new webhook endpoint.
-pub async fn run_add(
-    name: &str,
-    url: &str,
-    format: &str,
-    data_dir: &Path,
-) -> Result<()> {
+pub async fn run_add(name: &str, url: &str, format: &str, data_dir: &Path) -> Result<()> {
     let fmt = parse_format(format)?;
     let mut config = WebhookConfig::load(data_dir)?;
 
     // Check for duplicate names.
     if config.webhooks.iter().any(|w| w.name == name) {
-        return Err(anyhow::anyhow!(
-            "a webhook named '{}' already exists",
-            name
-        ));
+        return Err(anyhow::anyhow!("a webhook named '{}' already exists", name));
     }
 
     config.webhooks.push(WebhookEndpoint {

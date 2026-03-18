@@ -10,9 +10,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
 #[cfg(feature = "onnx")]
 use tracing::warn;
+use tracing::{debug, info};
 
 use crate::ml_features::{ELF_FEATURE_DIM, PE_FEATURE_DIM};
 
@@ -50,17 +50,22 @@ mod onnx_backend {
     }
 
     pub(super) fn run_inference(model: &OnnxModel, features: &[f32]) -> Result<f32> {
-        let input =
-            tract_ndarray::Array2::from_shape_vec((1, features.len()), features.to_vec())?;
+        let input = tract_ndarray::Array2::from_shape_vec((1, features.len()), features.to_vec())?;
         let result = model.run(tvec!(input.into_tensor().into()))?;
         let output = result[0].to_array_view::<f32>()?;
         // The model is expected to output a single probability value.
         // Handle both [1,1] and [1,2] output shapes.
         let prob = if output.len() >= 2 {
             // Assume softmax [benign, malicious]
-            output.as_slice().and_then(|s| s.get(1).copied()).unwrap_or(0.0)
+            output
+                .as_slice()
+                .and_then(|s| s.get(1).copied())
+                .unwrap_or(0.0)
         } else {
-            output.as_slice().and_then(|s| s.first().copied()).unwrap_or(0.0)
+            output
+                .as_slice()
+                .and_then(|s| s.first().copied())
+                .unwrap_or(0.0)
         };
         Ok(prob.clamp(0.0, 1.0))
     }
@@ -139,9 +144,7 @@ impl MlModel {
 
         #[cfg(not(feature = "onnx"))]
         {
-            debug!(
-                "onnx feature not enabled, using fallback models for all formats"
-            );
+            debug!("onnx feature not enabled, using fallback models for all formats");
             let _ = model_dir; // suppress unused warning
             Ok(Self::new_fallback())
         }

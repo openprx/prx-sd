@@ -116,11 +116,7 @@ impl ProcessActivity {
     /// Remove timestamps older than `window` from both deques.
     fn prune(&mut self, window: Duration, now: Instant) {
         let cutoff = now.checked_sub(window).unwrap_or(now);
-        while self
-            .modifications
-            .front()
-            .map_or(false, |&t| t < cutoff)
-        {
+        while self.modifications.front().map_or(false, |&t| t < cutoff) {
             self.modifications.pop_front();
         }
         while self.renames.front().map_or(false, |&t| t < cutoff) {

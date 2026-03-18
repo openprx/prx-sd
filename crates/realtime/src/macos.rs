@@ -56,7 +56,10 @@ impl MacOSMonitor {
         let mut results = Vec::new();
 
         // Handle rename events specially: notify may provide two paths (from, to)
-        if matches!(event.kind, EventKind::Modify(notify::event::ModifyKind::Name(_))) {
+        if matches!(
+            event.kind,
+            EventKind::Modify(notify::event::ModifyKind::Name(_))
+        ) {
             if event.paths.len() >= 2 {
                 results.push(FileEvent::Rename {
                     from: event.paths[0].clone(),

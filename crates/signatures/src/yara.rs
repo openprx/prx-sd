@@ -61,10 +61,7 @@ impl YaraEngine {
                 continue;
             }
 
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("");
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
             if ext != "yar" && ext != "yara" && ext != "rule" {
                 continue;
             }
@@ -141,10 +138,7 @@ impl YaraEngine {
             .map(|rule| YaraMatch {
                 name: rule.identifier().to_string(),
                 namespace: rule.namespace().to_string(),
-                tags: rule
-                    .tags()
-                    .map(|t| t.identifier().to_string())
-                    .collect(),
+                tags: rule.tags().map(|t| t.identifier().to_string()).collect(),
             })
             .collect()
     }

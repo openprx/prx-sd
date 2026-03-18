@@ -323,7 +323,11 @@ enum Commands {
 }
 
 #[derive(Parser)]
-#[command(name = "sd", version, about = "PRX-SD: Open-source Rust antivirus engine")]
+#[command(
+    name = "sd",
+    version,
+    about = "PRX-SD: Open-source Rust antivirus engine"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -376,12 +380,9 @@ fn first_run_setup(data_dir: &Path) -> Result<()> {
     eprintln!("Welcome to PRX-SD! Setting up for first use...");
 
     // 1. Create directory structure.
-    std::fs::create_dir_all(&signatures_dir)
-        .context("failed to create signatures directory")?;
-    std::fs::create_dir_all(&yara_dir)
-        .context("failed to create yara directory")?;
-    std::fs::create_dir_all(&quarantine_dir)
-        .context("failed to create quarantine directory")?;
+    std::fs::create_dir_all(&signatures_dir).context("failed to create signatures directory")?;
+    std::fs::create_dir_all(&yara_dir).context("failed to create yara directory")?;
+    std::fs::create_dir_all(&quarantine_dir).context("failed to create quarantine directory")?;
     eprintln!("  Created data directories at {}", data_dir.display());
 
     // 2. Write embedded YARA rules so basic detection works offline.
@@ -403,10 +404,9 @@ fn first_run_setup(data_dir: &Path) -> Result<()> {
             .with_signatures_dir(signatures_dir.clone())
             .with_yara_rules_dir(yara_dir.clone())
             .with_quarantine_dir(quarantine_dir.clone());
-        let json = serde_json::to_string_pretty(&config)
-            .context("failed to serialize default config")?;
-        std::fs::write(&config_path, json)
-            .context("failed to write default config")?;
+        let json =
+            serde_json::to_string_pretty(&config).context("failed to serialize default config")?;
+        std::fs::write(&config_path, json).context("failed to write default config")?;
         eprintln!("  Created default configuration");
     }
 
@@ -474,9 +474,7 @@ async fn main() -> Result<()> {
             block,
             daemon,
         } => commands::realtime::run(paths, block, daemon, &data_dir).await,
-        Commands::Quarantine { action } => {
-            commands::quarantine::run(action, &data_dir).await
-        }
+        Commands::Quarantine { action } => commands::quarantine::run(action, &data_dir).await,
         Commands::Update {
             check_only,
             force,
@@ -485,9 +483,7 @@ async fn main() -> Result<()> {
         Commands::Config { action } => commands::config::run(action, &data_dir).await,
         Commands::Info => commands::info::run(&data_dir).await,
         Commands::Import { path } => commands::import::run(&path, &data_dir).await,
-        Commands::ImportClamav { paths } => {
-            commands::import_clamav::run(&paths, &data_dir).await
-        }
+        Commands::ImportClamav { paths } => commands::import_clamav::run(&paths, &data_dir).await,
         Commands::Schedule { action } => match action {
             ScheduleAction::Add {
                 scan_path,
@@ -497,13 +493,7 @@ async fn main() -> Result<()> {
             ScheduleAction::Status => commands::schedule::run_status().await,
         },
         Commands::Policy { action, key, value } => {
-            commands::policy::run(
-                &action,
-                key.as_deref(),
-                value.as_deref(),
-                &data_dir,
-            )
-            .await
+            commands::policy::run(&action, key.as_deref(), value.as_deref(), &data_dir).await
         }
         Commands::ScanUsb {
             device,
@@ -514,45 +504,30 @@ async fn main() -> Result<()> {
             update_hours,
         } => commands::daemon::run(&data_dir, paths, update_hours).await,
         #[cfg(target_os = "linux")]
-        Commands::ScanMemory { pid, json } => {
-            commands::memscan::run(pid, json, &data_dir).await
-        }
+        Commands::ScanMemory { pid, json } => commands::memscan::run(pid, json, &data_dir).await,
         #[cfg(target_os = "linux")]
-        Commands::CheckRootkit { json } => {
-            commands::rootkit::run(json, &data_dir).await
-        }
+        Commands::CheckRootkit { json } => commands::rootkit::run(json, &data_dir).await,
         Commands::Webhook { action } => match action {
             WebhookAction::List => commands::webhook::run_list(&data_dir).await,
             WebhookAction::Add { name, url, format } => {
                 commands::webhook::run_add(&name, &url, &format, &data_dir).await
             }
-            WebhookAction::Remove { name } => {
-                commands::webhook::run_remove(&name, &data_dir).await
-            }
+            WebhookAction::Remove { name } => commands::webhook::run_remove(&name, &data_dir).await,
             WebhookAction::Test => commands::webhook::run_test(&data_dir).await,
         },
         Commands::EmailAlert { action } => match action {
-            EmailAlertAction::Configure => {
-                commands::email_alert::run_configure(&data_dir).await
-            }
+            EmailAlertAction::Configure => commands::email_alert::run_configure(&data_dir).await,
             EmailAlertAction::Test => commands::email_alert::run_test(&data_dir).await,
             EmailAlertAction::Send {
                 threat_name,
                 threat_level,
                 file_path,
             } => {
-                commands::email_alert::run_send(
-                    &threat_name,
-                    &threat_level,
-                    &file_path,
-                    &data_dir,
-                )
-                .await
+                commands::email_alert::run_send(&threat_name, &threat_level, &file_path, &data_dir)
+                    .await
             }
         },
-        Commands::Report { output, input } => {
-            commands::report::run(&output, &input).await
-        }
+        Commands::Report { output, input } => commands::report::run(&output, &input).await,
         Commands::Status => commands::status::run(&data_dir).await,
         Commands::SelfUpdate { check_only } => {
             commands::self_update::run(check_only, &data_dir).await
@@ -565,12 +540,12 @@ async fn main() -> Result<()> {
             AdblockAction::Stats => commands::adblock::run_stats(&data_dir).await,
             AdblockAction::Check { url } => commands::adblock::run_check(&url, &data_dir).await,
             AdblockAction::Log { count } => commands::adblock::run_log(&data_dir, count).await,
-            AdblockAction::Add { name, url, category } => {
-                commands::adblock::run_add(&name, &url, &category, &data_dir).await
-            }
-            AdblockAction::Remove { name } => {
-                commands::adblock::run_remove(&name, &data_dir).await
-            }
+            AdblockAction::Add {
+                name,
+                url,
+                category,
+            } => commands::adblock::run_add(&name, &url, &category, &data_dir).await,
+            AdblockAction::Remove { name } => commands::adblock::run_remove(&name, &data_dir).await,
         },
         Commands::DnsProxy {
             listen,

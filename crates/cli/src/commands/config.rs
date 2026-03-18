@@ -142,10 +142,7 @@ pub async fn run(action: ConfigAction, data_dir: &Path) -> Result<()> {
         ConfigAction::Reset => {
             let config = default_config();
             save_config(data_dir, &config)?;
-            println!(
-                "{} Configuration reset to defaults.",
-                "OK".green().bold()
-            );
+            println!("{} Configuration reset to defaults.", "OK".green().bold());
             Ok(())
         }
     }

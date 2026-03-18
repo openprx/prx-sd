@@ -49,8 +49,7 @@ impl ScanEngine {
         let heuristic = HeuristicEngine::new();
 
         let sig_arc = Arc::new(signatures);
-        let vt_client = VtClient::new(&config.vt_api_key, Arc::clone(&sig_arc))
-            .map(Arc::new);
+        let vt_client = VtClient::new(&config.vt_api_key, Arc::clone(&sig_arc)).map(Arc::new);
 
         if vt_client.is_some() {
             info!("VirusTotal cloud lookup enabled");
@@ -79,8 +78,7 @@ impl ScanEngine {
             .context("failed to reload YARA engine")?;
 
         let sig_arc = Arc::new(signatures);
-        self.vt_client = VtClient::new(&self.config.vt_api_key, Arc::clone(&sig_arc))
-            .map(Arc::new);
+        self.vt_client = VtClient::new(&self.config.vt_api_key, Arc::clone(&sig_arc)).map(Arc::new);
         self.signatures = sig_arc;
         self.yara = Arc::new(yara);
 
@@ -163,10 +161,7 @@ mod tests {
         let (_dir, config) = temp_config();
         let engine = ScanEngine::new(config).unwrap();
         let cloned = engine.clone();
-        assert_eq!(
-            cloned.config().max_file_size,
-            engine.config().max_file_size
-        );
+        assert_eq!(cloned.config().max_file_size, engine.config().max_file_size);
     }
 
     #[test]

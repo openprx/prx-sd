@@ -23,7 +23,7 @@ pub mod behavior;
 pub mod enhanced;
 pub mod yara_gen;
 
-pub use yara_gen::{GeneratedRule, generate_rules};
+pub use yara_gen::{generate_rules, GeneratedRule};
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -361,8 +361,7 @@ mod tests {
     fn test_sandbox_verdict_serialization_roundtrip_clean() {
         let verdict = SandboxVerdict::Clean;
         let json = serde_json::to_string(&verdict).expect("serialize failed");
-        let deserialized: SandboxVerdict =
-            serde_json::from_str(&json).expect("deserialize failed");
+        let deserialized: SandboxVerdict = serde_json::from_str(&json).expect("deserialize failed");
         assert!(matches!(deserialized, SandboxVerdict::Clean));
     }
 
@@ -372,8 +371,7 @@ mod tests {
             reasons: vec!["anti-analysis detected".into()],
         };
         let json = serde_json::to_string(&verdict).expect("serialize failed");
-        let deserialized: SandboxVerdict =
-            serde_json::from_str(&json).expect("deserialize failed");
+        let deserialized: SandboxVerdict = serde_json::from_str(&json).expect("deserialize failed");
         match deserialized {
             SandboxVerdict::Suspicious { reasons } => {
                 assert_eq!(reasons.len(), 1);
@@ -389,8 +387,7 @@ mod tests {
             reasons: vec!["reverse shell".into(), "credential theft".into()],
         };
         let json = serde_json::to_string(&verdict).expect("serialize failed");
-        let deserialized: SandboxVerdict =
-            serde_json::from_str(&json).expect("deserialize failed");
+        let deserialized: SandboxVerdict = serde_json::from_str(&json).expect("deserialize failed");
         match deserialized {
             SandboxVerdict::Malicious { reasons } => {
                 assert_eq!(reasons.len(), 2);
@@ -403,8 +400,7 @@ mod tests {
     fn test_sandbox_verdict_serialization_roundtrip_timeout() {
         let verdict = SandboxVerdict::Timeout;
         let json = serde_json::to_string(&verdict).expect("serialize failed");
-        let deserialized: SandboxVerdict =
-            serde_json::from_str(&json).expect("deserialize failed");
+        let deserialized: SandboxVerdict = serde_json::from_str(&json).expect("deserialize failed");
         assert!(matches!(deserialized, SandboxVerdict::Timeout));
     }
 
@@ -412,8 +408,7 @@ mod tests {
     fn test_sandbox_verdict_serialization_roundtrip_error() {
         let verdict = SandboxVerdict::Error("something went wrong".into());
         let json = serde_json::to_string(&verdict).expect("serialize failed");
-        let deserialized: SandboxVerdict =
-            serde_json::from_str(&json).expect("deserialize failed");
+        let deserialized: SandboxVerdict = serde_json::from_str(&json).expect("deserialize failed");
         match deserialized {
             SandboxVerdict::Error(msg) => assert_eq!(msg, "something went wrong"),
             other => panic!("expected Error, got {:?}", other),

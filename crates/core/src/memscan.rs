@@ -85,8 +85,8 @@ pub struct MemRegionMatch {
 /// by known-safe system libraries are excluded.
 pub fn parse_proc_maps(pid: u32) -> Result<Vec<MemRegion>> {
     let maps_path = format!("/proc/{pid}/maps");
-    let content = fs::read_to_string(&maps_path)
-        .with_context(|| format!("failed to read {maps_path}"))?;
+    let content =
+        fs::read_to_string(&maps_path).with_context(|| format!("failed to read {maps_path}"))?;
 
     let mut regions = Vec::new();
     for line in content.lines() {
@@ -162,8 +162,8 @@ fn is_safe_mapping(region: &MemRegion) -> bool {
 /// Returns the concatenated bytes of the region.
 pub fn read_region(pid: u32, start: u64, end: u64) -> Result<Vec<u8>> {
     let mem_path = format!("/proc/{pid}/mem");
-    let mut file = fs::File::open(&mem_path)
-        .with_context(|| format!("failed to open {mem_path}"))?;
+    let mut file =
+        fs::File::open(&mem_path).with_context(|| format!("failed to open {mem_path}"))?;
 
     let total = (end - start) as usize;
     let mut buf = Vec::with_capacity(total);
@@ -213,11 +213,7 @@ fn process_name(pid: u32) -> String {
 ///
 /// Runs both YARA pattern matching and SHA-256 hash lookups on every readable
 /// (non-safe-library) region.
-pub fn scan_process(
-    pid: u32,
-    yara: &YaraEngine,
-    db: &SignatureDatabase,
-) -> Result<MemScanResult> {
+pub fn scan_process(pid: u32, yara: &YaraEngine, db: &SignatureDatabase) -> Result<MemScanResult> {
     let start = Instant::now();
     let name = process_name(pid);
 
@@ -288,10 +284,7 @@ pub fn scan_process(
 
 /// Enumerate all numeric directories in `/proc` (i.e. running PIDs) and scan
 /// each process. Processes that cannot be accessed are silently skipped.
-pub fn scan_all_processes(
-    yara: &YaraEngine,
-    db: &SignatureDatabase,
-) -> Vec<MemScanResult> {
+pub fn scan_all_processes(yara: &YaraEngine, db: &SignatureDatabase) -> Vec<MemScanResult> {
     let entries = match fs::read_dir("/proc") {
         Ok(e) => e,
         Err(e) => {

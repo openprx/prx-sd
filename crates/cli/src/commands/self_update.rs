@@ -100,10 +100,7 @@ pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
     let remote_version = strip_v_prefix(&release.tag_name);
 
     if !is_newer(current, remote_version) {
-        println!(
-            "  {} already up to date (v{current})",
-            "OK:".green().bold()
-        );
+        println!("  {} already up to date (v{current})", "OK:".green().bold());
         return Ok(());
     }
 
