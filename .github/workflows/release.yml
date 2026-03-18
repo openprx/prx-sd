@@ -11,8 +11,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build ${{ matrix.artifact }}
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 1. Build bare binaries for all platforms
+  # ═══════════════════════════════════════════════════════════════════════════
+  build-binaries:
+    name: Binary — ${{ matrix.artifact }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -46,7 +49,6 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # Install cross-compilation toolchain for aarch64-linux
       - name: Install cross-compilation tools
         if: matrix.cross
         run: |
@@ -65,8 +67,7 @@ jobs:
 
       - name: Prepare artifact (windows)
         if: runner.os == 'Windows'
-        run: |
-          cp target/${{ matrix.target }}/release/sd.exe ${{ matrix.artifact }}
+        run: cp target/${{ matrix.target }}/release/sd.exe ${{ matrix.artifact }}
 
       - name: Generate SHA-256 checksum
         shell: bash
@@ -84,10 +85,371 @@ jobs:
             ${{ matrix.artifact }}
             ${{ matrix.artifact }}.sha256
 
-  release:
-    name: Create Release
-    needs: build
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 2. Linux packages — DEB, RPM, AppImage
+  # ═══════════════════════════════════════════════════════════════════════════
+  build-linux-packages:
+    name: Linux Packages — ${{ matrix.arch }}
+    needs: build-binaries
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            artifact: sd-linux-x86_64
+            rpm_arch: x86_64
+            appimage: true
+          - arch: arm64
+            artifact: sd-linux-aarch64
+            rpm_arch: aarch64
+            appimage: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: binary/
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # ── DEB ────────────────────────────────────────────────────────────────
+      - name: Build .deb package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          DEB_DIR="target/deb-staging/prx-sd_${VERSION}_${ARCH}"
+
+          mkdir -p "$DEB_DIR/DEBIAN"
+          mkdir -p "$DEB_DIR/usr/local/bin"
+          mkdir -p "$DEB_DIR/etc/prx-sd/yara"
+          mkdir -p "$DEB_DIR/usr/lib/systemd/system"
+          mkdir -p "$DEB_DIR/usr/share/applications"
+
+          # Binary
+          cp binary/${{ matrix.artifact }} "$DEB_DIR/usr/local/bin/sd"
+          chmod 755 "$DEB_DIR/usr/local/bin/sd"
+
+          # Systemd service
+          cp packaging/systemd/prx-sd.service "$DEB_DIR/usr/lib/systemd/system/"
+
+          # Desktop entry
+          cp packaging/desktop/prx-sd.desktop "$DEB_DIR/usr/share/applications/"
+
+          # Built-in signatures
+          cp -r signatures-db/yara/* "$DEB_DIR/etc/prx-sd/yara/" 2>/dev/null || true
+          cp signatures-db/hashes/*.txt "$DEB_DIR/etc/prx-sd/" 2>/dev/null || true
+
+          INSTALLED_SIZE=$(du -sk "$DEB_DIR" | cut -f1)
+
+          cat > "$DEB_DIR/DEBIAN/control" << EOF
+          Package: prx-sd
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: ${ARCH}
+          Installed-Size: ${INSTALLED_SIZE}
+          Maintainer: OpenPRX <team@openprx.dev>
+          Homepage: https://github.com/openprx/prx-sd
+          Description: Open-source Rust antivirus engine
+           PRX-SD is a fast, modular antivirus engine written in Rust. Features:
+           hash-based signature matching (LMDB), YARA-X rule scanning, heuristic
+           analysis, real-time file monitoring, AES-256-GCM quarantine, and
+           automatic threat remediation.
+          EOF
+          # Remove leading spaces from heredoc (control file is whitespace-sensitive)
+          sed -i 's/^          //' "$DEB_DIR/DEBIAN/control"
+
+          cat > "$DEB_DIR/DEBIAN/postinst" << 'EOF'
+          #!/bin/sh
+          set -e
+          mkdir -p /etc/prx-sd/signatures /etc/prx-sd/quarantine /etc/prx-sd/audit
+          if command -v sd >/dev/null 2>&1; then
+              for f in /etc/prx-sd/sha256_blocklist.txt /etc/prx-sd/md5_blocklist.txt; do
+                  [ -f "$f" ] && sd --data-dir /etc/prx-sd --log-level error import "$f" 2>/dev/null || true
+              done
+          fi
+          if command -v systemctl >/dev/null 2>&1; then
+              systemctl daemon-reload
+          fi
+          EOF
+          sed -i 's/^          //' "$DEB_DIR/DEBIAN/postinst"
+          chmod 755 "$DEB_DIR/DEBIAN/postinst"
+
+          cat > "$DEB_DIR/DEBIAN/prerm" << 'EOF'
+          #!/bin/sh
+          set -e
+          if command -v systemctl >/dev/null 2>&1; then
+              systemctl stop prx-sd 2>/dev/null || true
+              systemctl disable prx-sd 2>/dev/null || true
+          fi
+          EOF
+          sed -i 's/^          //' "$DEB_DIR/DEBIAN/prerm"
+          chmod 755 "$DEB_DIR/DEBIAN/prerm"
+
+          mkdir -p target/debian
+          dpkg-deb --build "$DEB_DIR" target/debian/
+
+      - name: Upload DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: prx-sd_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb
+          path: target/debian/prx-sd_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb
+
+      # ── RPM ────────────────────────────────────────────────────────────────
+      - name: Build .rpm package
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+          VERSION="${{ steps.version.outputs.version }}"
+          RPM_ARCH="${{ matrix.rpm_arch }}"
+
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS,BUILD,RPMS,SRPMS}
+
+          # Copy binary as source
+          cp binary/${{ matrix.artifact }} ~/rpmbuild/SOURCES/sd-linux-${RPM_ARCH}
+
+          cat > ~/rpmbuild/SPECS/prx-sd.spec << SPEC_EOF
+          Name:           prx-sd
+          Version:        ${VERSION}
+          Release:        1
+          Summary:        Open-source Rust antivirus engine
+          License:        MIT OR Apache-2.0
+          URL:            https://github.com/openprx/prx-sd
+          Source0:        sd-linux-${RPM_ARCH}
+          AutoReqProv:    no
+          BuildArch:      ${RPM_ARCH}
+
+          %description
+          PRX-SD is a fast, modular antivirus engine written in Rust.
+
+          %install
+          install -Dm755 %{SOURCE0} %{buildroot}%{_bindir}/sd
+
+          %post
+          mkdir -p /etc/prx-sd/signatures /etc/prx-sd/quarantine /etc/prx-sd/audit
+
+          %preun
+          if command -v systemctl >/dev/null 2>&1; then
+              systemctl stop prx-sd 2>/dev/null || true
+              systemctl disable prx-sd 2>/dev/null || true
+          fi
+
+          %files
+          %{_bindir}/sd
+          SPEC_EOF
+
+          rpmbuild -bb ~/rpmbuild/SPECS/prx-sd.spec \
+            --define "_rpmdir $(pwd)/target/rpm" \
+            --target "${RPM_ARCH}"
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: prx-sd-${{ steps.version.outputs.version }}-1.${{ matrix.rpm_arch }}.rpm
+          path: target/rpm/${{ matrix.rpm_arch }}/prx-sd-${{ steps.version.outputs.version }}-1.${{ matrix.rpm_arch }}.rpm
+
+      # ── AppImage (x86_64 only) ──────────────────────────────────────────────
+      - name: Build AppImage
+        if: matrix.appimage
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          APPDIR="target/appimage-staging/PRX-SD.AppDir"
+
+          mkdir -p "$APPDIR/usr/bin"
+          mkdir -p "$APPDIR/usr/share/prx-sd/signatures-db"
+          mkdir -p "$APPDIR/usr/share/applications"
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+
+          cp binary/${{ matrix.artifact }} "$APPDIR/usr/bin/sd"
+          chmod 755 "$APPDIR/usr/bin/sd"
+
+          # Signatures
+          cp -r signatures-db/yara "$APPDIR/usr/share/prx-sd/signatures-db/" 2>/dev/null || true
+          cp -r signatures-db/hashes "$APPDIR/usr/share/prx-sd/signatures-db/" 2>/dev/null || true
+
+          # Desktop + icon
+          cp packaging/appimage/prx-sd.desktop "$APPDIR/usr/share/applications/prx-sd.desktop"
+          cp packaging/appimage/prx-sd.svg "$APPDIR/usr/share/icons/hicolor/256x256/apps/prx-sd.svg"
+          cp packaging/appimage/prx-sd.desktop "$APPDIR/prx-sd.desktop"
+          cp packaging/appimage/prx-sd.svg "$APPDIR/prx-sd.svg"
+
+          # AppRun
+          cat > "$APPDIR/AppRun" << 'APPRUN_EOF'
+          #!/usr/bin/env bash
+          SELF_DIR="$(dirname "$(readlink -f "$0")")"
+          export PRX_SD_DATA_DIR="${PRX_SD_DATA_DIR:-$SELF_DIR/usr/share/prx-sd}"
+          export PRX_SD_SIGNATURES_DIR="${PRX_SD_SIGNATURES_DIR:-$SELF_DIR/usr/share/prx-sd/signatures-db}"
+          exec "$SELF_DIR/usr/bin/sd" "$@"
+          APPRUN_EOF
+          sed -i 's/^          //' "$APPDIR/AppRun"
+          chmod 755 "$APPDIR/AppRun"
+
+          # Download appimagetool
+          wget -q "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+
+          mkdir -p target/appimage
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "$APPDIR" "target/appimage/PRX-SD-${VERSION}-x86_64.AppImage"
+
+      - name: Upload AppImage
+        if: matrix.appimage
+        uses: actions/upload-artifact@v4
+        with:
+          name: PRX-SD-${{ steps.version.outputs.version }}-x86_64.AppImage
+          path: target/appimage/PRX-SD-${{ steps.version.outputs.version }}-x86_64.AppImage
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 3. macOS DMG — Universal binary (Intel + Apple Silicon)
+  # ═══════════════════════════════════════════════════════════════════════════
+  build-macos-dmg:
+    name: macOS DMG
+    needs: build-binaries
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sd-macos-x86_64
+          path: binary-x86/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sd-macos-aarch64
+          path: binary-arm/
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build Universal DMG
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STAGING="target/macos-staging"
+          APP_BUNDLE="$STAGING/PRX-SD.app"
+
+          # Create universal binary
+          mkdir -p "$APP_BUNDLE/Contents/MacOS"
+          mkdir -p "$APP_BUNDLE/Contents/Resources/signatures-db"
+          lipo -create binary-x86/sd-macos-x86_64 binary-arm/sd-macos-aarch64 -output "$APP_BUNDLE/Contents/MacOS/sd"
+          chmod 755 "$APP_BUNDLE/Contents/MacOS/sd"
+
+          # Signatures
+          cp -r signatures-db/yara "$APP_BUNDLE/Contents/Resources/signatures-db/" 2>/dev/null || true
+          cp -r signatures-db/hashes "$APP_BUNDLE/Contents/Resources/signatures-db/" 2>/dev/null || true
+
+          # Info.plist
+          cat > "$APP_BUNDLE/Contents/Info.plist" << PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>PRX-SD</string>
+              <key>CFBundleDisplayName</key>
+              <string>PRX-SD Antivirus</string>
+              <key>CFBundleIdentifier</key>
+              <string>dev.prx-sd.antivirus</string>
+              <key>CFBundleVersion</key>
+              <string>${VERSION}</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${VERSION}</string>
+              <key>CFBundleExecutable</key>
+              <string>sd</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>11.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          # Drag-to-install
+          ln -s /Applications "$STAGING/Applications"
+
+          # Build DMG
+          mkdir -p target/macos
+          hdiutil create \
+            -volname "PRX-SD ${VERSION}" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            "target/macos/PRX-SD-${VERSION}-universal.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PRX-SD-${{ steps.version.outputs.version }}-universal.dmg
+          path: target/macos/PRX-SD-${{ steps.version.outputs.version }}-universal.dmg
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 4. Windows MSI
+  # ═══════════════════════════════════════════════════════════════════════════
+  build-windows-msi:
+    name: Windows MSI
+    needs: build-binaries
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sd-windows-x86_64.exe
+          path: binary/
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix
+
+      - name: Prepare binary directory
+        shell: bash
+        run: |
+          mkdir -p target/release
+          cp binary/sd-windows-x86_64.exe target/release/sd.exe
+
+      - name: Build MSI
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p target/windows
+          wix build \
+            -d "Version=${VERSION}" \
+            -d "BinaryPath=target/release" \
+            packaging/windows/prx-sd.wxs \
+            -o "target/windows/PRX-SD-${VERSION}.msi"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PRX-SD-${{ steps.version.outputs.version }}.msi
+          path: target/windows/PRX-SD-${{ steps.version.outputs.version }}.msi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 5. Create GitHub Release with all artifacts
+  # ═══════════════════════════════════════════════════════════════════════════
+  create-release:
+    name: Create Release
+    needs: [build-binaries, build-linux-packages, build-macos-dmg, build-windows-msi]
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -96,8 +458,13 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -la artifacts/
+      - name: List all artifacts
+        run: find artifacts/ -type f | sort
+
+      - name: Generate consolidated checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS 2>/dev/null || true
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -113,3 +480,167 @@ jobs:
             artifacts/sd-macos-aarch64.sha256
             artifacts/sd-windows-x86_64.exe
             artifacts/sd-windows-x86_64.exe.sha256
+            artifacts/prx-sd_*.deb
+            artifacts/prx-sd-*.rpm
+            artifacts/PRX-SD-*-x86_64.AppImage
+            artifacts/PRX-SD-*-universal.dmg
+            artifacts/PRX-SD-*.msi
+            artifacts/SHA256SUMS
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 6. Publish to package managers
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # ── Homebrew Tap ───────────────────────────────────────────────────────────
+  publish-homebrew:
+    name: Update Homebrew Tap
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.release.prerelease }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download checksums
+        run: |
+          TAG="${{ github.ref_name }}"
+          BASE_URL="https://github.com/openprx/prx-sd/releases/download/${TAG}"
+          curl -sL "${BASE_URL}/sd-linux-x86_64.sha256" -o linux-x86_64.sha256
+          curl -sL "${BASE_URL}/sd-macos-x86_64.sha256" -o macos-x86_64.sha256
+          curl -sL "${BASE_URL}/sd-macos-aarch64.sha256" -o macos-aarch64.sha256
+
+      - name: Generate formula and push to tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ github.ref_name }}"
+          BASE_URL="https://github.com/openprx/prx-sd/releases/download/${TAG}"
+
+          LINUX_X86_SHA=$(awk '{print $1}' linux-x86_64.sha256)
+          MACOS_X86_SHA=$(awk '{print $1}' macos-x86_64.sha256)
+          MACOS_ARM_SHA=$(awk '{print $1}' macos-aarch64.sha256)
+
+          cat > prx-sd.rb << FORMULA
+          class PrxSd < Formula
+            desc "Open-source Rust antivirus engine with YARA-X and real-time protection"
+            homepage "https://github.com/openprx/prx-sd"
+            version "${VERSION}"
+            license any_of: ["MIT", "Apache-2.0"]
+
+            on_macos do
+              if Hardware::CPU.intel?
+                url "${BASE_URL}/sd-macos-x86_64"
+                sha256 "${MACOS_X86_SHA}"
+              else
+                url "${BASE_URL}/sd-macos-aarch64"
+                sha256 "${MACOS_ARM_SHA}"
+              end
+            end
+
+            on_linux do
+              url "${BASE_URL}/sd-linux-x86_64"
+              sha256 "${LINUX_X86_SHA}"
+            end
+
+            def install
+              bin.install Dir["sd-*"].first => "sd"
+            end
+
+            def caveats
+              <<~EOS
+                PRX-SD installed. Quick start:
+                  sd scan /path/to/check
+                  sd update
+                  sd monitor /home /tmp
+              EOS
+            end
+
+            test do
+              assert_match "prx-sd", shell_output("\#{bin}/sd --version")
+            end
+          end
+          FORMULA
+
+          # Push to tap repo
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/openprx/homebrew-tap.git" tap-repo
+          mkdir -p tap-repo/Formula
+          cp prx-sd.rb tap-repo/Formula/prx-sd.rb
+          cd tap-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/prx-sd.rb
+          git commit -m "Update prx-sd to ${VERSION}" || echo "No changes to commit"
+          git push
+
+  # ── Scoop Bucket ───────────────────────────────────────────────────────────
+  publish-scoop:
+    name: Update Scoop Bucket
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.release.prerelease }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download Windows checksum
+        run: |
+          TAG="${{ github.ref_name }}"
+          curl -sL "https://github.com/openprx/prx-sd/releases/download/${TAG}/sd-windows-x86_64.exe.sha256" -o win.sha256
+
+      - name: Generate manifest and push to bucket
+        env:
+          SCOOP_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ github.ref_name }}"
+          WIN_SHA=$(awk '{print $1}' win.sha256)
+
+          cat > prx-sd.json << MANIFEST
+          {
+              "version": "${VERSION}",
+              "description": "Open-source antivirus engine with YARA-X, hash matching, and real-time protection",
+              "homepage": "https://github.com/openprx/prx-sd",
+              "license": {
+                  "identifier": "MIT|Apache-2.0",
+                  "url": "https://github.com/openprx/prx-sd/blob/main/LICENSE-MIT"
+              },
+              "url": "https://github.com/openprx/prx-sd/releases/download/${TAG}/sd-windows-x86_64.exe",
+              "hash": "${WIN_SHA}",
+              "bin": [["sd-windows-x86_64.exe", "sd"]],
+              "checkver": {
+                  "url": "https://api.github.com/repos/openprx/prx-sd/releases/latest",
+                  "jsonpath": "$.tag_name",
+                  "regex": "v([\\\\d.]+)"
+              },
+              "autoupdate": {
+                  "url": "https://github.com/openprx/prx-sd/releases/download/v\$version/sd-windows-x86_64.exe",
+                  "hash": {
+                      "url": "\$baseurl/sd-windows-x86_64.exe.sha256",
+                      "regex": "^([a-f0-9]{64})"
+                  }
+              }
+          }
+          MANIFEST
+
+          git clone "https://x-access-token:${SCOOP_TOKEN}@github.com/openprx/scoop-bucket.git" scoop-repo
+          mkdir -p scoop-repo/bucket
+          cp prx-sd.json scoop-repo/bucket/prx-sd.json
+          cd scoop-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/prx-sd.json
+          git commit -m "Update prx-sd to ${VERSION}" || echo "No changes to commit"
+          git push
