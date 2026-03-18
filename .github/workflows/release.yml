@@ -248,7 +248,8 @@ jobs:
 
           rpmbuild -bb ~/rpmbuild/SPECS/prx-sd.spec \
             --define "_rpmdir $(pwd)/target/rpm" \
-            --target "${RPM_ARCH}"
+            --define "_target_cpu ${RPM_ARCH}" \
+            --target "${RPM_ARCH}-linux"
 
       - name: Upload RPM
         uses: actions/upload-artifact@v4
@@ -448,6 +449,7 @@ jobs:
   create-release:
     name: Create Release
     needs: [build-binaries, build-linux-packages, build-macos-dmg, build-windows-msi]
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
 
     steps:
@@ -496,7 +498,7 @@ jobs:
     name: Update Homebrew Tap
     needs: create-release
     runs-on: ubuntu-latest
-    if: ${{ !github.event.release.prerelease }}
+    if: success()
 
     steps:
       - uses: actions/checkout@v4
@@ -584,7 +586,7 @@ jobs:
     name: Update Scoop Bucket
     needs: create-release
     runs-on: ubuntu-latest
-    if: ${{ !github.event.release.prerelease }}
+    if: success()
 
     steps:
       - uses: actions/checkout@v4
