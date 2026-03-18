@@ -174,6 +174,15 @@ To report a security vulnerability, please see [SECURITY.md](SECURITY.md).
 
 PRX-SD is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
 
+## Documentation
+
+Documentation is available in 10 languages: [docs/README.md](docs/README.md)
+
+| | | | | |
+|---|---|---|---|---|
+| [English](docs/CLI.md) | [中文](docs/zh/CLI.md) | [日本語](docs/ja/CLI.md) | [한국어](docs/ko/CLI.md) | [Español](docs/es/CLI.md) |
+| [Français](docs/fr/CLI.md) | [Deutsch](docs/de/CLI.md) | [العربية](docs/ar/CLI.md) | [Русский](docs/ru/CLI.md) | [ქართული](docs/ka/CLI.md) |
+
 ## Links
 
 - [CLI Reference](docs/CLI.md)
