@@ -176,6 +176,7 @@ impl EnhancedSandbox {
     }
 
     #[cfg(not(target_os = "linux"))]
+    #[allow(dead_code)]
     fn set_resource_limits(_config: &EnhancedSandboxConfig) -> Result<()> {
         anyhow::bail!("resource limits are only supported on Linux")
     }
