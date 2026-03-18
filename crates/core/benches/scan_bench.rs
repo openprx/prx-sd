@@ -11,10 +11,7 @@ use prx_sd_signatures::SignatureDatabase;
 
 /// Build a `ScanEngine` backed by a temp directory with `n_hashes` random
 /// SHA-256 entries pre-loaded.
-fn engine_with_hashes(
-    tmp: &tempfile::TempDir,
-    n_hashes: usize,
-) -> ScanEngine {
+fn engine_with_hashes(tmp: &tempfile::TempDir, n_hashes: usize) -> ScanEngine {
     let sigs_dir = tmp.path().join("sigs");
     let yara_dir = tmp.path().join("yara");
     let qdir = tmp.path().join("quarantine");

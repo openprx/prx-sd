@@ -17,7 +17,11 @@ pub enum FileEvent {
     /// A file was closed after being written to.
     CloseWrite { path: PathBuf },
     /// A file was renamed.
-    Rename { from: PathBuf, to: PathBuf, pid: u32 },
+    Rename {
+        from: PathBuf,
+        to: PathBuf,
+        pid: u32,
+    },
 }
 
 /// Action to take in response to a file event (for blocking monitors).

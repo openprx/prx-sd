@@ -17,8 +17,7 @@ pub fn kill_process(pid: u32) -> Result<()> {
     use nix::unistd::Pid;
 
     let nix_pid = Pid::from_raw(pid as i32);
-    kill(nix_pid, Signal::SIGKILL)
-        .with_context(|| format!("failed to kill process {}", pid))?;
+    kill(nix_pid, Signal::SIGKILL).with_context(|| format!("failed to kill process {}", pid))?;
     tracing::info!(pid = pid, "killed process via SIGKILL");
     Ok(())
 }
@@ -46,7 +45,11 @@ pub fn clean_crontab(path: &Path) -> Result<Vec<String>> {
                         format!("failed to write cleaned crontab: {}", cron_path.display())
                     })?;
                     for line in &removed_lines {
-                        tracing::info!(file = cron_file, line = line.as_str(), "removed crontab entry");
+                        tracing::info!(
+                            file = cron_file,
+                            line = line.as_str(),
+                            "removed crontab entry"
+                        );
                     }
                     removed.extend(removed_lines);
                 }
@@ -144,7 +147,10 @@ pub fn clean_systemd_services(path: &Path) -> Result<Vec<String>> {
                                 "failed to remove systemd unit"
                             );
                         } else {
-                            tracing::info!(unit = file_name.as_str(), "removed malicious systemd unit");
+                            tracing::info!(
+                                unit = file_name.as_str(),
+                                "removed malicious systemd unit"
+                            );
                             cleaned.push(file_name);
                         }
                     }
@@ -239,11 +245,7 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
     let mut cleaned = Vec::new();
 
     // User profile files - check for all users via /etc/passwd
-    let profile_files = [
-        "/etc/profile",
-        "/etc/bash.bashrc",
-        "/etc/environment",
-    ];
+    let profile_files = ["/etc/profile", "/etc/bash.bashrc", "/etc/environment"];
 
     for pf in &profile_files {
         let pf_path = Path::new(pf);
@@ -254,7 +256,11 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
                     fs::write(pf_path, new_content)
                         .with_context(|| format!("failed to write: {}", pf_path.display()))?;
                     for line in &removed_lines {
-                        tracing::info!(file = *pf, line = line.as_str(), "removed from shell profile");
+                        tracing::info!(
+                            file = *pf,
+                            line = line.as_str(),
+                            "removed from shell profile"
+                        );
                     }
                     cleaned.extend(removed_lines);
                 }
@@ -284,8 +290,7 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
                                 "failed to remove profile.d script"
                             );
                         } else {
-                            let desc =
-                                format!("removed profile.d script: {}", file_path.display());
+                            let desc = format!("removed profile.d script: {}", file_path.display());
                             tracing::info!("{}", desc);
                             cleaned.push(desc);
                         }
@@ -432,9 +437,7 @@ pub fn isolate_network_iptables() -> Result<()> {
     }
 
     // Flush existing rules
-    let _ = std::process::Command::new("iptables")
-        .args(["-F"])
-        .output();
+    let _ = std::process::Command::new("iptables").args(["-F"]).output();
 
     // Allow loopback
     let _ = std::process::Command::new("iptables")
@@ -447,12 +450,26 @@ pub fn isolate_network_iptables() -> Result<()> {
     // Allow established connections (so we don't kill current SSH)
     let _ = std::process::Command::new("iptables")
         .args([
-            "-A", "INPUT", "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT",
+            "-A",
+            "INPUT",
+            "-m",
+            "conntrack",
+            "--ctstate",
+            "ESTABLISHED,RELATED",
+            "-j",
+            "ACCEPT",
         ])
         .output();
     let _ = std::process::Command::new("iptables")
         .args([
-            "-A", "OUTPUT", "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT",
+            "-A",
+            "OUTPUT",
+            "-m",
+            "conntrack",
+            "--ctstate",
+            "ESTABLISHED,RELATED",
+            "-j",
+            "ACCEPT",
         ])
         .output();
 
@@ -476,8 +493,7 @@ pub fn restore_network_iptables() -> Result<()> {
     let backup_path = Path::new("/tmp/prx-sd-iptables-backup.rules");
 
     if backup_path.exists() {
-        let rules =
-            fs::read_to_string(backup_path).context("failed to read iptables backup")?;
+        let rules = fs::read_to_string(backup_path).context("failed to read iptables backup")?;
         let mut child = std::process::Command::new("iptables-restore")
             .stdin(std::process::Stdio::piped())
             .spawn()
@@ -490,7 +506,9 @@ pub fn restore_network_iptables() -> Result<()> {
                 .context("failed to write to iptables-restore stdin")?;
         }
 
-        let status = child.wait().context("failed to wait for iptables-restore")?;
+        let status = child
+            .wait()
+            .context("failed to wait for iptables-restore")?;
         if !status.success() {
             anyhow::bail!("iptables-restore exited with status: {}", status);
         }
@@ -523,11 +541,7 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
     let mut findings = Vec::new();
 
     // Crontab entries
-    let cron_locations = [
-        "/etc/crontab",
-        "/var/spool/cron/crontabs",
-        "/etc/cron.d",
-    ];
+    let cron_locations = ["/etc/crontab", "/var/spool/cron/crontabs", "/etc/cron.d"];
     for loc in &cron_locations {
         let loc_path = Path::new(loc);
         if loc_path.is_file() {
@@ -592,7 +606,10 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
     let rc_local = Path::new("/etc/rc.local");
     if let Ok(content) = fs::read_to_string(rc_local) {
         if content.contains(path_str.as_ref()) {
-            findings.push((PersistenceType::InitScript, "found in /etc/rc.local".to_string()));
+            findings.push((
+                PersistenceType::InitScript,
+                "found in /etc/rc.local".to_string(),
+            ));
         }
     }
 
@@ -600,7 +617,10 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
     let ld_preload = Path::new("/etc/ld.so.preload");
     if let Ok(content) = fs::read_to_string(ld_preload) {
         if content.contains(path_str.as_ref()) {
-            findings.push((PersistenceType::LdPreload, "found in /etc/ld.so.preload".to_string()));
+            findings.push((
+                PersistenceType::LdPreload,
+                "found in /etc/ld.so.preload".to_string(),
+            ));
         }
     }
 

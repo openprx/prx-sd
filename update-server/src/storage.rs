@@ -43,8 +43,8 @@ impl SignatureStorage {
         // Read current version.
         let version_file = base_dir.join("version");
         let version = if version_file.exists() {
-            let text = std::fs::read_to_string(&version_file)
-                .context("failed to read version file")?;
+            let text =
+                std::fs::read_to_string(&version_file).context("failed to read version file")?;
             text.trim()
                 .parse::<u64>()
                 .context("invalid version number in version file")?
@@ -104,9 +104,7 @@ impl SignatureStorage {
         let new_version = patch.version;
 
         if new_version <= current {
-            bail!(
-                "cannot publish version {new_version}: current version is {current}"
-            );
+            bail!("cannot publish version {new_version}: current version is {current}");
         }
 
         // Encode (serialize + zstd compress) the delta.

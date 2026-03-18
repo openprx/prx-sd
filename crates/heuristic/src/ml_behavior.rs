@@ -285,7 +285,9 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         let trace = &["open", "read", "socket", "connect"];
         let pred = classifier.classify_from_names(trace);
-        assert!(pred.matched_patterns.contains(&"credential_theft".to_string()));
+        assert!(pred
+            .matched_patterns
+            .contains(&"credential_theft".to_string()));
     }
 
     #[test]
@@ -293,7 +295,9 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         let trace = &["setuid", "execve"];
         let pred = classifier.classify_from_names(trace);
-        assert!(pred.matched_patterns.contains(&"privilege_escalation".to_string()));
+        assert!(pred
+            .matched_patterns
+            .contains(&"privilege_escalation".to_string()));
     }
 
     #[test]
@@ -301,7 +305,9 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         let trace = &["getdents64", "open", "read", "socket", "sendto"];
         let pred = classifier.classify_from_names(trace);
-        assert!(pred.matched_patterns.contains(&"data_exfiltration".to_string()));
+        assert!(pred
+            .matched_patterns
+            .contains(&"data_exfiltration".to_string()));
     }
 
     #[test]
@@ -350,9 +356,9 @@ mod tests {
         // A trace that triggers many patterns simultaneously.
         let trace = &[
             "socket", "connect", "dup2", "execve", // reverse_shell (90)
-            "write", "chmod", "execve",             // dropper (80)
-            "open", "read", "socket", "connect",    // credential_theft (85)
-            "setuid", "execve",                     // priv_esc (75)
+            "write", "chmod", "execve", // dropper (80)
+            "open", "read", "socket", "connect", // credential_theft (85)
+            "setuid", "execve", // priv_esc (75)
         ];
         let pred = classifier.classify_from_names(trace);
         assert!(pred.score <= 100);

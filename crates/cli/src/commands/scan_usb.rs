@@ -57,12 +57,18 @@ fn find_mount_point(device: &str) -> Option<PathBuf> {
 /// Platform-specific path to the mount table file.
 fn mount_table_path() -> &'static str {
     #[cfg(target_os = "linux")]
-    { "/proc/mounts" }
+    {
+        "/proc/mounts"
+    }
     #[cfg(target_os = "macos")]
-    { "/etc/mtab" }
+    {
+        "/etc/mtab"
+    }
     // Windows and other platforms: no mount table file
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    { "" }
+    {
+        ""
+    }
 }
 
 /// Find all mounted USB/removable devices.
@@ -126,8 +132,8 @@ fn is_removable_device(dev: &str, mount: &str) -> bool {
 /// Quarantine a single file using the AES-256-GCM encrypted vault.
 fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()> {
     let vault_dir = data_dir.join("quarantine");
-    let quarantine = prx_sd_quarantine::Quarantine::new(vault_dir)
-        .context("failed to open quarantine vault")?;
+    let quarantine =
+        prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?;
     let id = quarantine
         .quarantine(path, threat_name)
         .with_context(|| format!("failed to quarantine {}", path.display()))?;
@@ -136,10 +142,7 @@ fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()
 }
 
 /// Scan a single mount point and return the scan results.
-async fn scan_mount(
-    mount_path: &Path,
-    engine: &ScanEngine,
-) -> Vec<ScanResult> {
+async fn scan_mount(mount_path: &Path, engine: &ScanEngine) -> Vec<ScanResult> {
     println!(
         "\n{} scanning USB mount: {}",
         ">>>".cyan().bold(),
@@ -246,11 +249,7 @@ pub async fn run(device: Option<&str>, auto_quarantine: bool, data_dir: &Path) -
                 let threat_name = r.threat_name.as_deref().unwrap_or("Unknown");
                 match quarantine_file(&r.path, threat_name, data_dir) {
                     Ok(()) => {
-                        println!(
-                            "  {} {}",
-                            "Quarantined:".red().bold(),
-                            r.path.display()
-                        );
+                        println!("  {} {}", "Quarantined:".red().bold(), r.path.display());
                     }
                     Err(e) => {
                         eprintln!(

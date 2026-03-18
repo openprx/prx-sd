@@ -40,11 +40,7 @@ pub fn parse_elf(data: &[u8]) -> Result<ElfInfo> {
         .section_headers
         .iter()
         .map(|sh| {
-            let name = elf
-                .shdr_strtab
-                .get_at(sh.sh_name)
-                .unwrap_or("")
-                .to_string();
+            let name = elf.shdr_strtab.get_at(sh.sh_name).unwrap_or("").to_string();
 
             let offset = sh.sh_offset as usize;
             let size = sh.sh_size as usize;
@@ -89,11 +85,7 @@ pub fn parse_elf(data: &[u8]) -> Result<ElfInfo> {
     symbols.dedup();
 
     // Dynamic libraries (DT_NEEDED entries)
-    let dynamic_libs: Vec<String> = elf
-        .libraries
-        .iter()
-        .map(|lib| lib.to_string())
-        .collect();
+    let dynamic_libs: Vec<String> = elf.libraries.iter().map(|lib| lib.to_string()).collect();
 
     // Interpreter (e.g. /lib64/ld-linux-x86-64.so.2)
     let interpreter = elf.interpreter.map(|s| s.to_string());

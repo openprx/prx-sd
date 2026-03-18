@@ -335,20 +335,28 @@ impl FileSystemMonitor for FanotifyMonitor {
         for path in paths {
             let c_path =
                 CString::new(path.as_os_str().as_bytes()).context("invalid path for fanotify")?;
-            fanotify_mark(fd, FAN_MARK_ADD | FAN_MARK_MOUNT, mark_mask, AT_FDCWD, Some(&c_path))
-                .with_context(|| format!("failed to mark path: {}", path.display()))?;
+            fanotify_mark(
+                fd,
+                FAN_MARK_ADD | FAN_MARK_MOUNT,
+                mark_mask,
+                AT_FDCWD,
+                Some(&c_path),
+            )
+            .with_context(|| format!("failed to mark path: {}", path.display()))?;
         }
 
         self.fanotify_fd = Some(fd);
         self.running.store(true, Ordering::Release);
 
-        let handle = Self::spawn_event_loop(fd, self.tx.clone(), self.running.clone(), self.hash_checker.clone())?;
+        let handle = Self::spawn_event_loop(
+            fd,
+            self.tx.clone(),
+            self.running.clone(),
+            self.hash_checker.clone(),
+        )?;
         self.event_loop_handle = Some(handle);
 
-        tracing::info!(
-            "fanotify monitor started, watching {} path(s)",
-            paths.len()
-        );
+        tracing::info!("fanotify monitor started, watching {} path(s)", paths.len());
 
         Ok(())
     }

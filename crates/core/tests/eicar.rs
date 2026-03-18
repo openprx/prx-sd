@@ -7,7 +7,7 @@
 
 use std::fs;
 
-use prx_sd_core::{ScanConfig, ScanEngine, ThreatLevel, DetectionType};
+use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_signatures::SignatureDatabase;
 
 /// The canonical EICAR test string.

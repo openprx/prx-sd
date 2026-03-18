@@ -64,8 +64,16 @@ pub struct ProcAnomaly {
 
 /// Suspicious keywords that indicate a rootkit-like kernel module name.
 const SUSPICIOUS_MODULE_KEYWORDS: &[&str] = &[
-    "rootkit", "backdoor", "hide", "stealth", "invisible", "diamorphine",
-    "reptile", "suterusu", "knark", "adore",
+    "rootkit",
+    "backdoor",
+    "hide",
+    "stealth",
+    "invisible",
+    "diamorphine",
+    "reptile",
+    "suterusu",
+    "knark",
+    "adore",
 ];
 
 /// Perform a full rootkit scan and return aggregated results.
@@ -327,9 +335,7 @@ fn check_proc_anomalies() -> Vec<ProcAnomaly> {
                 if target_str.contains("(deleted)") {
                     anomalies.push(ProcAnomaly {
                         path: exe_path,
-                        description: format!(
-                            "process running from deleted binary: {target_str}"
-                        ),
+                        description: format!("process running from deleted binary: {target_str}"),
                     });
                 }
             }

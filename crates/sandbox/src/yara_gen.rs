@@ -202,7 +202,9 @@ fn extract_wide_strings(data: &[u8], min_len: usize) -> Vec<String> {
 /// Return `true` if `s` contains any suspicious keyword (case-insensitive).
 fn is_suspicious_string(s: &str) -> bool {
     let lower = s.to_lowercase();
-    SUSPICIOUS_KEYWORDS.iter().any(|kw| lower.contains(&kw.to_lowercase()))
+    SUSPICIOUS_KEYWORDS
+        .iter()
+        .any(|kw| lower.contains(&kw.to_lowercase()))
 }
 
 /// Heuristic check for IPv4-like strings.
@@ -311,7 +313,10 @@ fn build_rule_source(
 
     // Meta section.
     let _ = writeln!(src, "    meta:");
-    let _ = writeln!(src, "        description = \"Auto-generated from sandbox analysis\"");
+    let _ = writeln!(
+        src,
+        "        description = \"Auto-generated from sandbox analysis\""
+    );
     let _ = writeln!(src, "        threat_name = \"{threat_name}\"");
     let _ = writeln!(src, "        source_file = \"{file_name}\"");
     let _ = writeln!(src, "        date = \"{date}\"");
@@ -518,7 +523,10 @@ fn generate_behavior_rule(
 
     let _ = writeln!(src, "rule {base_name} {{");
     let _ = writeln!(src, "    meta:");
-    let _ = writeln!(src, "        description = \"Behavior-based rule from sandbox analysis\"");
+    let _ = writeln!(
+        src,
+        "        description = \"Behavior-based rule from sandbox analysis\""
+    );
     let _ = writeln!(src, "        threat_name = \"{threat_name}\"");
     let _ = writeln!(src, "        source_file = \"{file_name}\"");
     let _ = writeln!(src, "        date = \"{date}\"");
@@ -734,7 +742,10 @@ mod tests {
 
     #[test]
     fn test_bytes_to_hex_string() {
-        assert_eq!(bytes_to_hex_string(&[0x4D, 0x5A, 0x90, 0x00]), "4D 5A 90 00");
+        assert_eq!(
+            bytes_to_hex_string(&[0x4D, 0x5A, 0x90, 0x00]),
+            "4D 5A 90 00"
+        );
         assert_eq!(bytes_to_hex_string(&[0xFF]), "FF");
         assert_eq!(bytes_to_hex_string(&[]), "");
     }

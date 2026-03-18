@@ -7,11 +7,7 @@ use anyhow::{Context, Result};
 use prx_sd_core::{ScanResult, ThreatLevel};
 
 /// Generate a self-contained HTML scan report from scan results.
-pub fn generate_html_report(
-    results: &[ScanResult],
-    scan_path: &str,
-    elapsed_ms: u64,
-) -> String {
+pub fn generate_html_report(results: &[ScanResult], scan_path: &str, elapsed_ms: u64) -> String {
     let total = results.len();
     let clean = results
         .iter()
@@ -219,8 +215,8 @@ pub async fn run(output: &Path, input: &str) -> Result<()> {
             .with_context(|| format!("failed to read input file: {input}"))?
     };
 
-    let results: Vec<ScanResult> = serde_json::from_str(&json_str)
-        .context("failed to parse JSON scan results")?;
+    let results: Vec<ScanResult> =
+        serde_json::from_str(&json_str).context("failed to parse JSON scan results")?;
 
     let html = generate_html_report(&results, "(from JSON input)", 0);
     write_report(output, &html)?;

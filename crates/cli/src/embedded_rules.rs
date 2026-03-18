@@ -25,12 +25,12 @@ pub const CROSS_PLATFORM_RULE: &str =
     include_str!("../../../signatures-db/yara/malware/cross_platform.yar");
 
 /// Common packer detection rules.
-pub const PACKER_RULE: &str =
-    include_str!("../../../signatures-db/yara/packer/common_packers.yar");
+pub const PACKER_RULE: &str = include_str!("../../../signatures-db/yara/packer/common_packers.yar");
 
 /// Embedded SHA-256 hash blocklist (compiled into binary).
 /// Format: "hex_hash malware_name" per line.
-pub const EMBEDDED_HASHES: &str = include_str!("../../../signatures-db/hashes/sha256_blocklist.txt");
+pub const EMBEDDED_HASHES: &str =
+    include_str!("../../../signatures-db/hashes/sha256_blocklist.txt");
 
 /// Import embedded hashes into the signature database at `signatures_dir`.
 /// Skips if the database already has entries (avoids re-importing on every run).
@@ -65,7 +65,8 @@ pub fn import_embedded_hashes(signatures_dir: &std::path::Path) -> Result<usize>
         return Ok(0);
     }
 
-    let count = db.import_hashes(&entries)
+    let count = db
+        .import_hashes(&entries)
         .context("failed to import embedded hashes")?;
     Ok(count)
 }
@@ -76,8 +77,7 @@ fn decode_hex(s: &str) -> Result<Vec<u8>> {
     }
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16)
-            .map_err(|e| anyhow::anyhow!("{e}")))
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| anyhow::anyhow!("{e}")))
         .collect()
 }
 
@@ -104,9 +104,8 @@ pub fn write_embedded_rules(yara_dir: &Path) -> Result<()> {
 
         // Ensure the parent directory exists.
         if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create directory {}", parent.display())
-            })?;
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create directory {}", parent.display()))?;
         }
 
         std::fs::write(&dest, content)
@@ -151,8 +150,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
 
         let eicar_path = tmp.join("test/eicar.yar");
-        std::fs::create_dir_all(eicar_path.parent().expect("has parent"))
-            .expect("create dir");
+        std::fs::create_dir_all(eicar_path.parent().expect("has parent")).expect("create dir");
         std::fs::write(&eicar_path, "custom rule").expect("write custom");
 
         write_embedded_rules(&tmp).expect("write_embedded_rules should succeed");

@@ -85,7 +85,9 @@ impl ProcessBehaviorScore {
     /// Recalculate the total score from counters.
     fn recalculate(&mut self) {
         // Weights: exec=5, connect=3, file_write=1, sensitive=10
-        self.total_score = self.exec_count.saturating_mul(5)
+        self.total_score = self
+            .exec_count
+            .saturating_mul(5)
             .saturating_add(self.connect_count.saturating_mul(3))
             .saturating_add(self.file_write_count)
             .saturating_add(self.sensitive_access.saturating_mul(10));
@@ -201,8 +203,7 @@ impl BehaviorMonitor {
         entry.exec_count = count_children(pid);
 
         // 3. File descriptors — check for writes and sensitive access
-        let (write_count, sensitive_count) =
-            check_fd_activity(pid, &self.config.sensitive_paths);
+        let (write_count, sensitive_count) = check_fd_activity(pid, &self.config.sensitive_paths);
         entry.file_write_count = write_count;
         entry.sensitive_access = sensitive_count;
 
@@ -237,10 +238,16 @@ impl BehaviorMonitor {
             reasons.push(format!("spawned {} child processes", entry.exec_count));
         }
         if entry.connect_count > 0 {
-            reasons.push(format!("{} active network connections", entry.connect_count));
+            reasons.push(format!(
+                "{} active network connections",
+                entry.connect_count
+            ));
         }
         if entry.file_write_count > 0 {
-            reasons.push(format!("{} writable file descriptors", entry.file_write_count));
+            reasons.push(format!(
+                "{} writable file descriptors",
+                entry.file_write_count
+            ));
         }
         if entry.sensitive_access > 0 {
             reasons.push(format!(
@@ -287,11 +294,7 @@ fn list_pids() -> Vec<u32> {
 
     entries
         .filter_map(|e| e.ok())
-        .filter_map(|e| {
-            e.file_name()
-                .to_str()
-                .and_then(|s| s.parse::<u32>().ok())
-        })
+        .filter_map(|e| e.file_name().to_str().and_then(|s| s.parse::<u32>().ok()))
         .collect()
 }
 
@@ -388,9 +391,11 @@ fn parse_proc_net_tcp(path: &str) -> Vec<NetworkConnection> {
         }
 
         // fields[1] = local_address:port, fields[2] = rem_address:port, fields[3] = state
-        if let (Some(local), Some(remote), Some(state)) =
-            (parse_hex_addr(fields[1]), parse_hex_addr(fields[2]), parse_hex_state(fields[3]))
-        {
+        if let (Some(local), Some(remote), Some(state)) = (
+            parse_hex_addr(fields[1]),
+            parse_hex_addr(fields[2]),
+            parse_hex_state(fields[3]),
+        ) {
             connections.push(NetworkConnection {
                 local_addr: local.0,
                 local_port: local.1,
@@ -506,9 +511,12 @@ fn extract_field(line: &str, key: &str) -> Option<String> {
 
         // Ensure it's a whole-token match (at start or preceded by whitespace / ':' / '(').
         let is_token_start = abs_pos == 0
-            || line.as_bytes().get(abs_pos.wrapping_sub(1)).map_or(false, |&b| {
-                b == b' ' || b == b'\t' || b == b':' || b == b'('
-            });
+            || line
+                .as_bytes()
+                .get(abs_pos.wrapping_sub(1))
+                .map_or(false, |&b| {
+                    b == b' ' || b == b'\t' || b == b':' || b == b'('
+                });
 
         if is_token_start {
             let value_start = abs_pos + key.len();
@@ -669,25 +677,22 @@ mod tests {
     #[test]
     fn verdict_for_unknown_pid_is_clean() {
         let monitor = BehaviorMonitor::new(BehaviorConfig::default());
-        assert!(matches!(monitor.verdict_for(999_999), BehaviorVerdict::Clean));
+        assert!(matches!(
+            monitor.verdict_for(999_999),
+            BehaviorVerdict::Clean
+        ));
     }
 
     #[test]
     fn parse_hex_addr_loopback() {
         let result = parse_hex_addr("0100007F:1F90");
-        assert_eq!(
-            result,
-            Some(("127.0.0.1".to_string(), 8080))
-        );
+        assert_eq!(result, Some(("127.0.0.1".to_string(), 8080)));
     }
 
     #[test]
     fn parse_hex_addr_any() {
         let result = parse_hex_addr("00000000:0050");
-        assert_eq!(
-            result,
-            Some(("0.0.0.0".to_string(), 80))
-        );
+        assert_eq!(result, Some(("0.0.0.0".to_string(), 80)));
     }
 
     #[test]

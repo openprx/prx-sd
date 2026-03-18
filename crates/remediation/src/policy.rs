@@ -74,8 +74,8 @@ impl RemediationPolicy {
 
     /// Save the remediation policy to a JSON file.
     pub fn save(&self, path: &Path) -> Result<()> {
-        let json = serde_json::to_string_pretty(self)
-            .context("failed to serialize remediation policy")?;
+        let json =
+            serde_json::to_string_pretty(self).context("failed to serialize remediation policy")?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).with_context(|| {
                 format!("failed to create parent directory: {}", parent.display())
@@ -134,10 +134,7 @@ mod tests {
             policy.on_malicious[2],
             ActionType::CleanPersistence
         ));
-        assert!(matches!(
-            policy.on_malicious[3],
-            ActionType::AddToBlocklist
-        ));
+        assert!(matches!(policy.on_malicious[3], ActionType::AddToBlocklist));
     }
 
     #[test]
@@ -201,21 +198,13 @@ mod tests {
     #[test]
     fn is_whitelisted_by_hash() {
         let policy = RemediationPolicy {
-            whitelist_hashes: vec![
-                "AABBCCDD1122334455667788".to_string(),
-            ],
+            whitelist_hashes: vec!["AABBCCDD1122334455667788".to_string()],
             ..RemediationPolicy::default()
         };
 
         // Case-insensitive match
-        assert!(policy.is_whitelisted(
-            Path::new("/any/file"),
-            Some("aabbccdd1122334455667788"),
-        ));
-        assert!(!policy.is_whitelisted(
-            Path::new("/any/file"),
-            Some("0000000000000000"),
-        ));
+        assert!(policy.is_whitelisted(Path::new("/any/file"), Some("aabbccdd1122334455667788"),));
+        assert!(!policy.is_whitelisted(Path::new("/any/file"), Some("0000000000000000"),));
         // No hash provided
         assert!(!policy.is_whitelisted(Path::new("/any/file"), None));
     }

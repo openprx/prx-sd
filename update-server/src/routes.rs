@@ -127,9 +127,7 @@ pub async fn get_delta(
 }
 
 /// `GET /full` - Return the full signed database snapshot.
-pub async fn get_full(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+pub async fn get_full(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
     let data = state.storage.get_full().map_err(|e| {
         warn!(error = %e, "full snapshot not available");
         AppError::not_found("full database snapshot not available")

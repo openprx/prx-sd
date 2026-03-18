@@ -32,10 +32,7 @@ pub enum Finding {
     HighEntropy(f64),
     /// A named PE section has suspiciously high entropy, suggesting packing or
     /// encryption.
-    PackedSection {
-        name: String,
-        entropy: f64,
-    },
+    PackedSection { name: String, entropy: f64 },
     /// A suspicious Windows API was found in the import table.
     SuspiciousApi(String),
     /// The PE timestamp is zero (often zeroed by malware authors).
@@ -204,11 +201,10 @@ impl HeuristicEngine {
     ///
     /// Falls back to the heuristic scorer if model files are not found.
     pub fn with_models(model_dir: &std::path::Path) -> Self {
-        let ml_model = ml_model::MlModel::load(model_dir)
-            .unwrap_or_else(|e| {
-                debug!("failed to load ML models: {e}, using fallback");
-                ml_model::MlModel::new_fallback()
-            });
+        let ml_model = ml_model::MlModel::load(model_dir).unwrap_or_else(|e| {
+            debug!("failed to load ML models: {e}, using fallback");
+            ml_model::MlModel::new_fallback()
+        });
         HeuristicEngine { ml_model }
     }
 
@@ -258,7 +254,11 @@ impl HeuristicEngine {
 
         // If HighEntropy is the ONLY finding, suppress it regardless of
         // file type — entropy alone is not a reliable malware indicator.
-        if non_entropy_findings == 0 && findings.iter().any(|f| matches!(f, Finding::HighEntropy(_))) {
+        if non_entropy_findings == 0
+            && findings
+                .iter()
+                .any(|f| matches!(f, Finding::HighEntropy(_)))
+        {
             debug!("suppressing lone HighEntropy finding (need corroborating evidence)");
             findings.clear();
         }
@@ -269,9 +269,12 @@ impl HeuristicEngine {
         // are truly anomalous indicators like packers or no imports.
         if let Some(elf) = parsed.as_elf() {
             if elf.elf_type == "DYN" {
-                let has_packer = findings.iter().any(|f| matches!(
-                    f, Finding::PackerDetected(_) | Finding::NoImports | Finding::SelfModifying
-                ));
+                let has_packer = findings.iter().any(|f| {
+                    matches!(
+                        f,
+                        Finding::PackerDetected(_) | Finding::NoImports | Finding::SelfModifying
+                    )
+                });
                 if !has_packer {
                     debug!("suppressing findings on ELF shared library (normal APIs)");
                     findings.clear();
@@ -283,14 +286,22 @@ impl HeuristicEngine {
         // Binaries like bash, coreutils naturally contain these strings.
         if let Some(elf) = parsed.as_elf() {
             if elf.elf_type == "EXEC" {
-                let generic_apis = ["/bin/sh", "/bin/bash", "socket", "connect",
-                                    "execve", "ptrace", "dup2", "getdents",
-                                    "/etc/shadow", "reverse", "crontab",
-                                    "authorized_keys"];
+                let generic_apis = [
+                    "/bin/sh",
+                    "/bin/bash",
+                    "socket",
+                    "connect",
+                    "execve",
+                    "ptrace",
+                    "dup2",
+                    "getdents",
+                    "/etc/shadow",
+                    "reverse",
+                    "crontab",
+                    "authorized_keys",
+                ];
                 let has_non_generic = findings.iter().any(|f| match f {
-                    Finding::SuspiciousApi(api) => {
-                        !generic_apis.iter().any(|g| api.contains(g))
-                    }
+                    Finding::SuspiciousApi(api) => !generic_apis.iter().any(|g| api.contains(g)),
                     Finding::HighEntropy(_) | Finding::PackedSection { .. } => false,
                     _ => true, // Packer, NoImports, etc. are always non-generic
                 });
@@ -309,7 +320,9 @@ impl HeuristicEngine {
             && parsed.as_pdf().is_none()
             && parsed.as_office().is_none()
         {
-            let only_entropy = findings.iter().all(|f| matches!(f, Finding::HighEntropy(_)));
+            let only_entropy = findings
+                .iter()
+                .all(|f| matches!(f, Finding::HighEntropy(_)));
             if only_entropy && !findings.is_empty() {
                 debug!("suppressing HighEntropy on non-executable file");
                 findings.clear();
@@ -443,7 +456,10 @@ impl HeuristicEngine {
             if data.windows(pattern.len()).any(|w| w == *pattern) {
                 let name = String::from_utf8_lossy(pattern).to_string();
                 // Avoid duplicates from the import-table scan above.
-                if !findings.iter().any(|f| matches!(f, Finding::SuspiciousApi(n) if n == &name)) {
+                if !findings
+                    .iter()
+                    .any(|f| matches!(f, Finding::SuspiciousApi(n) if n == &name))
+                {
                     findings.push(Finding::SuspiciousApi(name));
                 }
             }
@@ -465,7 +481,10 @@ impl HeuristicEngine {
             debug!("entry point anomaly detected");
             // Entry point anomalies strengthen packer suspicion. If no packer
             // was detected by section name, record a suspicious section.
-            if !findings.iter().any(|f| matches!(f, Finding::PackerDetected(_))) {
+            if !findings
+                .iter()
+                .any(|f| matches!(f, Finding::PackerDetected(_)))
+            {
                 findings.push(Finding::SuspiciousSection("EP anomaly".to_string()));
             }
         }
@@ -511,25 +530,25 @@ impl HeuristicEngine {
 
         // Suspicious strings in ELF binaries
         let suspicious_patterns: &[&[u8]] = &[
-            b"/dev/tcp/",           // bash reverse shell
-            b"LD_PRELOAD",          // rootkit injection
-            b"/proc/self/exe",      // self-replication
-            b"ptrace",              // anti-debug (was ptrace(PTRACE_ — too specific)
-            b"getdents",            // directory listing hook — matches getdents and getdents64
-            b"/etc/shadow",         // credential theft
-            b"authorized_keys",     // SSH backdoor
-            b"crontab",             // persistence
-            b"/etc/systemd",        // systemd persistence (was /etc/systemd/system — too specific)
-            b"stratum+tcp",         // cryptominer (was stratum+tcp:// — too specific)
-            b"kdevtmpfsi",          // Kinsing miner
-            b"xmrig",               // cryptominer
-            b"rootkit",             // explicit rootkit string
-            b"hide_pid",            // rootkit indicator
-            b"sys_call_table",      // rootkit indicator
-            b"module_hide",         // rootkit indicator
-            b"/bin/sh",             // shell access
-            b"reverse",             // reverse shell
-            b"backdoor",            // explicit backdoor string
+            b"/dev/tcp/",       // bash reverse shell
+            b"LD_PRELOAD",      // rootkit injection
+            b"/proc/self/exe",  // self-replication
+            b"ptrace",          // anti-debug (was ptrace(PTRACE_ — too specific)
+            b"getdents",        // directory listing hook — matches getdents and getdents64
+            b"/etc/shadow",     // credential theft
+            b"authorized_keys", // SSH backdoor
+            b"crontab",         // persistence
+            b"/etc/systemd",    // systemd persistence (was /etc/systemd/system — too specific)
+            b"stratum+tcp",     // cryptominer (was stratum+tcp:// — too specific)
+            b"kdevtmpfsi",      // Kinsing miner
+            b"xmrig",           // cryptominer
+            b"rootkit",         // explicit rootkit string
+            b"hide_pid",        // rootkit indicator
+            b"sys_call_table",  // rootkit indicator
+            b"module_hide",     // rootkit indicator
+            b"/bin/sh",         // shell access
+            b"reverse",         // reverse shell
+            b"backdoor",        // explicit backdoor string
         ];
 
         for pattern in suspicious_patterns {
@@ -572,17 +591,17 @@ impl HeuristicEngine {
 
         // Suspicious macOS-specific strings
         let suspicious_patterns: &[&[u8]] = &[
-            b"osascript",                   // AppleScript execution
-            b"DYLD_INSERT_LIBRARIES",       // dylib injection
-            b"LaunchAgents",                // persistence
-            b"LaunchDaemons",               // persistence
-            b"security find-generic-pass",  // keychain theft
-            b"spctl --master-disable",      // Gatekeeper bypass
-            b"com.apple.quarantine",        // quarantine flag manipulation
-            b"xattr -d",                    // remove extended attributes
-            b"screencapture",               // screen spying
-            b"AVCaptureSession",            // camera access
-            b"CGWindowListCreateImage",     // screen capture API
+            b"osascript",                  // AppleScript execution
+            b"DYLD_INSERT_LIBRARIES",      // dylib injection
+            b"LaunchAgents",               // persistence
+            b"LaunchDaemons",              // persistence
+            b"security find-generic-pass", // keychain theft
+            b"spctl --master-disable",     // Gatekeeper bypass
+            b"com.apple.quarantine",       // quarantine flag manipulation
+            b"xattr -d",                   // remove extended attributes
+            b"screencapture",              // screen spying
+            b"AVCaptureSession",           // camera access
+            b"CGWindowListCreateImage",    // screen capture API
         ];
 
         for pattern in suspicious_patterns {
@@ -594,8 +613,13 @@ impl HeuristicEngine {
 
         // Suspicious imports
         let suspicious_imports = [
-            "ptrace", "dlopen", "NSTask", "system", "popen",
-            "SecKeychainCopyDefault", "IOServiceGetMatchingService",
+            "ptrace",
+            "dlopen",
+            "NSTask",
+            "system",
+            "popen",
+            "SecKeychainCopyDefault",
+            "IOServiceGetMatchingService",
         ];
         for imp in &macho.imports {
             if suspicious_imports.iter().any(|s| imp.contains(s)) {
@@ -605,11 +629,7 @@ impl HeuristicEngine {
     }
 
     /// Office-specific macro analysis.
-    fn analyze_office_macros(
-        &self,
-        data: &[u8],
-        findings: &mut Vec<Finding>,
-    ) {
+    fn analyze_office_macros(&self, data: &[u8], findings: &mut Vec<Finding>) {
         let analysis = match prx_sd_parsers::office::analyze_office(data) {
             Ok(a) => a,
             Err(e) => {
@@ -659,11 +679,7 @@ impl HeuristicEngine {
     }
 
     /// PDF-specific exploit analysis.
-    fn analyze_pdf_exploits(
-        &self,
-        data: &[u8],
-        findings: &mut Vec<Finding>,
-    ) {
+    fn analyze_pdf_exploits(&self, data: &[u8], findings: &mut Vec<Finding>) {
         let analysis = match prx_sd_parsers::pdf::analyze_pdf(data) {
             Ok(a) => a,
             Err(e) => {
@@ -713,11 +729,7 @@ mod tests {
     use super::*;
     use prx_sd_parsers::pe::{ImportInfo, PeInfo, SectionInfo};
 
-    fn make_pe(
-        sections: Vec<SectionInfo>,
-        imports: Vec<ImportInfo>,
-        timestamp: u32,
-    ) -> ParsedFile {
+    fn make_pe(sections: Vec<SectionInfo>, imports: Vec<ImportInfo>, timestamp: u32) -> ParsedFile {
         ParsedFile::PE(PeInfo {
             is_64bit: false,
             is_dll: false,
@@ -789,13 +801,26 @@ mod tests {
         let engine = HeuristicEngine::new();
         let result = engine.analyze(&data, &parsed);
 
-        assert!(result.score >= 60, "expected malicious score, got {}", result.score);
+        assert!(
+            result.score >= 60,
+            "expected malicious score, got {}",
+            result.score
+        );
         assert_eq!(result.threat_level, ThreatLevel::Malicious);
 
         // Should have packer-related findings.
-        assert!(result.findings.iter().any(|f| matches!(f, Finding::PackerDetected(_))));
-        assert!(result.findings.iter().any(|f| matches!(f, Finding::UPXPacked)));
-        assert!(result.findings.iter().any(|f| matches!(f, Finding::NoImports)));
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| matches!(f, Finding::PackerDetected(_))));
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| matches!(f, Finding::UPXPacked)));
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| matches!(f, Finding::NoImports)));
     }
 
     #[test]

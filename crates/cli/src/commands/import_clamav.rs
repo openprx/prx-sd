@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use colored::Colorize;
 
 pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
@@ -29,14 +29,10 @@ pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
         println!("Importing {}...", path.display());
 
         let stats = match ext.as_str() {
-            "cvd" | "cld" => {
-                prx_sd_signatures::import_cvd(path, &db)
-                    .with_context(|| format!("failed to import CVD: {}", path.display()))?
-            }
-            "hdb" | "hsb" => {
-                prx_sd_signatures::import_hash_file(path, &db)
-                    .with_context(|| format!("failed to import: {}", path.display()))?
-            }
+            "cvd" | "cld" => prx_sd_signatures::import_cvd(path, &db)
+                .with_context(|| format!("failed to import CVD: {}", path.display()))?,
+            "hdb" | "hsb" => prx_sd_signatures::import_hash_file(path, &db)
+                .with_context(|| format!("failed to import: {}", path.display()))?,
             _ => {
                 eprintln!(
                     "{} unsupported file type '{}' for {}",
@@ -89,10 +85,7 @@ pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
     }
 
     println!();
-    println!(
-        "{} ClamAV import complete",
-        "success:".green().bold()
-    );
+    println!("{} ClamAV import complete", "success:".green().bold());
     println!("  Total SHA-256 hash entries imported: {total_sha256}");
     println!("  Total MD5 hash entries imported: {total_md5}");
     if total_ndb > 0 || total_ldb > 0 {

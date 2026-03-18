@@ -104,7 +104,9 @@ fn inspect_zip(data: &[u8]) -> Result<ArchiveInfo> {
     let mut total_uncompressed_size: u64 = 0;
 
     for i in 0..archive.len() {
-        let file = archive.by_index_raw(i).context("failed to read zip entry")?;
+        let file = archive
+            .by_index_raw(i)
+            .context("failed to read zip entry")?;
         let is_encrypted = file.encrypted();
         let size = file.size();
         total_uncompressed_size = total_uncompressed_size.saturating_add(size);
@@ -458,8 +460,7 @@ mod tests {
     fn inspect_7z_valid_signature() {
         let mut data = vec![0u8; 64];
         data[0..6].copy_from_slice(b"7z\xBC\xAF\x27\x1C");
-        let info =
-            inspect_archive(&data, ArchiveFormat::SevenZip).expect("should inspect 7z stub");
+        let info = inspect_archive(&data, ArchiveFormat::SevenZip).expect("should inspect 7z stub");
         assert_eq!(info.format, ArchiveFormat::SevenZip);
         assert!(info.entries.is_empty());
     }
@@ -476,8 +477,7 @@ mod tests {
     #[test]
     fn extract_zip_contents() {
         let data = make_minimal_zip();
-        let files =
-            extract_archive(&data, ArchiveFormat::Zip, 3).expect("should extract zip");
+        let files = extract_archive(&data, ArchiveFormat::Zip, 3).expect("should extract zip");
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].0, "hello.txt");
         assert_eq!(files[0].1, b"Hello, world!");
@@ -487,8 +487,7 @@ mod tests {
     fn extract_gzip_contents() {
         let content = b"gzip payload";
         let data = make_minimal_gzip(content);
-        let files =
-            extract_archive(&data, ArchiveFormat::Gzip, 3).expect("should extract gzip");
+        let files = extract_archive(&data, ArchiveFormat::Gzip, 3).expect("should extract gzip");
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].1, content);
     }
@@ -506,7 +505,10 @@ mod tests {
         let mut data = vec![0u8; 64];
         data[0..6].copy_from_slice(b"7z\xBC\xAF\x27\x1C");
         let result = extract_archive(&data, ArchiveFormat::SevenZip, 3);
-        assert!(result.is_err(), "7z extraction should fail (not implemented)");
+        assert!(
+            result.is_err(),
+            "7z extraction should fail (not implemented)"
+        );
     }
 
     #[test]

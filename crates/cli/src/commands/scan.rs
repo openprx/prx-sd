@@ -44,9 +44,10 @@ fn build_config(data_dir: &Path, threads: Option<usize>, exclude: Vec<String>) -
 /// Quarantine a single file using the real AES-256-GCM encrypted vault.
 fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()> {
     let vault_dir = data_dir.join("quarantine");
-    let quarantine = prx_sd_quarantine::Quarantine::new(vault_dir)
-        .context("failed to open quarantine vault")?;
-    let id = quarantine.quarantine(path, threat_name)
+    let quarantine =
+        prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?;
+    let id = quarantine
+        .quarantine(path, threat_name)
         .with_context(|| format!("failed to quarantine {}", path.display()))?;
     tracing::info!(id = %id, path = %path.display(), threat = threat_name, "file quarantined");
     Ok(())
@@ -56,7 +57,9 @@ fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()
 async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()> {
     let threats: Vec<&ScanResult> = results
         .iter()
-        .filter(|r| r.threat_level == ThreatLevel::Malicious || r.threat_level == ThreatLevel::Suspicious)
+        .filter(|r| {
+            r.threat_level == ThreatLevel::Malicious || r.threat_level == ThreatLevel::Suspicious
+        })
         .collect();
 
     if threats.is_empty() {
@@ -66,22 +69,20 @@ async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()
     // Load policy from config dir, or use defaults.
     let policy_path = data_dir.join("remediation_policy.json");
     let policy = if policy_path.exists() {
-        RemediationPolicy::load(&policy_path)
-            .unwrap_or_else(|e| {
-                eprintln!(
-                    "  {} failed to load policy: {e}, using defaults",
-                    "warning:".yellow()
-                );
-                RemediationPolicy::default()
-            })
+        RemediationPolicy::load(&policy_path).unwrap_or_else(|e| {
+            eprintln!(
+                "  {} failed to load policy: {e}, using defaults",
+                "warning:".yellow()
+            );
+            RemediationPolicy::default()
+        })
     } else {
         RemediationPolicy::default()
     };
 
     let vault_dir = data_dir.join("quarantine");
     let quarantine = Arc::new(
-        prx_sd_quarantine::Quarantine::new(vault_dir)
-            .context("failed to open quarantine vault")?,
+        prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?,
     );
 
     let audit_dir = data_dir.join("audit");
@@ -119,20 +120,14 @@ async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()
             } else {
                 "FAIL".red().bold()
             };
-            println!(
-                "    [{}] {:?}",
-                status, action_result.action
-            );
+            println!("    [{}] {:?}", status, action_result.action);
             if let Some(err) = &action_result.error {
                 eprintln!("      {}", err.as_str().red());
             }
         }
     }
 
-    println!(
-        "\n{} remediation complete",
-        "success:".green().bold()
-    );
+    println!("\n{} remediation complete", "success:".green().bold());
 
     Ok(())
 }
@@ -271,11 +266,8 @@ pub async fn run(
 
     // Generate HTML report if requested.
     if let Some(report_path) = &report {
-        let html = super::report::generate_html_report(
-            &results,
-            &path.display().to_string(),
-            elapsed_ms,
-        );
+        let html =
+            super::report::generate_html_report(&results, &path.display().to_string(), elapsed_ms);
         super::report::write_report(report_path, &html)?;
         println!("Report saved to {}", report_path.display());
     }
@@ -284,10 +276,7 @@ pub async fn run(
     // since remediation already includes quarantine in its default policy.
     if remediate {
         if let Err(e) = remediate_threats(&results, data_dir).await {
-            eprintln!(
-                "\n{} remediation error: {e:#}",
-                "Error:".red().bold()
-            );
+            eprintln!("\n{} remediation error: {e:#}", "Error:".red().bold());
         }
     } else if auto_quarantine {
         let threats: Vec<&ScanResult> = results
@@ -305,11 +294,7 @@ pub async fn run(
                 let threat_name = r.threat_name.as_deref().unwrap_or("Unknown");
                 match quarantine_file(&r.path, threat_name, data_dir) {
                     Ok(()) => {
-                        println!(
-                            "  {} {}",
-                            "Quarantined:".red().bold(),
-                            r.path.display()
-                        );
+                        println!("  {} {}", "Quarantined:".red().bold(), r.path.display());
                     }
                     Err(e) => {
                         eprintln!(

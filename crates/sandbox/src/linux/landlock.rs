@@ -173,8 +173,7 @@ impl LandlockSandbox {
         let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_PATH | libc::O_CLOEXEC) };
         if fd < 0 {
             let err = std::io::Error::last_os_error();
-            return Err(err)
-                .with_context(|| format!("failed to open path: {}", path.display()));
+            return Err(err).with_context(|| format!("failed to open path: {}", path.display()));
         }
 
         let path_beneath = LandlockPathBeneathAttr {
@@ -188,9 +187,7 @@ impl LandlockSandbox {
         // SAFETY: fd is a valid open file descriptor returned by open() above.
         unsafe { libc::close(fd) };
 
-        result.with_context(|| {
-            format!("failed to add landlock rule for: {}", path.display())
-        })
+        result.with_context(|| format!("failed to add landlock rule for: {}", path.display()))
     }
 
     /// Apply the Landlock rules to the current process.
@@ -206,12 +203,9 @@ impl LandlockSandbox {
         let attr = LandlockRulesetAttr {
             handled_access_fs: LANDLOCK_ACCESS_FS_ALL,
         };
-        let ruleset_fd = sys_landlock_create_ruleset(
-            &attr,
-            std::mem::size_of::<LandlockRulesetAttr>(),
-            0,
-        )
-        .context("failed to create landlock ruleset")?;
+        let ruleset_fd =
+            sys_landlock_create_ruleset(&attr, std::mem::size_of::<LandlockRulesetAttr>(), 0)
+                .context("failed to create landlock ruleset")?;
 
         // Add read-only path rules.
         for path in &self.allowed_read_paths {

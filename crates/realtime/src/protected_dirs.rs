@@ -83,10 +83,7 @@ fn default_protected_paths() -> Vec<PathBuf> {
     }
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
-        vec![
-            PathBuf::from("/etc/hosts"),
-            PathBuf::from("/etc/passwd"),
-        ]
+        vec![PathBuf::from("/etc/hosts"), PathBuf::from("/etc/passwd")]
     }
 }
 
@@ -156,9 +153,11 @@ impl ProtectedDirsEnforcer {
         }
 
         // Check if path is under a protected directory.
-        let is_protected = self.config.protected_paths.iter().any(|protected| {
-            path.starts_with(protected)
-        });
+        let is_protected = self
+            .config
+            .protected_paths
+            .iter()
+            .any(|protected| path.starts_with(protected));
 
         if !is_protected {
             return ProtectionVerdict::Allowed;

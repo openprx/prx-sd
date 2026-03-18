@@ -132,10 +132,8 @@ mod tests {
 
     #[test]
     fn remediation_result_failure_has_error_field_set() {
-        let result = RemediationResult::failure(
-            RemediationAction::Deleted,
-            "permission denied".to_string(),
-        );
+        let result =
+            RemediationResult::failure(RemediationAction::Deleted, "permission denied".to_string());
         assert!(!result.success);
         assert_eq!(result.error.as_deref(), Some("permission denied"));
         assert!(!result.requires_reboot);
@@ -196,8 +194,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&record).expect("serialize");
-        let deserialized: ThreatAuditRecord =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: ThreatAuditRecord = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(deserialized.id, record.id);
         assert_eq!(deserialized.file_path, record.file_path);
@@ -226,8 +223,7 @@ mod tests {
         ];
         for pt in &types {
             let json = serde_json::to_string(pt).expect("serialize");
-            let deserialized: PersistenceType =
-                serde_json::from_str(&json).expect("deserialize");
+            let deserialized: PersistenceType = serde_json::from_str(&json).expect("deserialize");
             // Just verify roundtrip doesn't fail
             let json2 = serde_json::to_string(&deserialized).expect("re-serialize");
             assert_eq!(json, json2);

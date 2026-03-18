@@ -12,11 +12,11 @@
 use std::io::{Cursor, Read};
 use std::path::Path;
 
-use anyhow::{Context, Result};
-use flate2::read::GzDecoder;
 use crate::database::SignatureDatabase;
 use crate::formats::cvd::parse_cvd;
 use crate::formats::hdb::{self, HashKind};
+use anyhow::{Context, Result};
+use flate2::read::GzDecoder;
 
 /// Statistics returned after a ClamAV import operation.
 #[derive(Debug, Clone)]
@@ -227,7 +227,10 @@ pub fn import_cvd_bytes(data: &[u8], db: &SignatureDatabase) -> Result<ClamavImp
 
 /// Import hash signatures from a standalone `.hdb` or `.hsb` file
 /// (not wrapped in a CVD container).
-pub fn import_hash_file(path: impl AsRef<Path>, db: &SignatureDatabase) -> Result<ClamavImportStats> {
+pub fn import_hash_file(
+    path: impl AsRef<Path>,
+    db: &SignatureDatabase,
+) -> Result<ClamavImportStats> {
     let path = path.as_ref();
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read: {}", path.display()))?;

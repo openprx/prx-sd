@@ -46,14 +46,15 @@ async fn main() -> anyhow::Result<()> {
         .parse()
         .context("LISTEN_ADDR must be a valid socket address")?;
 
-    let storage_dir = PathBuf::from(
-        std::env::var("STORAGE_DIR").unwrap_or_else(|_| "./data".to_string()),
-    );
+    let storage_dir =
+        PathBuf::from(std::env::var("STORAGE_DIR").unwrap_or_else(|_| "./data".to_string()));
 
-    let key_file = PathBuf::from(
-        std::env::var("KEY_FILE")
-            .unwrap_or_else(|_| storage_dir.join("signing.key").to_string_lossy().to_string()),
-    );
+    let key_file = PathBuf::from(std::env::var("KEY_FILE").unwrap_or_else(|_| {
+        storage_dir
+            .join("signing.key")
+            .to_string_lossy()
+            .to_string()
+    }));
 
     let admin_token = std::env::var("ADMIN_TOKEN").ok();
 

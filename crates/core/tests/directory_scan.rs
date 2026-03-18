@@ -14,10 +14,7 @@ const MALWARE_A: &[u8] = b"__prx_sd_test_malware_sample_alpha__";
 const MALWARE_B: &[u8] = b"__prx_sd_test_malware_sample_bravo__";
 
 /// Build a `ScanEngine` with the given malicious byte patterns pre-imported.
-fn setup_engine(
-    tmp: &tempfile::TempDir,
-    malicious_samples: &[(&[u8], &str)],
-) -> ScanEngine {
+fn setup_engine(tmp: &tempfile::TempDir, malicious_samples: &[(&[u8], &str)]) -> ScanEngine {
     let sigs_dir = tmp.path().join("signatures");
     let yara_dir = tmp.path().join("yara");
     let quarantine_dir = tmp.path().join("quarantine");
@@ -29,12 +26,7 @@ fn setup_engine(
     let db = SignatureDatabase::open(&sigs_dir).expect("open sig db");
     let entries: Vec<(Vec<u8>, String)> = malicious_samples
         .iter()
-        .map(|(data, name)| {
-            (
-                prx_sd_signatures::hash::sha256_hash(data),
-                name.to_string(),
-            )
-        })
+        .map(|(data, name)| (prx_sd_signatures::hash::sha256_hash(data), name.to_string()))
         .collect();
     db.import_hashes(&entries).expect("import hashes");
 
@@ -153,10 +145,7 @@ fn test_scan_respects_exclude_paths() {
 
     assert_eq!(results.len(), 1, "only 1 file should be scanned");
     assert!(
-        results[0]
-            .path
-            .to_string_lossy()
-            .contains("included.txt"),
+        results[0].path.to_string_lossy().contains("included.txt"),
         "the scanned file should be included.txt"
     );
 }

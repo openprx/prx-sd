@@ -32,8 +32,8 @@ impl ScanEngine {
             return Ok(ScanResult::clean(&path, 0));
         }
 
-        let metadata = fs::metadata(&path)
-            .with_context(|| format!("cannot stat {}", path.display()))?;
+        let metadata =
+            fs::metadata(&path).with_context(|| format!("cannot stat {}", path.display()))?;
 
         if metadata.len() > self.config.max_file_size {
             debug!(
@@ -45,8 +45,7 @@ impl ScanEngine {
             return Ok(ScanResult::clean(&path, elapsed_ms(&start)));
         }
 
-        let data = fs::read(&path)
-            .with_context(|| format!("cannot read {}", path.display()))?;
+        let data = fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?;
 
         let mut result = self.scan_data_inner(&data, &path, &start)?;
 
@@ -56,7 +55,11 @@ impl ScanEngine {
                 let hash_bytes = prx_sd_signatures::hash::sha256_hash(&data);
                 let sha256_hex: String = hash_bytes.iter().map(|b| format!("{b:02x}")).collect();
                 match vt.lookup_sha256(&sha256_hex).await {
-                    Ok(VtVerdict::Malicious { threat_name, detections, total }) => {
+                    Ok(VtVerdict::Malicious {
+                        threat_name,
+                        detections,
+                        total,
+                    }) => {
                         debug!(
                             path = %path.display(),
                             threat = %threat_name,
@@ -163,26 +166,20 @@ impl ScanEngine {
     fn scan_file_sync(&self, path: &Path) -> Result<ScanResult> {
         let start = Instant::now();
 
-        let metadata = fs::metadata(path)
-            .with_context(|| format!("cannot stat {}", path.display()))?;
+        let metadata =
+            fs::metadata(path).with_context(|| format!("cannot stat {}", path.display()))?;
 
         if metadata.len() > self.config.max_file_size {
             return Ok(ScanResult::clean(path, elapsed_ms(&start)));
         }
 
-        let data = fs::read(path)
-            .with_context(|| format!("cannot read {}", path.display()))?;
+        let data = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
 
         self.scan_data_inner(&data, path, &start)
     }
 
     /// Core scanning logic shared by all entry points.
-    fn scan_data_inner(
-        &self,
-        data: &[u8],
-        path: &Path,
-        start: &Instant,
-    ) -> Result<ScanResult> {
+    fn scan_data_inner(&self, data: &[u8], path: &Path, start: &Instant) -> Result<ScanResult> {
         let mut sub_results: Vec<ScanResult> = Vec::with_capacity(3);
 
         // -- 1. Hash lookup (fast path) -------------------------------------------
@@ -213,10 +210,8 @@ impl ScanEngine {
             if !matches.is_empty() {
                 let names: Vec<String> = matches.iter().map(|m| m.name.clone()).collect();
                 let threat = names.first().cloned().unwrap_or_default();
-                let details: Vec<String> = names
-                    .iter()
-                    .map(|n| format!("yara rule: {n}"))
-                    .collect();
+                let details: Vec<String> =
+                    names.iter().map(|n| format!("yara rule: {n}")).collect();
                 sub_results.push(ScanResult::detected(
                     path,
                     ThreatLevel::Malicious,
@@ -354,13 +349,11 @@ mod tests {
         assert_eq!(result.threat_level, ThreatLevel::Malicious);
         assert!(result.is_threat());
         assert_eq!(result.detection_type, Some(DetectionType::Hash));
-        assert!(
-            result
-                .threat_name
-                .as_deref()
-                .unwrap_or("")
-                .contains("Test.Malware.FakePayload")
-        );
+        assert!(result
+            .threat_name
+            .as_deref()
+            .unwrap_or("")
+            .contains("Test.Malware.FakePayload"));
     }
 
     #[test]

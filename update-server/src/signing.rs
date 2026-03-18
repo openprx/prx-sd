@@ -26,9 +26,9 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
             );
         }
 
-        let seed: [u8; 32] = seed_bytes
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("signing key seed conversion failed despite length check"))?;
+        let seed: [u8; 32] = seed_bytes.try_into().map_err(|_| {
+            anyhow::anyhow!("signing key seed conversion failed despite length check")
+        })?;
 
         let signing_key = SigningKey::from_bytes(&seed);
         let verifying_key = signing_key.verifying_key();
@@ -48,13 +48,15 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
         // Ensure parent directory exists.
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create directory for signing key: {}", parent.display())
+                format!(
+                    "failed to create directory for signing key: {}",
+                    parent.display()
+                )
             })?;
         }
 
-        std::fs::write(path, signing_key.to_bytes()).with_context(|| {
-            format!("failed to write signing key to {}", path.display())
-        })?;
+        std::fs::write(path, signing_key.to_bytes())
+            .with_context(|| format!("failed to write signing key to {}", path.display()))?;
 
         info!(
             path = %path.display(),
@@ -74,8 +76,7 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
 /// This is the wire format used for delta and full-database downloads.
 #[allow(dead_code)]
 pub fn sign_and_compress(data: &[u8], key: &SigningKey) -> Result<Vec<u8>> {
-    let compressed =
-        zstd::encode_all(data, 3).context("failed to compress payload with zstd")?;
+    let compressed = zstd::encode_all(data, 3).context("failed to compress payload with zstd")?;
 
     Ok(sign_payload(key, &compressed))
 }

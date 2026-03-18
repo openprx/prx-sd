@@ -261,8 +261,7 @@ mod tests {
         let lines: Vec<&str> = content.lines().collect();
         assert_eq!(lines.len(), 1);
 
-        let parsed: ThreatAuditRecord =
-            serde_json::from_str(lines[0]).expect("parse record");
+        let parsed: ThreatAuditRecord = serde_json::from_str(lines[0]).expect("parse record");
         assert_eq!(parsed.threat_name, "TestThreat");
         assert_eq!(parsed.threat_level, "malicious");
     }
@@ -348,10 +347,7 @@ mod tests {
         assert_eq!(summary.total_processes_killed, 1);
         assert_eq!(summary.total_persistence_cleaned, 1);
         assert_eq!(*summary.by_threat_level.get("malicious").unwrap_or(&0), 2);
-        assert_eq!(
-            *summary.by_threat_level.get("suspicious").unwrap_or(&0),
-            1
-        );
+        assert_eq!(*summary.by_threat_level.get("suspicious").unwrap_or(&0), 1);
     }
 
     #[test]

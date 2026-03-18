@@ -68,12 +68,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
                                 let secs = elapsed.as_secs();
                                 let hours = secs / 3600;
                                 let mins = (secs % 3600) / 60;
-                                println!(
-                                    "  {:<22} {}h {}m",
-                                    "Uptime:".bold(),
-                                    hours,
-                                    mins
-                                );
+                                println!("  {:<22} {}h {}m", "Uptime:".bold(), hours, mins);
                             }
                         }
                     }
@@ -102,16 +97,8 @@ pub async fn run(data_dir: &Path) -> Result<()> {
         match SignatureDatabase::open(&sig_dir) {
             Ok(db) => match db.get_stats() {
                 Ok(stats) => {
-                    println!(
-                        "  {:<22} v{}",
-                        "Signature version:".bold(),
-                        stats.version
-                    );
-                    println!(
-                        "  {:<22} {}",
-                        "Hash signatures:".bold(),
-                        stats.hash_count
-                    );
+                    println!("  {:<22} v{}", "Signature version:".bold(), stats.version);
+                    println!("  {:<22} {}", "Hash signatures:".bold(), stats.hash_count);
 
                     if let Some(ts) = stats.last_update {
                         let dt = chrono::DateTime::from_timestamp(ts, 0)
@@ -119,11 +106,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
                             .unwrap_or_else(|| ts.to_string());
                         println!("  {:<22} {}", "Last update:".bold(), dt);
                     } else {
-                        println!(
-                            "  {:<22} {}",
-                            "Last update:".bold(),
-                            "never".dimmed()
-                        );
+                        println!("  {:<22} {}", "Last update:".bold(), "never".dimmed());
                     }
                 }
                 Err(e) => {
@@ -145,11 +128,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             }
         }
     } else {
-        println!(
-            "  {:<22} {}",
-            "Signatures:".bold(),
-            "not found".yellow()
-        );
+        println!("  {:<22} {}", "Signatures:".bold(), "not found".yellow());
     }
 
     // Quarantine stats.
@@ -175,11 +154,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             output::format_bytes(total_size)
         );
     } else {
-        println!(
-            "  {:<22} {}",
-            "Threats blocked:".bold(),
-            "0".dimmed()
-        );
+        println!("  {:<22} {}", "Threats blocked:".bold(), "0".dimmed());
     }
 
     Ok(())

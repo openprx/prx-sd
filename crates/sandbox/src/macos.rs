@@ -35,10 +35,8 @@ impl MacOSSandbox {
         let start = std::time::Instant::now();
 
         // Write the seatbelt profile to a temporary file.
-        let profile_path = std::env::temp_dir().join(format!(
-            "prx-sandbox-{}.sb",
-            std::process::id()
-        ));
+        let profile_path =
+            std::env::temp_dir().join(format!("prx-sandbox-{}.sb", std::process::id()));
         tokio::fs::write(&profile_path, &profile).await?;
 
         // Build the sandbox-exec command.

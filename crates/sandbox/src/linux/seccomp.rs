@@ -128,8 +128,8 @@ fn default_allowed_syscalls() -> BTreeSet<i64> {
     // aarch64 needs openat and fstatat since legacy open/stat don't exist.
     #[cfg(target_arch = "aarch64")]
     {
-        set.insert(56);  // openat
-        set.insert(79);  // fstatat / newfstatat
+        set.insert(56); // openat
+        set.insert(79); // fstatat / newfstatat
     }
 
     set
@@ -227,7 +227,8 @@ impl SeccompFilter {
         // ability to gain new privileges. No pointers are dereferenced.
         let ret = unsafe { libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) };
         if ret != 0 {
-            return Err(std::io::Error::last_os_error()).context("prctl(PR_SET_NO_NEW_PRIVS) failed");
+            return Err(std::io::Error::last_os_error())
+                .context("prctl(PR_SET_NO_NEW_PRIVS) failed");
         }
 
         // SAFETY: prog points to a valid SockFprog with a valid filter array.
@@ -244,10 +245,7 @@ impl SeccompFilter {
             return Err(std::io::Error::last_os_error()).context("seccomp(SET_MODE_FILTER) failed");
         }
 
-        tracing::debug!(
-            allowed_count = self.allowed.len(),
-            "seccomp filter applied"
-        );
+        tracing::debug!(allowed_count = self.allowed.len(), "seccomp filter applied");
 
         Ok(())
     }

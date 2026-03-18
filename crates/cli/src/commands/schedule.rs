@@ -2,13 +2,16 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use colored::Colorize;
 
 /// Sanitize a path for safe inclusion in shell commands and config files.
 /// Rejects paths containing shell metacharacters, newlines, or null bytes.
 fn sanitize_path(path: &str) -> Result<&str> {
-    let forbidden = [';', '&', '|', '`', '$', '(', ')', '{', '}', '<', '>', '!', '\n', '\r', '\0', '\'', '"', '\\'];
+    let forbidden = [
+        ';', '&', '|', '`', '$', '(', ')', '{', '}', '<', '>', '!', '\n', '\r', '\0', '\'', '"',
+        '\\',
+    ];
     for ch in forbidden {
         if path.contains(ch) {
             let display = match ch {
@@ -142,8 +145,7 @@ fn install_systemd_timer(scan_path: &str, frequency: &str, data_dir: &Path) -> R
 
     std::fs::write(&service_path, service_content)
         .context("failed to write systemd service unit")?;
-    std::fs::write(&timer_path, timer_content)
-        .context("failed to write systemd timer unit")?;
+    std::fs::write(&timer_path, timer_content).context("failed to write systemd timer unit")?;
 
     // Reload and enable.
     let reload = std::process::Command::new("systemctl")
@@ -158,10 +160,7 @@ fn install_systemd_timer(scan_path: &str, frequency: &str, data_dir: &Path) -> R
         }
     }
 
-    println!(
-        "{} systemd timer installed",
-        "success:".green().bold()
-    );
+    println!("{} systemd timer installed", "success:".green().bold());
     println!("  Service: {}", service_path.display());
     println!("  Timer:   {}", timer_path.display());
     println!("  Schedule: {calendar}");
@@ -193,10 +192,7 @@ fn remove_systemd_timer() -> Result<()> {
         .args(["--user", "daemon-reload"])
         .status();
 
-    println!(
-        "{} systemd timer removed",
-        "success:".green().bold()
-    );
+    println!("{} systemd timer removed", "success:".green().bold());
     Ok(())
 }
 
@@ -213,7 +209,10 @@ fn show_systemd_status() -> Result<()> {
                 println!("{stdout}");
             }
             if !stderr.is_empty() && !o.status.success() {
-                println!("{}", "No scheduled scan configured (systemd timer not found)".yellow());
+                println!(
+                    "{}",
+                    "No scheduled scan configured (systemd timer not found)".yellow()
+                );
             }
         }
         Err(_) => {
@@ -268,10 +267,7 @@ fn install_cron_job(scan_path: &str, frequency: &str, data_dir: &Path) -> Result
         bail!("crontab returned non-zero exit code");
     }
 
-    println!(
-        "{} cron job installed",
-        "success:".green().bold()
-    );
+    println!("{} cron job installed", "success:".green().bold());
     println!("  Cron expression: {cron_expr}");
     println!("  Scan path: {scan_path}");
     println!("  View: crontab -l | grep prx-sd");
@@ -306,17 +302,12 @@ fn remove_cron_job() -> Result<()> {
 
     let _ = child.wait();
 
-    println!(
-        "{} cron job removed",
-        "success:".green().bold()
-    );
+    println!("{} cron job removed", "success:".green().bold());
     Ok(())
 }
 
 fn show_cron_status() -> Result<()> {
-    let output = std::process::Command::new("crontab")
-        .arg("-l")
-        .output();
+    let output = std::process::Command::new("crontab").arg("-l").output();
 
     match output {
         Ok(o) => {
@@ -326,7 +317,10 @@ fn show_cron_status() -> Result<()> {
                 .filter(|l| l.contains("prx-sd-scheduled-scan"))
                 .collect();
             if found.is_empty() {
-                println!("{}", "No scheduled scan configured (no cron job found)".yellow());
+                println!(
+                    "{}",
+                    "No scheduled scan configured (no cron job found)".yellow()
+                );
             } else {
                 println!("{}", "Scheduled scan cron jobs:".cyan().bold());
                 for line in found {
@@ -438,7 +432,10 @@ fn show_launchd_status() -> Result<()> {
             println!("{}", String::from_utf8_lossy(&o.stdout));
         }
         _ => {
-            println!("{}", "No scheduled scan configured (launchd job not found)".yellow());
+            println!(
+                "{}",
+                "No scheduled scan configured (launchd job not found)".yellow()
+            );
         }
     }
     Ok(())
@@ -478,7 +475,10 @@ fn install_task_scheduler(scan_path: &str, frequency: &str, data_dir: &Path) -> 
         bail!("schtasks /Create failed");
     }
 
-    println!("{} Windows scheduled task created", "success:".green().bold());
+    println!(
+        "{} Windows scheduled task created",
+        "success:".green().bold()
+    );
     println!("  Task name: PRX-SD Scheduled Scan");
     println!("  Frequency: {frequency}");
     println!("  Scan path: {scan_path}");
@@ -490,14 +490,24 @@ fn remove_task_scheduler() -> Result<()> {
     let _ = std::process::Command::new("schtasks")
         .args(["/Delete", "/F", "/TN", "PRX-SD Scheduled Scan"])
         .status();
-    println!("{} Windows scheduled task removed", "success:".green().bold());
+    println!(
+        "{} Windows scheduled task removed",
+        "success:".green().bold()
+    );
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
 fn show_task_scheduler_status() -> Result<()> {
     let output = std::process::Command::new("schtasks")
-        .args(["/Query", "/TN", "PRX-SD Scheduled Scan", "/V", "/FO", "LIST"])
+        .args([
+            "/Query",
+            "/TN",
+            "PRX-SD Scheduled Scan",
+            "/V",
+            "/FO",
+            "LIST",
+        ])
         .output();
 
     match output {
@@ -506,7 +516,10 @@ fn show_task_scheduler_status() -> Result<()> {
             println!("{}", String::from_utf8_lossy(&o.stdout));
         }
         _ => {
-            println!("{}", "No scheduled scan configured (task not found)".yellow());
+            println!(
+                "{}",
+                "No scheduled scan configured (task not found)".yellow()
+            );
         }
     }
     Ok(())

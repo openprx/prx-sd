@@ -53,17 +53,11 @@ impl UrlScanner {
         .map(|s| (*s).to_owned())
         .collect();
 
-        let url_shorteners: HashSet<String> = [
-            "bit.ly",
-            "tinyurl.com",
-            "t.co",
-            "goo.gl",
-            "is.gd",
-            "ow.ly",
-        ]
-        .iter()
-        .map(|s| (*s).to_owned())
-        .collect();
+        let url_shorteners: HashSet<String> =
+            ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly"]
+                .iter()
+                .map(|s| (*s).to_owned())
+                .collect();
 
         Self {
             suspicious_tlds,
@@ -72,10 +66,7 @@ impl UrlScanner {
     }
 
     /// Create a `UrlScanner` with custom suspicious TLD and shortener lists.
-    pub fn with_lists(
-        suspicious_tlds: HashSet<String>,
-        url_shorteners: HashSet<String>,
-    ) -> Self {
+    pub fn with_lists(suspicious_tlds: HashSet<String>, url_shorteners: HashSet<String>) -> Self {
         Self {
             suspicious_tlds,
             url_shorteners,
@@ -285,7 +276,12 @@ mod tests {
     fn deduplicate_urls() {
         let data = b"http://dup.com http://dup.com http://dup.com";
         let urls = UrlScanner::extract_urls(data);
-        assert_eq!(urls.iter().filter(|u| u.as_str() == "http://dup.com").count(), 1);
+        assert_eq!(
+            urls.iter()
+                .filter(|u| u.as_str() == "http://dup.com")
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -303,7 +299,10 @@ mod tests {
         let scanner = UrlScanner::new();
         let data = b"click http://bit.ly/abc123 for prize";
         let result = scanner.scan_urls(data, None);
-        assert!(result.malicious_urls.iter().any(|m| m.reason.contains("shortener")));
+        assert!(result
+            .malicious_urls
+            .iter()
+            .any(|m| m.reason.contains("shortener")));
     }
 
     #[test]
@@ -311,7 +310,10 @@ mod tests {
         let scanner = UrlScanner::new();
         let data = b"visit http://evil-dropper.tk/payload for updates";
         let result = scanner.scan_urls(data, None);
-        assert!(result.malicious_urls.iter().any(|m| m.reason.contains(".tk")));
+        assert!(result
+            .malicious_urls
+            .iter()
+            .any(|m| m.reason.contains(".tk")));
     }
 
     #[test]
@@ -327,7 +329,10 @@ mod tests {
         let scanner = UrlScanner::new();
         let data = b"get http://malware.evil.com/dropper for the goods";
         let result = scanner.scan_urls(data, Some(&ioc));
-        assert!(result.malicious_urls.iter().any(|m| m.reason.contains("IOC blocklist")));
+        assert!(result
+            .malicious_urls
+            .iter()
+            .any(|m| m.reason.contains("IOC blocklist")));
         assert!(result.score >= 30);
     }
 

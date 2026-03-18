@@ -18,17 +18,25 @@ use prx_sd_realtime::adblock_filter::{AdblockCategory, AdblockFilterManager};
 /// Returns the platform-specific hosts file path for display purposes.
 fn hosts_file_display() -> &'static str {
     #[cfg(target_os = "windows")]
-    { r"C:\Windows\System32\drivers\etc\hosts" }
+    {
+        r"C:\Windows\System32\drivers\etc\hosts"
+    }
     #[cfg(not(target_os = "windows"))]
-    { "/etc/hosts" }
+    {
+        "/etc/hosts"
+    }
 }
 
 /// Returns the platform-specific hint for running with elevated privileges.
 fn elevate_hint() -> &'static str {
     #[cfg(target_os = "windows")]
-    { "Try running as Administrator" }
+    {
+        "Try running as Administrator"
+    }
     #[cfg(not(target_os = "windows"))]
-    { "Try: sudo sd adblock enable" }
+    {
+        "Try: sudo sd adblock enable"
+    }
 }
 
 fn adblock_dir(data_dir: &Path) -> std::path::PathBuf {
@@ -70,7 +78,10 @@ pub async fn run_enable(data_dir: &Path) -> Result<()> {
     // 1. Init and sync lists
     let mgr = init_manager(data_dir)?;
     let stats = mgr.stats();
-    println!("  Loaded {} lists ({} rules)", stats.list_count, stats.total_rules);
+    println!(
+        "  Loaded {} lists ({} rules)",
+        stats.list_count, stats.total_rules
+    );
 
     // 2. Generate hosts file entries from adblock engine
     // We use the dns_filter module to write entries to /etc/hosts
@@ -84,7 +95,11 @@ pub async fn run_enable(data_dir: &Path) -> Result<()> {
             if let Ok(content) = std::fs::read_to_string(entry.path()) {
                 for line in content.lines() {
                     let line = line.trim();
-                    if line.is_empty() || line.starts_with('!') || line.starts_with('#') || line.starts_with('[') {
+                    if line.is_empty()
+                        || line.starts_with('!')
+                        || line.starts_with('#')
+                        || line.starts_with('[')
+                    {
                         continue;
                     }
                     // Extract domain from ABP rule "||domain.com^"
@@ -179,11 +194,21 @@ pub async fn run_stats(data_dir: &Path) -> Result<()> {
     let enabled = adblock_dir(data_dir).join("enabled").exists();
 
     println!("{}", "Adblock Engine Statistics".cyan().bold());
-    println!("  Status:        {}", if enabled { "ENABLED".green().bold().to_string() } else { "DISABLED".yellow().to_string() });
+    println!(
+        "  Status:        {}",
+        if enabled {
+            "ENABLED".green().bold().to_string()
+        } else {
+            "DISABLED".yellow().to_string()
+        }
+    );
     println!("  Lists loaded:  {}", stats.list_count);
     println!("  Total rules:   {}", stats.total_rules);
     println!("  Cache dir:     {}", stats.cache_dir);
-    println!("  Last sync:     {}", stats.last_sync.as_deref().unwrap_or("never"));
+    println!(
+        "  Last sync:     {}",
+        stats.last_sync.as_deref().unwrap_or("never")
+    );
 
     // Show log stats
     let log = log_path(data_dir);
@@ -214,14 +239,15 @@ pub async fn run_check(url: &str, data_dir: &Path) -> Result<()> {
     let result = mgr.check_url(&full_url, &full_url, "document");
 
     if result.blocked {
-        println!(
-            "{} {} → {:?}",
-            "BLOCKED".red().bold(),
-            url,
-            result.category,
-        );
+        println!("{} {} → {:?}", "BLOCKED".red().bold(), url, result.category,);
         // Log it
-        log_blocked(data_dir, url, &full_url, &format!("{:?}", result.category), "manual_check");
+        log_blocked(
+            data_dir,
+            url,
+            &full_url,
+            &format!("{:?}", result.category),
+            "manual_check",
+        );
     } else {
         println!("{} {}", "ALLOWED".green().bold(), url);
     }
@@ -236,21 +262,31 @@ pub async fn run_log(data_dir: &Path, count: usize) -> Result<()> {
         return Ok(());
     }
 
-    let content = std::fs::read_to_string(&log)
-        .context("failed to read adblock log")?;
+    let content = std::fs::read_to_string(&log).context("failed to read adblock log")?;
 
     let lines: Vec<&str> = content.lines().collect();
     let total = lines.len();
     let start = if total > count { total - count } else { 0 };
 
-    println!("{} (showing last {} of {})", "Adblock Block Log".cyan().bold(), count.min(total), total);
+    println!(
+        "{} (showing last {} of {})",
+        "Adblock Block Log".cyan().bold(),
+        count.min(total),
+        total
+    );
     println!();
 
     for line in &lines[start..] {
         if let Ok(record) = serde_json::from_str::<serde_json::Value>(line) {
-            let ts = record.get("timestamp").and_then(|v| v.as_str()).unwrap_or("?");
+            let ts = record
+                .get("timestamp")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             let domain = record.get("domain").and_then(|v| v.as_str()).unwrap_or("?");
-            let cat = record.get("category").and_then(|v| v.as_str()).unwrap_or("?");
+            let cat = record
+                .get("category")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             let source = record.get("source").and_then(|v| v.as_str()).unwrap_or("?");
             println!(
                 "  {} {} {:30} [{}] ({})",

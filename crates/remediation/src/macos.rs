@@ -17,8 +17,7 @@ pub fn kill_process(pid: u32) -> Result<()> {
     use nix::unistd::Pid;
 
     let nix_pid = Pid::from_raw(pid as i32);
-    kill(nix_pid, Signal::SIGKILL)
-        .with_context(|| format!("failed to kill process {}", pid))?;
+    kill(nix_pid, Signal::SIGKILL).with_context(|| format!("failed to kill process {}", pid))?;
     tracing::info!(pid = pid, "killed process via SIGKILL");
     Ok(())
 }
@@ -216,7 +215,13 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
 
     // User profiles
     if let Ok(home) = std::env::var("HOME") {
-        let user_files = [".bashrc", ".bash_profile", ".profile", ".zshrc", ".zprofile"];
+        let user_files = [
+            ".bashrc",
+            ".bash_profile",
+            ".profile",
+            ".zshrc",
+            ".zprofile",
+        ];
         for uf in &user_files {
             let uf_path = Path::new(&home).join(uf);
             if uf_path.exists() {
@@ -374,10 +379,7 @@ fn scan_plist_dir(
             }
             if let Ok(content) = fs::read_to_string(&file_path) {
                 if content.contains(pattern) {
-                    findings.push((
-                        ptype.clone(),
-                        format!("found in {}", file_path.display()),
-                    ));
+                    findings.push((ptype.clone(), format!("found in {}", file_path.display())));
                 }
             }
         }

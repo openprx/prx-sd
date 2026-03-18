@@ -82,13 +82,11 @@ fn directory_with_mixed_threat_types() {
         .expect("hash_evil.bin should be in results");
     assert_eq!(hash_result.threat_level, ThreatLevel::Malicious);
     assert_eq!(hash_result.detection_type, Some(DetectionType::Hash));
-    assert!(
-        hash_result
-            .threat_name
-            .as_deref()
-            .unwrap_or("")
-            .contains("Mixed.Hash.Malware"),
-    );
+    assert!(hash_result
+        .threat_name
+        .as_deref()
+        .unwrap_or("")
+        .contains("Mixed.Hash.Malware"),);
 
     // Verify YARA-detected file.
     let yara_result = results
@@ -97,13 +95,11 @@ fn directory_with_mixed_threat_types() {
         .expect("yara_evil.bin should be in results");
     assert_eq!(yara_result.threat_level, ThreatLevel::Malicious);
     assert_eq!(yara_result.detection_type, Some(DetectionType::YaraRule));
-    assert!(
-        yara_result
-            .threat_name
-            .as_deref()
-            .unwrap_or("")
-            .contains("MixedTestEvil"),
-    );
+    assert!(yara_result
+        .threat_name
+        .as_deref()
+        .unwrap_or("")
+        .contains("MixedTestEvil"),);
 
     // Verify clean files.
     let clean_results: Vec<_> = results

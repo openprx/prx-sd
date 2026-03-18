@@ -160,9 +160,8 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── Launch / SubmitForm / ImportData actions ─────────────────────
-    let has_launch_action = text.contains("/Launch")
-        || text.contains("/SubmitForm")
-        || text.contains("/ImportData");
+    let has_launch_action =
+        text.contains("/Launch") || text.contains("/SubmitForm") || text.contains("/ImportData");
     if has_launch_action {
         score += 40;
         patterns.push(PdfSuspiciousPattern {
@@ -207,16 +206,14 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── Embedded files ──────────────────────────────────────────────
-    let has_embedded_file =
-        text.contains("/EmbeddedFile") || text.contains("/Filespec");
+    let has_embedded_file = text.contains("/EmbeddedFile") || text.contains("/Filespec");
     if has_embedded_file {
         score += 10;
         patterns.push(PdfSuspiciousPattern {
             pattern_name: "EmbeddedFile".to_string(),
             description: "PDF contains embedded file(s)".to_string(),
             severity: PatternSeverity::Medium,
-            offset: find_bytes(data, b"/EmbeddedFile")
-                .or_else(|| find_bytes(data, b"/Filespec")),
+            offset: find_bytes(data, b"/EmbeddedFile").or_else(|| find_bytes(data, b"/Filespec")),
         });
     }
 
@@ -304,8 +301,7 @@ fn count_javascript(text: &str) -> u32 {
 
 /// Find the byte offset of `needle` in `data`.
 fn find_bytes(data: &[u8], needle: &[u8]) -> Option<usize> {
-    data.windows(needle.len())
-        .position(|w| w == needle)
+    data.windows(needle.len()).position(|w| w == needle)
 }
 
 /// Check for known CVE exploit patterns.
@@ -324,7 +320,9 @@ fn check_cve_patterns(
         let region = &data[region_start..region_end];
         // JBIG2Decode combined with long DecodeParms is a strong CVE-2010-0188 indicator
         if text.contains("/JBIG2Decode")
-            && region.windows(b"/JBIG2Globals".len()).any(|w| w == b"/JBIG2Globals")
+            && region
+                .windows(b"/JBIG2Globals".len())
+                .any(|w| w == b"/JBIG2Globals")
         {
             *score += 60;
             patterns.push(PdfSuspiciousPattern {
@@ -451,11 +449,7 @@ fn count_hex_encoded_names(text: &str) -> u32 {
 
 /// Check for heap spray indicators (very large /Length values or repeated
 /// patterns like `%u0c0c`).
-fn check_heap_spray(
-    text: &str,
-    patterns: &mut Vec<PdfSuspiciousPattern>,
-    score: &mut u32,
-) {
+fn check_heap_spray(text: &str, patterns: &mut Vec<PdfSuspiciousPattern>, score: &mut u32) {
     // Check for very large stream lengths (> 1 MB is suspicious for PDFs
     // that are not primarily image containers)
     let mut from = 0;
@@ -559,9 +553,8 @@ mod tests {
 
     #[test]
     fn detect_javascript() {
-        let data = make_pdf(
-            "4 0 obj\n<< /Type /Action /S /JavaScript /JS (app.alert('hi')) >>\nendobj",
-        );
+        let data =
+            make_pdf("4 0 obj\n<< /Type /Action /S /JavaScript /JS (app.alert('hi')) >>\nendobj");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
         assert!(analysis.has_javascript);
         assert!(analysis.javascript_count >= 1);
@@ -574,9 +567,7 @@ mod tests {
 
     #[test]
     fn detect_launch_action() {
-        let data = make_pdf(
-            "4 0 obj\n<< /Type /Action /S /Launch /F (cmd.exe) >>\nendobj",
-        );
+        let data = make_pdf("4 0 obj\n<< /Type /Action /S /Launch /F (cmd.exe) >>\nendobj");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
         assert!(analysis.has_launch_action);
         assert!(analysis.threat_score >= 40);

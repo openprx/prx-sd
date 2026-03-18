@@ -70,10 +70,7 @@ impl UpdateClient {
     /// Perform a full update cycle: check for updates and apply them.
     ///
     /// Returns `true` if the database was updated, `false` if already current.
-    pub async fn update(
-        &self,
-        db: &mut prx_sd_signatures::SignatureDatabase,
-    ) -> Result<bool> {
+    pub async fn update(&self, db: &mut prx_sd_signatures::SignatureDatabase) -> Result<bool> {
         let current_version = db.get_version()?;
         let latest = self.fetch_latest_version().await?;
 
@@ -113,9 +110,7 @@ impl UpdateClient {
 
         let status = resp.status();
         if !status.is_success() {
-            bail!(
-                "update server returned HTTP {status} for GET /version"
-            );
+            bail!("update server returned HTTP {status} for GET /version");
         }
 
         let info: VersionInfo = resp
@@ -139,9 +134,7 @@ impl UpdateClient {
 
         let status = resp.status();
         if !status.is_success() {
-            bail!(
-                "update server returned HTTP {status} for GET /delta/{from}..{to}"
-            );
+            bail!("update server returned HTTP {status} for GET /delta/{from}..{to}");
         }
 
         let bytes = resp

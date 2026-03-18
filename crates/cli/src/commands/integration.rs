@@ -4,9 +4,12 @@ use anyhow::{Context, Result};
 
 /// File manager integration asset files, embedded at compile time.
 mod assets {
-    pub const NAUTILUS_SCRIPT: &str = include_str!("../../../../packaging/filemanager/nautilus/prx-sd-scan");
-    pub const DOLPHIN_DESKTOP: &str = include_str!("../../../../packaging/filemanager/dolphin/prx-sd-scan.desktop");
-    pub const NEMO_ACTION: &str = include_str!("../../../../packaging/filemanager/nemo/prx-sd-scan.nemo_action");
+    pub const NAUTILUS_SCRIPT: &str =
+        include_str!("../../../../packaging/filemanager/nautilus/prx-sd-scan");
+    pub const DOLPHIN_DESKTOP: &str =
+        include_str!("../../../../packaging/filemanager/dolphin/prx-sd-scan.desktop");
+    pub const NEMO_ACTION: &str =
+        include_str!("../../../../packaging/filemanager/nemo/prx-sd-scan.nemo_action");
 }
 
 /// Install file manager right-click scan integration for the current platform.
@@ -113,12 +116,16 @@ fn install_macos() -> Result<()> {
         .context("failed to create workflow directory in ~/Library/Services")?;
 
     // Write Info.plist
-    let info_plist = include_str!("../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/Info.plist");
+    let info_plist = include_str!(
+        "../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/Info.plist"
+    );
     std::fs::write(workflow_dir.join("Info.plist"), info_plist)
         .context("failed to write Info.plist")?;
 
     // Write document.wflow
-    let document_wflow = include_str!("../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/document.wflow");
+    let document_wflow = include_str!(
+        "../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/document.wflow"
+    );
     std::fs::write(workflow_dir.join("document.wflow"), document_wflow)
         .context("failed to write document.wflow")?;
 
@@ -132,12 +139,7 @@ fn install_macos() -> Result<()> {
 
 /// Write a file into the given directory, creating the directory if needed.
 #[cfg(target_os = "linux")]
-fn install_file(
-    dir: &Path,
-    filename: &str,
-    content: &str,
-    executable: bool,
-) -> Result<()> {
+fn install_file(dir: &Path, filename: &str, content: &str, executable: bool) -> Result<()> {
     std::fs::create_dir_all(dir)
         .with_context(|| format!("failed to create directory {}", dir.display()))?;
 
