@@ -6,16 +6,16 @@
 
 ### სავალდებულო
 
-- **Rust** 1.70+ (დააინსტალირეთ [rustup](https://rustup.rs/)-ის მეშვეობით)
+- **Rust** 1.70+ (დაყენება [rustup](https://rustup.rs/)-ით)
 - **pkg-config**
-- **OpenSSL დეველოპმენტის ჰედერები** (reqwest/TLS-ისთვის)
+- **OpenSSL დეველოპერული ჰედერები** (reqwest/TLS-ისთვის)
 
-### არჩევითი
+### არასავალდებულო
 
 - **Node.js** 18+ და **npm** (GUI-სთვის)
 - **Tauri CLI** (`cargo install tauri-cli`) (GUI-სთვის)
 
-### პლატფორმის მიხედვით
+### პლატფორმის სპეციფიკური
 
 **Debian/Ubuntu:**
 ```bash
@@ -34,8 +34,8 @@ brew install pkg-config openssl
 ```
 
 **Windows:**
-- დააინსტალირეთ [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- დააინსტალირეთ [vcpkg](https://github.com/microsoft/vcpkg) და გაუშვით: `vcpkg install openssl`
+- დააყენეთ [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- დააყენეთ [vcpkg](https://github.com/microsoft/vcpkg) და გაუშვით: `vcpkg install openssl`
 
 ## CLI-ის აგება
 
@@ -46,7 +46,7 @@ cd prx-sd
 # Debug აგება
 cargo build
 
-# Release აგება (ოპტიმიზებული)
+# Release აგება (ოპტიმიზირებული)
 cargo build --release
 
 # ბინარი მდებარეობს:
@@ -54,38 +54,38 @@ cargo build --release
 #   Release: target/release/sd
 ```
 
-### Feature Flag-ები
+### ფუნქციის დროშები
 
 ```bash
 # აგება ONNX ML მოდელის მხარდაჭერით
 cargo build --release --features onnx
 
-# აგება WASM დანამატების მხარდაჭერის გარეშე (უფრო პატარა ბინარი)
+# აგება WASM მოდულების მხარდაჭერის გარეშე (უფრო მცირე ბინარი)
 cargo build --release --no-default-features
 ```
 
-| Feature | ნაგულისხმევი | აღწერა |
+| ფუნქცია | ნაგულისხმევი | აღწერა |
 |---------|-------------|--------|
-| `wasm-runtime` | დიახ | WebAssembly დანამატების მხარდაჭერა (Wasmtime) |
-| `onnx` | არა | ONNX ML მოდელის ინფერენცია (tract-onnx) |
+| `wasm-runtime` | დიახ | WebAssembly მოდულების მხარდაჭერა (Wasmtime) |
+| `onnx` | არა | ONNX ML მოდელის გამოყვანა (tract-onnx) |
 
-## GUI-ის აგება
+## GUI-ს აგება
 
-დესკტოპის GUI იყენებს Tauri 2 (Rust) + Vue 3 (TypeScript) ტექნოლოგიებს.
+დესკტოპ GUI იყენებს Tauri 2 (Rust) + Vue 3 (TypeScript) ტექნოლოგიებს.
 
 ```bash
-# ფრონტენდის დამოკიდებულებების ინსტალაცია
+# ფრონტენდის დამოკიდებულებების დაყენება
 cd gui
 npm install
 
-# დეველოპმენტის რეჟიმი (ცხელი გადატვირთვა)
+# დეველოპერული რეჟიმი (ცხელი გადატვირთვა)
 npm run tauri dev
 
-# პროდაქშენის აგება
+# პროდაქშენ აგება
 npm run tauri build
 ```
 
-აგებული აპლიკაცია იქნება `gui/src-tauri/target/release/bundle/` დირექტორიაში.
+აგებული აპლიკაცია განთავსდება `gui/src-tauri/target/release/bundle/` დირექტორიაში.
 
 ## განახლების სერვერის აგება
 
@@ -110,7 +110,7 @@ cargo test --test '*'
 ## კოდის ხარისხი
 
 ```bash
-# კომპილაციის შეცდომების შემოწმება (სწრაფი, ლინკირების გარეშე)
+# კომპილაციის შეცდომების შემოწმება (სწრაფი, ლინკერის გარეშე)
 cargo check
 
 # ავტომატური შესწორებების გამოყენება
@@ -125,15 +125,15 @@ cargo clippy -- -D warnings
 
 ## ჯვარედინი კომპილაცია
 
-პროექტი შეიცავს ჯვარედინი კომპილაციის კონფიგურაციას `.cargo/config.toml` ფაილში.
+პროექტი მოიცავს ჯვარედინი კომპილაციის კონფიგურაციას `.cargo/config.toml` ფაილში.
 
 ### Linux ARM64 (aarch64)
 
 ```bash
-# სამიზნის ინსტალაცია
+# სამიზნის დაყენება
 rustup target add aarch64-unknown-linux-gnu
 
-# ჯვარედინი კომპილაციის ინსტრუმენტარიუმის ინსტალაცია
+# ჯვარედინი კომპილაციის ინსტრუმენტარიუმის დაყენება
 sudo apt install -y gcc-aarch64-linux-gnu
 
 # აგება
@@ -142,15 +142,15 @@ cargo build --release --target aarch64-unknown-linux-gnu
 
 ### macOS (Linux-იდან)
 
-macOS-ზე ჯვარედინი კომპილაცია Linux-იდან მოითხოვს [osxcross](https://github.com/tpoechtrager/osxcross)-ს.
+Linux-იდან macOS-ისთვის ჯვარედინი კომპილაცია საჭიროებს [osxcross](https://github.com/tpoechtrager/osxcross)-ს.
 
 ### Windows (Linux-იდან)
 
 ```bash
-# სამიზნის ინსტალაცია
+# სამიზნის დაყენება
 rustup target add x86_64-pc-windows-gnu
 
-# ჯვარედინი კომპილაციის ინსტრუმენტარიუმის ინსტალაცია
+# ჯვარედინი კომპილაციის ინსტრუმენტარიუმის დაყენება
 sudo apt install -y gcc-mingw-w64-x86-64
 
 # აგება
@@ -175,7 +175,7 @@ cargo build --release --target x86_64-pc-windows-gnu
 ./tools/build-appimage.sh
 ```
 
-პლატფორმის მიხედვით შეფუთვის კონფიგურაციები მდებარეობს `packaging/` დირექტორიაში:
+პლატფორმის სპეციფიკური შეფუთვის კონფიგურაციები მდებარეობს `packaging/` დირექტორიაში:
 
 ```
 packaging/
@@ -185,8 +185,8 @@ packaging/
 ├── filemanager/    # ფაილ-მენეჯერის ინტეგრაციის სკრიპტები
 ├── homebrew/       # Homebrew ფორმულა
 ├── launchd/        # macOS გაშვების აგენტის plist
-├── systemd/        # Linux systemd სერვისის მოდული
-├── udev/           # Linux udev წესები (USB ავტო-სკანირება)
+├── systemd/        # Linux systemd სერვისის ფაილი
+├── udev/           # Linux udev წესები (USB ავტომატური სკანირება)
 └── windows/        # WiX MSI ინსტალერის კონფიგურაცია
 ```
 
@@ -194,19 +194,19 @@ packaging/
 
 ```
 prx-sd/
-├── Cargo.toml          # სამუშაო სივრცის ძირი
+├── Cargo.toml          # სამუშაო სივრცის ფესვი
 ├── Cargo.lock          # დამოკიდებულებების ჩაკეტვის ფაილი
 ├── crates/
 │   ├── cli/            # sd ბინარი
 │   ├── core/           # სკანირების ძრავი
 │   ├── signatures/     # ხელმოწერების მონაცემთა ბაზა
-│   ├── parsers/        # ბინარული ფორმატების პარსერები
+│   ├── parsers/        # ბინარული ფორმატების ანალიზატორები
 │   ├── heuristic/      # ევრისტიკული + ML აღმოჩენა
 │   ├── realtime/       # რეალურ დროში მონიტორინგი
 │   ├── quarantine/     # კარანტინის საცავი
 │   ├── remediation/    # საფრთხეებზე რეაგირება
 │   ├── sandbox/        # პროცესის იზოლაცია
-│   ├── plugins/        # WASM დანამატების სისტემა
+│   ├── plugins/        # WASM მოდულების სისტემა
 │   └── updater/        # განახლების კლიენტი
 ├── update-server/      # ხელმოწერების განაწილების სერვერი
 ├── gui/                # Tauri + Vue 3 დესკტოპ აპლიკაცია
@@ -214,5 +214,5 @@ prx-sd/
 ├── signatures-db/      # ჩაშენებული ხელმოწერები
 ├── tests/              # ინტეგრაციული ტესტები
 ├── tools/              # აგების სკრიპტები
-└── packaging/          # დისტრიბუციის შეფუთვა
+└── packaging/          # განაწილების შეფუთვა
 ```
