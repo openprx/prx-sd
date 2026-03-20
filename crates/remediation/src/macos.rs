@@ -11,6 +11,14 @@ use anyhow::{Context, Result};
 
 use crate::PersistenceType;
 
+/// Escape a string for safe embedding in AppleScript double-quoted strings.
+///
+/// Prevents command injection when interpolating untrusted values into
+/// osascript commands by escaping backslashes and double-quotes.
+fn escape_applescript(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 /// Kill a process by PID using SIGKILL.
 pub fn kill_process(pid: u32) -> Result<()> {
     use nix::sys::signal::{kill, Signal};
@@ -156,10 +164,12 @@ pub fn clean_login_items(path: &Path) -> Result<Vec<String>> {
                 continue;
             }
             // Check if this item references the malicious path
-            // by getting its path property
+            // by getting its path property.
+            // Escape item_name to prevent AppleScript injection.
+            let safe_name = escape_applescript(item_name);
             let check_script = format!(
                 "tell application \"System Events\" to get the path of login item \"{}\"",
-                item_name
+                safe_name
             );
             let check_output = Command::new("osascript")
                 .args(["-e", &check_script])
@@ -170,7 +180,7 @@ pub fn clean_login_items(path: &Path) -> Result<Vec<String>> {
                 if item_path.contains(path_str.as_ref()) {
                     let delete_script = format!(
                         "tell application \"System Events\" to delete login item \"{}\"",
-                        item_name
+                        safe_name
                     );
                     let _ = Command::new("osascript")
                         .args(["-e", &delete_script])

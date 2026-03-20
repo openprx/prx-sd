@@ -71,11 +71,11 @@ fn make_suspicious_pe(apis: &[&str], high_entropy: bool) -> Vec<u8> {
     // Fill with entropy if requested
     if high_entropy {
         let mut state: u64 = 0xCAFE;
-        for i in off..8000 {
+        for item in pe.iter_mut().take(8000).skip(off) {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
-            pe[i] = (state & 0xFF) as u8;
+            *item = (state & 0xFF) as u8;
         }
     }
     pe

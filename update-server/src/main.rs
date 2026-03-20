@@ -20,9 +20,10 @@ use std::sync::Arc;
 
 use anyhow::Context;
 
+use axum::http::header;
 use axum::routing::{get, post};
 use axum::Router;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -83,7 +84,17 @@ async fn main() -> anyhow::Result<()> {
         .route("/full", get(routes::get_full))
         .route("/admin/publish", post(routes::publish))
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(
+            CorsLayer::new()
+                .allow_methods(AllowMethods::list([
+                    axum::http::Method::GET,
+                    axum::http::Method::POST,
+                ]))
+                .allow_headers(AllowHeaders::list([
+                    header::CONTENT_TYPE,
+                    header::AUTHORIZATION,
+                ])),
+        )
         .with_state(state);
 
     info!(%listen_addr, "starting prx-sd update server");

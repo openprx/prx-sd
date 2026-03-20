@@ -120,6 +120,68 @@ export default {
   'badge.suspicious': '疑わしい',
   'badge.malicious': '悪意あり',
 
+  // Nav (new pages)
+  'nav.dashboard': 'ダッシュボード',
+  'nav.alerts': 'アラート',
+
+  // Drag & Drop
+  'dragdrop.title': 'ファイルをドロップしてスキャン',
+  'dragdrop.subtitle': 'リリースしてドロップされたファイルのスキャンを開始',
+  'dragdrop.results': 'ドロップスキャン結果',
+  'dragdrop.no_results': '結果なし。',
+
+  // Alert History
+  'alerts.title': 'アラート履歴',
+  'alerts.refresh': '更新',
+  'alerts.search': 'アラートを検索...',
+  'alerts.entries': '件',
+  'alerts.empty': 'アラートはまだ記録されていません。',
+  'alerts.col_time': 'タイムスタンプ',
+  'alerts.col_file': 'ファイル',
+  'alerts.col_threat': '脅威',
+  'alerts.col_level': 'レベル',
+  'alerts.col_action': 'アクション',
+
+  // Dashboard
+  'dashboard.title': 'ダッシュボード',
+  'dashboard.total_scans': '総スキャン数',
+  'dashboard.threats_found': '検出された脅威',
+  'dashboard.quarantined': '隔離済み',
+  'dashboard.status': '保護状態',
+  'dashboard.protected': '保護されています',
+  'dashboard.unprotected': '保護されていません',
+  'dashboard.scan_history': 'スキャン履歴',
+  'dashboard.recent_threats': '最近の脅威',
+  'dashboard.no_history': 'スキャン履歴がありません。',
+  'dashboard.no_threats': '脅威は検出されませんでした。システムは安全です。',
+  'dashboard.system_status': 'システム状態',
+  'dashboard.engine_version': 'エンジンバージョン',
+  'dashboard.sig_version': 'シグネチャバージョン',
+  'dashboard.hash_count': 'ハッシュシグネチャ',
+  'dashboard.yara_rules': 'YARAルール',
+  'dashboard.monitoring': 'リアルタイム監視',
+  'dashboard.active': 'アクティブ',
+  'dashboard.inactive': '非アクティブ',
+  'dashboard.last_scan': '最終スキャン',
+
+  // Nav (adblock)
+  'nav.adblock': '広告ブロック',
+
+  // Adblock
+  'adblock.title': '広告・マルウェアブロック',
+  'adblock.enabled': '保護が有効',
+  'adblock.disabled': '保護が無効',
+  'adblock.rules': 'フィルタールール',
+  'adblock.lists': 'フィルターリスト',
+  'adblock.sync': 'リストを更新',
+  'adblock.check': 'ドメインを確認',
+  'adblock.check_placeholder': '確認するドメインを入力...',
+  'adblock.log': 'ブロックログ',
+  'adblock.last_sync': '最終同期',
+  'adblock.enable': '有効化',
+  'adblock.disable': '無効化',
+  'adblock.add_list': 'カスタムリストを追加',
+
   // Common
   'common.confirm': '確認',
   'common.cancel': 'キャンセル',

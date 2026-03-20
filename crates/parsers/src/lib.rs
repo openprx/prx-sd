@@ -474,11 +474,11 @@ mod tests {
     fn entropy_two_values() {
         // Equal distribution of two byte values => entropy = 1.0
         let mut data = vec![0u8; 1000];
-        for i in 0..500 {
-            data[i] = 0;
+        for item in data.iter_mut().take(500) {
+            *item = 0;
         }
-        for i in 500..1000 {
-            data[i] = 1;
+        for item in data.iter_mut().take(1000).skip(500) {
+            *item = 1;
         }
         let e = shannon_entropy(&data);
         assert!(

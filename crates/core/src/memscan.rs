@@ -165,7 +165,14 @@ pub fn read_region(pid: u32, start: u64, end: u64) -> Result<Vec<u8>> {
     let mut file =
         fs::File::open(&mem_path).with_context(|| format!("failed to open {mem_path}"))?;
 
-    let total = (end - start) as usize;
+    let region_size = end
+        .checked_sub(start)
+        .with_context(|| format!("invalid memory region: end (0x{end:x}) < start (0x{start:x})"))?;
+
+    let total: usize = region_size.try_into().with_context(|| {
+        format!("memory region too large for this platform: {region_size} bytes")
+    })?;
+
     let mut buf = Vec::with_capacity(total);
 
     file.seek(SeekFrom::Start(start))

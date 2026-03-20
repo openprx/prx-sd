@@ -81,10 +81,33 @@ fn remove_pid_file(data_dir: &Path) {
     }
 }
 
+/// Sanitize a string for safe embedding in AppleScript double-quoted strings.
+///
+/// Escapes backslashes and double-quotes to prevent command injection when
+/// interpolating user-controlled values into osascript commands.
+#[cfg(target_os = "macos")]
+fn escape_applescript(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// Sanitize a string for safe embedding in PowerShell single-quoted strings.
+///
+/// In PowerShell single-quoted strings, the only special character is the
+/// single quote itself, which is escaped by doubling it.
+#[cfg(target_os = "windows")]
+fn escape_powershell_single_quote(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
 /// Send a desktop notification (cross-platform, best-effort).
+///
+/// All user-controlled values are sanitized before interpolation into shell
+/// commands to prevent command injection.
 fn send_notification(title: &str, body: &str) {
     #[cfg(target_os = "linux")]
     {
+        // notify-send receives title and body as separate argv entries,
+        // so no shell interpolation occurs -- safe as-is.
         let _ = std::process::Command::new("notify-send")
             .args(["--urgency=critical", "--icon=dialog-warning", title, body])
             .spawn();
@@ -92,28 +115,37 @@ fn send_notification(title: &str, body: &str) {
 
     #[cfg(target_os = "macos")]
     {
+        let safe_body = escape_applescript(body);
+        let safe_title = escape_applescript(title);
         let _ = std::process::Command::new("osascript")
             .args([
                 "-e",
-                &format!("display notification \"{}\" with title \"{}\"", body, title),
+                &format!(
+                    "display notification \"{}\" with title \"{}\"",
+                    safe_body, safe_title
+                ),
             ])
             .spawn();
     }
 
     #[cfg(target_os = "windows")]
     {
+        // Use PowerShell single-quoted strings to avoid backtick/variable
+        // expansion. The only character that needs escaping inside single
+        // quotes is the single quote itself (doubled).
+        let safe_title = escape_powershell_single_quote(title);
+        let safe_body = escape_powershell_single_quote(body);
         let script = format!(
             "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; \
              $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); \
              $textNodes = $template.GetElementsByTagName('text'); \
-             $textNodes.Item(0).AppendChild($template.CreateTextNode('{}')) > $null; \
-             $textNodes.Item(1).AppendChild($template.CreateTextNode('{}')) > $null; \
+             $textNodes.Item(0).AppendChild($template.CreateTextNode('{safe_title}')) > $null; \
+             $textNodes.Item(1).AppendChild($template.CreateTextNode('{safe_body}')) > $null; \
              $toast = [Windows.UI.Notifications.ToastNotification]::new($template); \
-             [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('PRX-SD').Show($toast)",
-            title, body
+             [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('PRX-SD').Show($toast)"
         );
         let _ = std::process::Command::new("powershell")
-            .args(["-Command", &script])
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
             .spawn();
     }
 }

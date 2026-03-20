@@ -1,4 +1,5 @@
 pub mod adblock;
+pub mod community;
 pub mod config;
 pub mod daemon;
 pub mod dns_proxy;

@@ -1,7 +1,7 @@
 import { reactive } from 'vue';
 
 type Lang = 'en' | 'zh' | 'ru' | 'ka' | 'ja' | 'ko' | 'es' | 'fr' | 'de' | 'ar';
-const state = reactive({ locale: (localStorage.getItem('prxsd-lang') || 'en') as Lang });
+const state = reactive({ locale: (localStorage.getItem('locale') || localStorage.getItem('prxsd-lang') || 'en') as Lang });
 
 import en from './en';
 import zh from './zh';
@@ -22,7 +22,7 @@ export function t(key: string): string {
 
 export function setLocale(lang: Lang) {
   state.locale = lang;
-  localStorage.setItem('prxsd-lang', lang);
+  localStorage.setItem('locale', lang);
 }
 
 export function getLocale(): Lang {

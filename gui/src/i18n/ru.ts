@@ -120,6 +120,68 @@ export default {
   'badge.suspicious': 'Подозрительно',
   'badge.malicious': 'Вредоносно',
 
+  // Nav (new pages)
+  'nav.dashboard': 'Панель',
+  'nav.alerts': 'Оповещения',
+
+  // Drag & Drop
+  'dragdrop.title': 'Перетащите файлы для сканирования',
+  'dragdrop.subtitle': 'Отпустите для начала сканирования',
+  'dragdrop.results': 'Результаты сканирования',
+  'dragdrop.no_results': 'Нет результатов.',
+
+  // Alert History
+  'alerts.title': 'История оповещений',
+  'alerts.refresh': 'Обновить',
+  'alerts.search': 'Поиск оповещений...',
+  'alerts.entries': 'записей',
+  'alerts.empty': 'Оповещений пока нет.',
+  'alerts.col_time': 'Время',
+  'alerts.col_file': 'Файл',
+  'alerts.col_threat': 'Угроза',
+  'alerts.col_level': 'Уровень',
+  'alerts.col_action': 'Действие',
+
+  // Dashboard
+  'dashboard.title': 'Панель',
+  'dashboard.total_scans': 'Всего сканирований',
+  'dashboard.threats_found': 'Обнаружено угроз',
+  'dashboard.quarantined': 'Карантин',
+  'dashboard.status': 'Защита',
+  'dashboard.protected': 'Защищён',
+  'dashboard.unprotected': 'Не защищён',
+  'dashboard.scan_history': 'История сканирований',
+  'dashboard.recent_threats': 'Недавние угрозы',
+  'dashboard.no_history': 'История сканирований отсутствует.',
+  'dashboard.no_threats': 'Угрозы не обнаружены. Система чиста.',
+  'dashboard.system_status': 'Состояние системы',
+  'dashboard.engine_version': 'Версия движка',
+  'dashboard.sig_version': 'Версия сигнатур',
+  'dashboard.hash_count': 'Хеш-сигнатуры',
+  'dashboard.yara_rules': 'Правила YARA',
+  'dashboard.monitoring': 'Мониторинг в реальном времени',
+  'dashboard.active': 'Активен',
+  'dashboard.inactive': 'Неактивен',
+  'dashboard.last_scan': 'Последнее сканирование',
+
+  // Nav (adblock)
+  'nav.adblock': 'Блокировка',
+
+  // Adblock
+  'adblock.title': 'Блокировка рекламы и вредоносного ПО',
+  'adblock.enabled': 'Защита включена',
+  'adblock.disabled': 'Защита выключена',
+  'adblock.rules': 'Правила фильтрации',
+  'adblock.lists': 'Списки фильтров',
+  'adblock.sync': 'Обновить списки',
+  'adblock.check': 'Проверить домен',
+  'adblock.check_placeholder': 'Введите домен для проверки...',
+  'adblock.log': 'Журнал блокировок',
+  'adblock.last_sync': 'Последняя синхронизация',
+  'adblock.enable': 'Включить',
+  'adblock.disable': 'Отключить',
+  'adblock.add_list': 'Добавить пользовательский список',
+
   // Common
   'common.confirm': 'Подтвердить',
   'common.cancel': 'Отмена',
