@@ -237,7 +237,7 @@ mod tests {
         // Total size: pe_offset + 4 (sig) + 20 (COFF) + optional_header_size + 40 (one section header)
         let total_size = pe_offset as usize + 4 + 20 + optional_header_size as usize + 40;
         // We also need raw section data at some offset; put it at a page boundary.
-        let section_raw_offset: u32 = ((total_size + 511) / 512 * 512) as u32;
+        let section_raw_offset: u32 = (total_size.div_ceil(512) * 512) as u32;
         let section_raw_size: u32 = 512;
         let file_size = section_raw_offset as usize + section_raw_size as usize;
         let mut pe = vec![0u8; file_size];

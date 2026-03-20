@@ -52,12 +52,18 @@ impl YaraEngine {
         let mut errors = 0usize;
 
         for entry in WalkDir::new(rules_dir)
-            .follow_links(true)
+            .follow_links(false)
             .into_iter()
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            if !path.is_file() {
+            // Use entry.file_type() (lstat) rather than path.is_file() (stat)
+            // to avoid following symlinks that could escape the rules directory.
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            if entry.path_is_symlink() {
+                tracing::debug!(path = %path.display(), "skipping symlinked YARA rule file");
                 continue;
             }
 

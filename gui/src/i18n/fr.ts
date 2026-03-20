@@ -46,6 +46,69 @@ export default {
   'settings.save': 'Enregistrer', 'settings.saving': 'Enregistrement...',
   'settings.save_success': 'Paramètres enregistrés.', 'settings.save_fail': 'Échec de l\'enregistrement.',
   'badge.clean': 'Sain', 'badge.suspicious': 'Suspect', 'badge.malicious': 'Malveillant',
+  // Nav (new pages)
+  'nav.dashboard': 'Tableau de bord',
+  'nav.alerts': 'Alertes',
+
+  // Drag & Drop
+  'dragdrop.title': 'Déposez des fichiers à analyser',
+  'dragdrop.subtitle': 'Relâchez pour lancer l\'analyse des fichiers',
+  'dragdrop.results': 'Résultats de l\'analyse',
+  'dragdrop.no_results': 'Aucun résultat.',
+
+  // Alert History
+  'alerts.title': 'Historique des alertes',
+  'alerts.refresh': 'Actualiser',
+  'alerts.search': 'Rechercher des alertes...',
+  'alerts.entries': 'entrées',
+  'alerts.empty': 'Aucune alerte enregistrée.',
+  'alerts.col_time': 'Horodatage',
+  'alerts.col_file': 'Fichier',
+  'alerts.col_threat': 'Menace',
+  'alerts.col_level': 'Niveau',
+  'alerts.col_action': 'Action',
+
+  // Dashboard
+  'dashboard.title': 'Tableau de bord',
+  'dashboard.total_scans': 'Analyses totales',
+  'dashboard.threats_found': 'Menaces détectées',
+  'dashboard.quarantined': 'En quarantaine',
+  'dashboard.status': 'Protection',
+  'dashboard.protected': 'Protégé',
+  'dashboard.unprotected': 'Non protégé',
+  'dashboard.scan_history': 'Historique des analyses',
+  'dashboard.recent_threats': 'Menaces récentes',
+  'dashboard.no_history': 'Aucun historique d\'analyse.',
+  'dashboard.no_threats': 'Aucune menace détectée. Le système est sûr.',
+  'dashboard.system_status': 'État du système',
+  'dashboard.engine_version': 'Version du moteur',
+  'dashboard.sig_version': 'Version des signatures',
+  'dashboard.hash_count': 'Signatures de hachage',
+  'dashboard.yara_rules': 'Règles YARA',
+  'dashboard.monitoring': 'Surveillance en temps réel',
+  'dashboard.active': 'Actif',
+  'dashboard.inactive': 'Inactif',
+  'dashboard.last_scan': 'Dernière analyse',
+
+  // Nav (adblock)
+  'nav.adblock': 'Bloqueur',
+
+  // Adblock
+  'adblock.title': 'Blocage des publicités et malwares',
+  'adblock.enabled': 'Protection activée',
+  'adblock.disabled': 'Protection désactivée',
+  'adblock.rules': 'Règles de filtre',
+  'adblock.lists': 'Listes de filtres',
+  'adblock.sync': 'Mettre à jour les listes',
+  'adblock.check': 'Vérifier le domaine',
+  'adblock.check_placeholder': 'Entrez le domaine à vérifier...',
+  'adblock.log': 'Journal de blocage',
+  'adblock.last_sync': 'Dernière synchronisation',
+  'adblock.enable': 'Activer',
+  'adblock.disable': 'Désactiver',
+  'adblock.add_list': 'Ajouter une liste personnalisée',
+
+  // Common
   'common.confirm': 'Confirmer', 'common.cancel': 'Annuler', 'common.save': 'Enregistrer',
   'common.error': 'Erreur', 'common.success': 'Succès', 'common.loading': 'Chargement...',
 } as Record<string, string>;

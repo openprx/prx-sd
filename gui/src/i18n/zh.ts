@@ -120,6 +120,68 @@ export default {
   'badge.suspicious': '可疑',
   'badge.malicious': '恶意',
 
+  // Nav (new pages)
+  'nav.dashboard': '仪表盘',
+  'nav.alerts': '警报',
+
+  // Drag & Drop
+  'dragdrop.title': '拖放文件进行扫描',
+  'dragdrop.subtitle': '释放以开始扫描拖放的文件',
+  'dragdrop.results': '拖放扫描结果',
+  'dragdrop.no_results': '无结果。',
+
+  // Alert History
+  'alerts.title': '警报历史',
+  'alerts.refresh': '刷新',
+  'alerts.search': '搜索警报...',
+  'alerts.entries': '条目',
+  'alerts.empty': '暂无警报记录。',
+  'alerts.col_time': '时间戳',
+  'alerts.col_file': '文件',
+  'alerts.col_threat': '威胁',
+  'alerts.col_level': '级别',
+  'alerts.col_action': '操作',
+
+  // Dashboard
+  'dashboard.title': '仪表盘',
+  'dashboard.total_scans': '总扫描次数',
+  'dashboard.threats_found': '发现的威胁',
+  'dashboard.quarantined': '已隔离',
+  'dashboard.status': '保护状态',
+  'dashboard.protected': '受保护',
+  'dashboard.unprotected': '未受保护',
+  'dashboard.scan_history': '扫描历史',
+  'dashboard.recent_threats': '最近威胁',
+  'dashboard.no_history': '暂无扫描历史。',
+  'dashboard.no_threats': '未检测到威胁。系统安全。',
+  'dashboard.system_status': '系统状态',
+  'dashboard.engine_version': '引擎版本',
+  'dashboard.sig_version': '签名版本',
+  'dashboard.hash_count': '哈希签名',
+  'dashboard.yara_rules': 'YARA 规则',
+  'dashboard.monitoring': '实时监控',
+  'dashboard.active': '活跃',
+  'dashboard.inactive': '未活跃',
+  'dashboard.last_scan': '上次扫描',
+
+  // Nav (adblock)
+  'nav.adblock': '广告拦截',
+
+  // Adblock
+  'adblock.title': '广告和恶意软件拦截',
+  'adblock.enabled': '保护已启用',
+  'adblock.disabled': '保护已禁用',
+  'adblock.rules': '过滤规则',
+  'adblock.lists': '过滤列表',
+  'adblock.sync': '更新列表',
+  'adblock.check': '检查域名',
+  'adblock.check_placeholder': '输入要检查的域名...',
+  'adblock.log': '拦截日志',
+  'adblock.last_sync': '上次同步',
+  'adblock.enable': '启用',
+  'adblock.disable': '禁用',
+  'adblock.add_list': '添加自定义列表',
+
   // Common
   'common.confirm': '确认',
   'common.cancel': '取消',

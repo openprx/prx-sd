@@ -10,6 +10,7 @@
 //!   applies updates from the prx-sd update server.
 
 pub mod client;
+pub mod community;
 pub mod delta;
 pub mod verify;
 

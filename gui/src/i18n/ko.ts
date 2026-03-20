@@ -46,6 +46,69 @@ export default {
   'settings.save': '설정 저장', 'settings.saving': '저장 중...',
   'settings.save_success': '설정이 저장되었습니다.', 'settings.save_fail': '설정 저장에 실패했습니다.',
   'badge.clean': '안전', 'badge.suspicious': '의심', 'badge.malicious': '악성',
+  // Nav (new pages)
+  'nav.dashboard': '대시보드',
+  'nav.alerts': '알림',
+
+  // Drag & Drop
+  'dragdrop.title': '파일을 드롭하여 스캔',
+  'dragdrop.subtitle': '놓으면 드롭된 파일 스캔이 시작됩니다',
+  'dragdrop.results': '드롭 스캔 결과',
+  'dragdrop.no_results': '결과 없음.',
+
+  // Alert History
+  'alerts.title': '알림 기록',
+  'alerts.refresh': '새로고침',
+  'alerts.search': '알림 검색...',
+  'alerts.entries': '항목',
+  'alerts.empty': '아직 기록된 알림이 없습니다.',
+  'alerts.col_time': '타임스탬프',
+  'alerts.col_file': '파일',
+  'alerts.col_threat': '위협',
+  'alerts.col_level': '수준',
+  'alerts.col_action': '작업',
+
+  // Dashboard
+  'dashboard.title': '대시보드',
+  'dashboard.total_scans': '총 스캔 수',
+  'dashboard.threats_found': '발견된 위협',
+  'dashboard.quarantined': '격리됨',
+  'dashboard.status': '보호 상태',
+  'dashboard.protected': '보호됨',
+  'dashboard.unprotected': '보호되지 않음',
+  'dashboard.scan_history': '스캔 기록',
+  'dashboard.recent_threats': '최근 위협',
+  'dashboard.no_history': '스캔 기록이 없습니다.',
+  'dashboard.no_threats': '위협이 감지되지 않았습니다. 시스템이 안전합니다.',
+  'dashboard.system_status': '시스템 상태',
+  'dashboard.engine_version': '엔진 버전',
+  'dashboard.sig_version': '시그니처 버전',
+  'dashboard.hash_count': '해시 시그니처',
+  'dashboard.yara_rules': 'YARA 규칙',
+  'dashboard.monitoring': '실시간 모니터링',
+  'dashboard.active': '활성',
+  'dashboard.inactive': '비활성',
+  'dashboard.last_scan': '마지막 스캔',
+
+  // Nav (adblock)
+  'nav.adblock': '광고 차단',
+
+  // Adblock
+  'adblock.title': '광고 및 악성코드 차단',
+  'adblock.enabled': '보호 활성화됨',
+  'adblock.disabled': '보호 비활성화됨',
+  'adblock.rules': '필터 규칙',
+  'adblock.lists': '필터 목록',
+  'adblock.sync': '목록 업데이트',
+  'adblock.check': '도메인 확인',
+  'adblock.check_placeholder': '확인할 도메인 입력...',
+  'adblock.log': '차단 로그',
+  'adblock.last_sync': '마지막 동기화',
+  'adblock.enable': '활성화',
+  'adblock.disable': '비활성화',
+  'adblock.add_list': '사용자 지정 목록 추가',
+
+  // Common
   'common.confirm': '확인', 'common.cancel': '취소', 'common.save': '저장',
   'common.error': '오류', 'common.success': '성공', 'common.loading': '로딩 중...',
 } as Record<string, string>;

@@ -303,7 +303,7 @@ mod tests {
             .unwrap();
         assert!(db.sha256_lookup_raw(&hash).is_some());
 
-        let removed = db.remove_hashes(&[hash.clone()]).unwrap();
+        let removed = db.remove_hashes(std::slice::from_ref(&hash)).unwrap();
         assert_eq!(removed, 1);
         assert!(db.sha256_lookup_raw(&hash).is_none());
 

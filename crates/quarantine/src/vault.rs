@@ -246,36 +246,79 @@ impl Quarantine {
 
 /// Load an existing vault encryption key or create a new one.
 ///
-/// The key is stored as raw bytes in `vault_dir/.key`.
+/// The key is stored as raw bytes in `vault_dir/.key`. Uses atomic
+/// file creation (`create_new`) to eliminate TOCTOU race conditions.
+/// On Unix, the key file is created with mode 0o600 to restrict access.
 fn load_or_create_key(vault_dir: &Path) -> Result<[u8; 32]> {
+    use std::io::Write;
     let key_path = vault_dir.join(".key");
 
-    if key_path.exists() {
-        let data = fs::read(&key_path).context("failed to read vault key")?;
-        if data.len() != 32 {
-            anyhow::bail!(
-                "invalid vault key length: expected 32 bytes, got {}",
-                data.len()
-            );
+    // Try to read existing key first.
+    match fs::read(&key_path) {
+        Ok(data) => {
+            if data.len() != 32 {
+                anyhow::bail!(
+                    "invalid vault key length: expected 32 bytes, got {}",
+                    data.len()
+                );
+            }
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&data);
+            tracing::debug!("loaded existing vault key");
+            Ok(key)
         }
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&data);
-        tracing::debug!("loaded existing vault key");
-        Ok(key)
-    } else {
-        let mut key = [0u8; 32];
-        OsRng.fill_bytes(&mut key);
-        fs::write(&key_path, key).context("failed to write vault key")?;
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // Key does not exist -- generate and write atomically.
+            let mut key = [0u8; 32];
+            OsRng.fill_bytes(&mut key);
 
-        // Restrict permissions on the key file (Unix only).
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
-                .context("failed to set key file permissions")?;
+            // Use create_new (O_CREAT | O_EXCL) to atomically create the file
+            // and fail if it was created by another process in the meantime.
+            let open_result = {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&key_path)
+                }
+                #[cfg(not(unix))]
+                {
+                    fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&key_path)
+                }
+            };
+
+            match open_result {
+                Ok(mut file) => {
+                    file.write_all(&key).context("failed to write vault key")?;
+                    file.sync_all()
+                        .context("failed to sync vault key to disk")?;
+                    tracing::info!("generated new vault encryption key");
+                    Ok(key)
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    // Another process created the key between our read attempt
+                    // and our create attempt -- read the key it wrote.
+                    let data = fs::read(&key_path).context("failed to read vault key")?;
+                    if data.len() != 32 {
+                        anyhow::bail!(
+                            "invalid vault key length: expected 32 bytes, got {}",
+                            data.len()
+                        );
+                    }
+                    let mut existing = [0u8; 32];
+                    existing.copy_from_slice(&data);
+                    tracing::debug!("loaded vault key created by concurrent process");
+                    Ok(existing)
+                }
+                Err(e) => Err(anyhow::anyhow!("failed to create vault key file: {e}")),
+            }
         }
-
-        tracing::info!("generated new vault encryption key");
-        Ok(key)
+        Err(e) => Err(anyhow::anyhow!("failed to read vault key: {e}")),
     }
 }

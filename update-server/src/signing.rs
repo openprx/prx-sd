@@ -15,56 +15,124 @@ use prx_sd_updater::sign_payload;
 /// written to disk, and the pair is returned. If it exists, the seed is
 /// read and the keypair is reconstructed.
 pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)> {
-    if path.exists() {
-        let seed_bytes = std::fs::read(path)
-            .with_context(|| format!("failed to read signing key from {}", path.display()))?;
+    use std::io::Write;
 
-        if seed_bytes.len() != 32 {
-            anyhow::bail!(
-                "signing key file has invalid length: expected 32 bytes, got {}",
-                seed_bytes.len()
-            );
-        }
+    // Try to read existing key first (avoids TOCTOU with exists() check).
+    match std::fs::read(path) {
+        Ok(seed_bytes) => {
+            if seed_bytes.len() != 32 {
+                anyhow::bail!(
+                    "signing key file has invalid length: expected 32 bytes, got {}",
+                    seed_bytes.len()
+                );
+            }
 
-        let seed: [u8; 32] = seed_bytes.try_into().map_err(|_| {
-            anyhow::anyhow!("signing key seed conversion failed despite length check")
-        })?;
-
-        let signing_key = SigningKey::from_bytes(&seed);
-        let verifying_key = signing_key.verifying_key();
-
-        info!(
-            path = %path.display(),
-            public_key = hex::encode(verifying_key.as_bytes()),
-            "loaded existing signing keypair"
-        );
-
-        Ok((signing_key, verifying_key))
-    } else {
-        // Generate a new keypair.
-        let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
-        let verifying_key = signing_key.verifying_key();
-
-        // Ensure parent directory exists.
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "failed to create directory for signing key: {}",
-                    parent.display()
-                )
+            let seed: [u8; 32] = seed_bytes.try_into().map_err(|_| {
+                anyhow::anyhow!("signing key seed conversion failed despite length check")
             })?;
+
+            let signing_key = SigningKey::from_bytes(&seed);
+            let verifying_key = signing_key.verifying_key();
+
+            info!(
+                path = %path.display(),
+                public_key = hex::encode(verifying_key.as_bytes()),
+                "loaded existing signing keypair"
+            );
+
+            Ok((signing_key, verifying_key))
         }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // Generate a new keypair.
+            let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
+            let verifying_key = signing_key.verifying_key();
 
-        std::fs::write(path, signing_key.to_bytes())
-            .with_context(|| format!("failed to write signing key to {}", path.display()))?;
+            // Ensure parent directory exists.
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).with_context(|| {
+                    format!(
+                        "failed to create directory for signing key: {}",
+                        parent.display()
+                    )
+                })?;
+            }
 
-        info!(
-            path = %path.display(),
-            public_key = hex::encode(verifying_key.as_bytes()),
-            "generated and saved new signing keypair"
-        );
+            // Use create_new (O_CREAT | O_EXCL) for atomic creation.
+            // On Unix, set mode 0o600 at creation time to prevent
+            // any window where the key is world-readable.
+            let open_result = {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(path)
+                }
+                #[cfg(not(unix))]
+                {
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(path)
+                }
+            };
 
-        Ok((signing_key, verifying_key))
+            match open_result {
+                Ok(mut file) => {
+                    file.write_all(&signing_key.to_bytes()).with_context(|| {
+                        format!("failed to write signing key to {}", path.display())
+                    })?;
+                    file.sync_all().with_context(|| {
+                        format!("failed to sync signing key to {}", path.display())
+                    })?;
+
+                    info!(
+                        path = %path.display(),
+                        public_key = hex::encode(verifying_key.as_bytes()),
+                        "generated and saved new signing keypair"
+                    );
+
+                    Ok((signing_key, verifying_key))
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    // Another process created the key concurrently -- load it.
+                    let seed_bytes = std::fs::read(path).with_context(|| {
+                        format!("failed to read signing key from {}", path.display())
+                    })?;
+
+                    if seed_bytes.len() != 32 {
+                        anyhow::bail!(
+                            "signing key file has invalid length: expected 32 bytes, got {}",
+                            seed_bytes.len()
+                        );
+                    }
+
+                    let seed: [u8; 32] = seed_bytes
+                        .try_into()
+                        .map_err(|_| anyhow::anyhow!("signing key seed conversion failed"))?;
+
+                    let sk = SigningKey::from_bytes(&seed);
+                    let vk = sk.verifying_key();
+
+                    info!(
+                        path = %path.display(),
+                        "loaded signing key created by concurrent process"
+                    );
+
+                    Ok((sk, vk))
+                }
+                Err(e) => Err(anyhow::anyhow!(
+                    "failed to create signing key file {}: {e}",
+                    path.display()
+                )),
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!(
+            "failed to read signing key from {}: {e}",
+            path.display()
+        )),
     }
 }
 

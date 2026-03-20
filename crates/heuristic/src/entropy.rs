@@ -72,8 +72,8 @@ mod tests {
     fn two_equally_likely_bytes() {
         // 50/50 split of two distinct byte values → entropy = 1.0
         let mut data = vec![0u8; 1000];
-        for i in 0..500 {
-            data[i] = 0xFF;
+        for item in data.iter_mut().take(500) {
+            *item = 0xFF;
         }
         let e = shannon_entropy(&data);
         assert!((e - 1.0).abs() < 0.01, "expected ~1.0, got {e}");

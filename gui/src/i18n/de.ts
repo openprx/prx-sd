@@ -46,6 +46,69 @@ export default {
   'settings.save': 'Speichern', 'settings.saving': 'Speichere...',
   'settings.save_success': 'Einstellungen gespeichert.', 'settings.save_fail': 'Speichern fehlgeschlagen.',
   'badge.clean': 'Sauber', 'badge.suspicious': 'Verdächtig', 'badge.malicious': 'Bösartig',
+  // Nav (new pages)
+  'nav.dashboard': 'Dashboard',
+  'nav.alerts': 'Warnungen',
+
+  // Drag & Drop
+  'dragdrop.title': 'Dateien zum Scannen ablegen',
+  'dragdrop.subtitle': 'Loslassen um den Scan zu starten',
+  'dragdrop.results': 'Scan-Ergebnisse',
+  'dragdrop.no_results': 'Keine Ergebnisse.',
+
+  // Alert History
+  'alerts.title': 'Warnungsverlauf',
+  'alerts.refresh': 'Aktualisieren',
+  'alerts.search': 'Warnungen suchen...',
+  'alerts.entries': 'Einträge',
+  'alerts.empty': 'Noch keine Warnungen aufgezeichnet.',
+  'alerts.col_time': 'Zeitstempel',
+  'alerts.col_file': 'Datei',
+  'alerts.col_threat': 'Bedrohung',
+  'alerts.col_level': 'Stufe',
+  'alerts.col_action': 'Aktion',
+
+  // Dashboard
+  'dashboard.title': 'Dashboard',
+  'dashboard.total_scans': 'Gesamte Scans',
+  'dashboard.threats_found': 'Gefundene Bedrohungen',
+  'dashboard.quarantined': 'Quarantäne',
+  'dashboard.status': 'Schutz',
+  'dashboard.protected': 'Geschützt',
+  'dashboard.unprotected': 'Ungeschützt',
+  'dashboard.scan_history': 'Scan-Verlauf',
+  'dashboard.recent_threats': 'Aktuelle Bedrohungen',
+  'dashboard.no_history': 'Kein Scan-Verlauf verfügbar.',
+  'dashboard.no_threats': 'Keine Bedrohungen erkannt. System ist sicher.',
+  'dashboard.system_status': 'Systemstatus',
+  'dashboard.engine_version': 'Engine-Version',
+  'dashboard.sig_version': 'Signaturversion',
+  'dashboard.hash_count': 'Hash-Signaturen',
+  'dashboard.yara_rules': 'YARA-Regeln',
+  'dashboard.monitoring': 'Echtzeitüberwachung',
+  'dashboard.active': 'Aktiv',
+  'dashboard.inactive': 'Inaktiv',
+  'dashboard.last_scan': 'Letzter Scan',
+
+  // Nav (adblock)
+  'nav.adblock': 'Werbeblocker',
+
+  // Adblock
+  'adblock.title': 'Werbe- und Malware-Blocker',
+  'adblock.enabled': 'Schutz aktiviert',
+  'adblock.disabled': 'Schutz deaktiviert',
+  'adblock.rules': 'Filterregeln',
+  'adblock.lists': 'Filterlisten',
+  'adblock.sync': 'Listen aktualisieren',
+  'adblock.check': 'Domain prüfen',
+  'adblock.check_placeholder': 'Domain eingeben...',
+  'adblock.log': 'Blockierungsprotokoll',
+  'adblock.last_sync': 'Letzte Synchronisation',
+  'adblock.enable': 'Aktivieren',
+  'adblock.disable': 'Deaktivieren',
+  'adblock.add_list': 'Benutzerdefinierte Liste hinzufügen',
+
+  // Common
   'common.confirm': 'Bestätigen', 'common.cancel': 'Abbrechen', 'common.save': 'Speichern',
   'common.error': 'Fehler', 'common.success': 'Erfolg', 'common.loading': 'Laden...',
 } as Record<string, string>;

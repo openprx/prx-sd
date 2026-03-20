@@ -46,6 +46,69 @@ export default {
   'settings.save': 'حفظ الإعدادات', 'settings.saving': 'جارٍ الحفظ...',
   'settings.save_success': 'تم حفظ الإعدادات بنجاح.', 'settings.save_fail': 'فشل حفظ الإعدادات.',
   'badge.clean': 'نظيف', 'badge.suspicious': 'مشبوه', 'badge.malicious': 'خبيث',
+  // Nav (new pages)
+  'nav.dashboard': 'لوحة التحكم',
+  'nav.alerts': 'التنبيهات',
+
+  // Drag & Drop
+  'dragdrop.title': 'أسقط الملفات للفحص',
+  'dragdrop.subtitle': 'حرر لبدء فحص الملفات المسقطة',
+  'dragdrop.results': 'نتائج فحص الإسقاط',
+  'dragdrop.no_results': 'لا نتائج.',
+
+  // Alert History
+  'alerts.title': 'سجل التنبيهات',
+  'alerts.refresh': 'تحديث',
+  'alerts.search': 'بحث في التنبيهات...',
+  'alerts.entries': 'إدخالات',
+  'alerts.empty': 'لم يتم تسجيل تنبيهات بعد.',
+  'alerts.col_time': 'الطابع الزمني',
+  'alerts.col_file': 'الملف',
+  'alerts.col_threat': 'التهديد',
+  'alerts.col_level': 'المستوى',
+  'alerts.col_action': 'الإجراء',
+
+  // Dashboard
+  'dashboard.title': 'لوحة التحكم',
+  'dashboard.total_scans': 'إجمالي عمليات الفحص',
+  'dashboard.threats_found': 'التهديدات المكتشفة',
+  'dashboard.quarantined': 'في الحجر',
+  'dashboard.status': 'الحماية',
+  'dashboard.protected': 'محمي',
+  'dashboard.unprotected': 'غير محمي',
+  'dashboard.scan_history': 'سجل الفحص',
+  'dashboard.recent_threats': 'التهديدات الأخيرة',
+  'dashboard.no_history': 'لا يوجد سجل فحص.',
+  'dashboard.no_threats': 'لم يتم اكتشاف تهديدات. النظام آمن.',
+  'dashboard.system_status': 'حالة النظام',
+  'dashboard.engine_version': 'إصدار المحرك',
+  'dashboard.sig_version': 'إصدار التوقيعات',
+  'dashboard.hash_count': 'توقيعات الهاش',
+  'dashboard.yara_rules': 'قواعد YARA',
+  'dashboard.monitoring': 'المراقبة في الوقت الفعلي',
+  'dashboard.active': 'نشط',
+  'dashboard.inactive': 'غير نشط',
+  'dashboard.last_scan': 'آخر فحص',
+
+  // Nav (adblock)
+  'nav.adblock': 'حظر الإعلانات',
+
+  // Adblock
+  'adblock.title': 'حظر الإعلانات والبرمجيات الخبيثة',
+  'adblock.enabled': 'الحماية مفعلة',
+  'adblock.disabled': 'الحماية معطلة',
+  'adblock.rules': 'قواعد التصفية',
+  'adblock.lists': 'قوائم التصفية',
+  'adblock.sync': 'تحديث القوائم',
+  'adblock.check': 'فحص النطاق',
+  'adblock.check_placeholder': 'أدخل النطاق للفحص...',
+  'adblock.log': 'سجل الحظر',
+  'adblock.last_sync': 'آخر مزامنة',
+  'adblock.enable': 'تفعيل',
+  'adblock.disable': 'تعطيل',
+  'adblock.add_list': 'إضافة قائمة مخصصة',
+
+  // Common
   'common.confirm': 'تأكيد', 'common.cancel': 'إلغاء', 'common.save': 'حفظ',
   'common.error': 'خطأ', 'common.success': 'نجاح', 'common.loading': 'جارٍ التحميل...',
 } as Record<string, string>;

@@ -120,6 +120,68 @@ export default {
   'badge.suspicious': 'საეჭვო',
   'badge.malicious': 'მავნე',
 
+  // Nav (new pages)
+  'nav.dashboard': 'პანელი',
+  'nav.alerts': 'შეტყობინებები',
+
+  // Drag & Drop
+  'dragdrop.title': 'ჩააგდეთ ფაილები სკანირებისთვის',
+  'dragdrop.subtitle': 'გაუშვით სკანირების დასაწყებად',
+  'dragdrop.results': 'სკანირების შედეგები',
+  'dragdrop.no_results': 'შედეგები არ არის.',
+
+  // Alert History
+  'alerts.title': 'შეტყობინებების ისტორია',
+  'alerts.refresh': 'განახლება',
+  'alerts.search': 'შეტყობინებების ძებნა...',
+  'alerts.entries': 'ჩანაწერი',
+  'alerts.empty': 'შეტყობინებები ჯერ არ არის.',
+  'alerts.col_time': 'დრო',
+  'alerts.col_file': 'ფაილი',
+  'alerts.col_threat': 'საფრთხე',
+  'alerts.col_level': 'დონე',
+  'alerts.col_action': 'მოქმედება',
+
+  // Dashboard
+  'dashboard.title': 'პანელი',
+  'dashboard.total_scans': 'სულ სკანირება',
+  'dashboard.threats_found': 'ნაპოვნი საფრთხეები',
+  'dashboard.quarantined': 'კარანტინში',
+  'dashboard.status': 'დაცვა',
+  'dashboard.protected': 'დაცულია',
+  'dashboard.unprotected': 'დაუცველია',
+  'dashboard.scan_history': 'სკანირების ისტორია',
+  'dashboard.recent_threats': 'ბოლო საფრთხეები',
+  'dashboard.no_history': 'სკანირების ისტორია არ არის.',
+  'dashboard.no_threats': 'საფრთხეები არ აღმოჩენილა. სისტემა უსაფრთხოა.',
+  'dashboard.system_status': 'სისტემის მდგომარეობა',
+  'dashboard.engine_version': 'ძრავის ვერსია',
+  'dashboard.sig_version': 'ხელმოწერის ვერსია',
+  'dashboard.hash_count': 'ჰეშ-ხელმოწერები',
+  'dashboard.yara_rules': 'YARA წესები',
+  'dashboard.monitoring': 'რეალ-დროის მონიტორინგი',
+  'dashboard.active': 'აქტიური',
+  'dashboard.inactive': 'არააქტიური',
+  'dashboard.last_scan': 'ბოლო სკანირება',
+
+  // Nav (adblock)
+  'nav.adblock': 'რეკლამის ბლოკერი',
+
+  // Adblock
+  'adblock.title': 'რეკლამისა და მავნე პროგრამების ბლოკირება',
+  'adblock.enabled': 'დაცვა ჩართულია',
+  'adblock.disabled': 'დაცვა გამორთულია',
+  'adblock.rules': 'ფილტრის წესები',
+  'adblock.lists': 'ფილტრის სიები',
+  'adblock.sync': 'სიების განახლება',
+  'adblock.check': 'დომენის შემოწმება',
+  'adblock.check_placeholder': 'შეიყვანეთ დომენი შესამოწმებლად...',
+  'adblock.log': 'ბლოკირების ჟურნალი',
+  'adblock.last_sync': 'ბოლო სინქრონიზაცია',
+  'adblock.enable': 'ჩართვა',
+  'adblock.disable': 'გამორთვა',
+  'adblock.add_list': 'მორგებული სიის დამატება',
+
   // Common
   'common.confirm': 'დადასტურება',
   'common.cancel': 'გაუქმება',

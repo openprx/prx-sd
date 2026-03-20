@@ -149,6 +149,17 @@ pub enum ScheduleAction {
     Status,
 }
 
+/// Subcommands for community threat intelligence sharing.
+#[derive(Subcommand)]
+pub enum CommunityAction {
+    /// Show community sharing configuration and enrollment status.
+    Status,
+    /// Enroll this machine with the community threat sharing API.
+    Enroll,
+    /// Disable community threat intelligence sharing.
+    Disable,
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Scan a file or directory for threats.
@@ -307,6 +318,11 @@ enum Commands {
     Adblock {
         #[command(subcommand)]
         action: AdblockAction,
+    },
+    /// Manage community threat intelligence sharing.
+    Community {
+        #[command(subcommand)]
+        action: CommunityAction,
     },
     /// Start local DNS proxy with adblock + IOC + custom blocklist filtering.
     DnsProxy {
@@ -546,6 +562,11 @@ async fn main() -> Result<()> {
                 category,
             } => commands::adblock::run_add(&name, &url, &category, &data_dir).await,
             AdblockAction::Remove { name } => commands::adblock::run_remove(&name, &data_dir).await,
+        },
+        Commands::Community { action } => match action {
+            CommunityAction::Status => commands::community::run_status(&data_dir).await,
+            CommunityAction::Enroll => commands::community::run_enroll(&data_dir).await,
+            CommunityAction::Disable => commands::community::run_disable(&data_dir).await,
         },
         Commands::DnsProxy {
             listen,
