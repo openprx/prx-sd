@@ -57,7 +57,13 @@ async fn main() -> anyhow::Result<()> {
             .to_string()
     }));
 
-    let admin_token = std::env::var("ADMIN_TOKEN").ok();
+    let admin_token = std::env::var("ADMIN_TOKEN").map_err(|_| {
+        anyhow::anyhow!(
+            "ADMIN_TOKEN environment variable must be set. \
+             The /admin/publish endpoint requires authentication to prevent \
+             unauthorized signature updates. Set ADMIN_TOKEN to a strong secret."
+        )
+    })?;
 
     // Load or generate Ed25519 signing keypair.
     let (signing_key, verifying_key) = load_or_create_keypair(&key_file)?;

@@ -129,12 +129,26 @@ impl ScanEngine {
             Ok(pool) => pool,
             Err(e) => {
                 warn!(error = %e, "failed to build custom rayon pool, using default thread count");
-                rayon::ThreadPoolBuilder::new()
-                    .build()
-                    .unwrap_or_else(|e2| {
-                        // This should never fail with default settings, but handle it gracefully.
-                        panic!("failed to build even a default rayon pool: {e2}");
-                    })
+                match rayon::ThreadPoolBuilder::new().build() {
+                    Ok(pool) => pool,
+                    Err(e2) => {
+                        error!(
+                            error = %e2,
+                            "failed to build even a default rayon pool"
+                        );
+                        // Return error results for all entries instead of panicking.
+                        return entries
+                            .iter()
+                            .map(|entry| {
+                                let mut r = ScanResult::clean(entry.path(), 0);
+                                r.details.push(format!(
+                                    "scan error: failed to create thread pool: {e2}"
+                                ));
+                                r
+                            })
+                            .collect();
+                    }
+                }
             }
         };
 
@@ -183,7 +197,7 @@ impl ScanEngine {
         let mut sub_results: Vec<ScanResult> = Vec::with_capacity(3);
 
         // -- 1. Hash lookup (fast path) -------------------------------------------
-        if let Some(threat_name) = self.signatures.hash_lookup(data) {
+        if let Some(threat_name) = self.signatures.hash_lookup(data)? {
             debug!(path = %path.display(), threat = %threat_name, "hash match");
             return Ok(ScanResult::detected(
                 path,

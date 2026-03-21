@@ -22,8 +22,8 @@ pub struct AppState {
     pub storage: Arc<SignatureStorage>,
     /// Ed25519 signing key for authenticating payloads.
     pub signing_key: Arc<SigningKey>,
-    /// Admin authentication token (simple bearer token for publish endpoint).
-    pub admin_token: Option<String>,
+    /// Admin authentication token (required; publish endpoint always requires auth).
+    pub admin_token: String,
 }
 
 /// Response body for `GET /version`.
@@ -154,15 +154,28 @@ pub async fn publish(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> Result<impl IntoResponse, AppError> {
-    // Check authorization if an admin token is configured.
-    if let Some(ref expected_token) = state.admin_token {
+    // Always check authorization -- ADMIN_TOKEN is required at startup.
+    {
         let provided = headers
             .get(header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
             .unwrap_or("");
 
-        if provided != expected_token {
+        let expected_bytes = state.admin_token.as_bytes();
+        let provided_bytes = provided.as_bytes();
+
+        // Constant-time comparison to prevent timing attacks.
+        // Length difference is checked first (this leaks length but not content).
+        let is_valid = provided_bytes.len() == expected_bytes.len() && {
+            let mut diff = 0u8;
+            for (a, b) in provided_bytes.iter().zip(expected_bytes.iter()) {
+                diff |= a ^ b;
+            }
+            diff == 0
+        };
+
+        if !is_valid {
             return Err(AppError::unauthorized("invalid or missing admin token"));
         }
     }

@@ -85,41 +85,51 @@ impl SignatureDatabase {
     /// Look up a SHA-256 hash of `data` in the database.
     ///
     /// Computes the SHA-256 of the provided data and checks the database.
-    /// Returns the signature name if found.
+    /// Returns the signature name if found, or an error if the database
+    /// cannot be read (preventing silent signature bypass).
     #[instrument(skip_all)]
-    pub fn hash_lookup(&self, data: &[u8]) -> Option<String> {
+    pub fn hash_lookup(&self, data: &[u8]) -> Result<Option<String>> {
         let hash = crate::hash::sha256_hash(data);
         self.sha256_lookup_raw(&hash)
     }
 
     /// Look up a raw SHA-256 hash (already computed) in the database.
-    pub fn sha256_lookup_raw(&self, hash: &[u8]) -> Option<String> {
-        let rtxn = self.env.read_txn().ok()?;
-        self.sha256_db
+    pub fn sha256_lookup_raw(&self, hash: &[u8]) -> Result<Option<String>> {
+        let rtxn = self
+            .env
+            .read_txn()
+            .context("failed to create LMDB read transaction for SHA-256 lookup")?;
+        let result = self
+            .sha256_db
             .get(&rtxn, hash)
-            .ok()
-            .flatten()
-            .map(|s| s.to_owned())
+            .context("failed to look up SHA-256 hash in LMDB")?
+            .map(|s| s.to_owned());
+        Ok(result)
     }
 
     /// Look up an MD5 hash of `data` in the database.
     ///
     /// Computes the MD5 of the provided data and checks the database.
-    /// Returns the signature name if found.
+    /// Returns the signature name if found, or an error if the database
+    /// cannot be read.
     #[instrument(skip_all)]
-    pub fn md5_lookup(&self, data: &[u8]) -> Option<String> {
+    pub fn md5_lookup(&self, data: &[u8]) -> Result<Option<String>> {
         let hash = crate::hash::md5_hash(data);
         self.md5_lookup_raw(&hash)
     }
 
     /// Look up a raw MD5 hash (already computed) in the database.
-    pub fn md5_lookup_raw(&self, hash: &[u8]) -> Option<String> {
-        let rtxn = self.env.read_txn().ok()?;
-        self.md5_db
+    pub fn md5_lookup_raw(&self, hash: &[u8]) -> Result<Option<String>> {
+        let rtxn = self
+            .env
+            .read_txn()
+            .context("failed to create LMDB read transaction for MD5 lookup")?;
+        let result = self
+            .md5_db
             .get(&rtxn, hash)
-            .ok()
-            .flatten()
-            .map(|s| s.to_owned())
+            .context("failed to look up MD5 hash in LMDB")?
+            .map(|s| s.to_owned());
+        Ok(result)
     }
 
     /// Import SHA-256 hash entries into the database.
@@ -283,15 +293,15 @@ mod tests {
         assert_eq!(count, 1);
 
         // Lookup by data should find it.
-        let result = db.hash_lookup(b"malware_sample");
+        let result = db.hash_lookup(b"malware_sample").unwrap();
         assert_eq!(result, Some("Win.Trojan.Test-1".to_string()));
 
         // Lookup by raw hash should also work.
-        let result = db.sha256_lookup_raw(&hash);
+        let result = db.sha256_lookup_raw(&hash).unwrap();
         assert_eq!(result, Some("Win.Trojan.Test-1".to_string()));
 
         // Unknown data should return None.
-        assert!(db.hash_lookup(b"benign_file").is_none());
+        assert!(db.hash_lookup(b"benign_file").unwrap().is_none());
     }
 
     #[test]
@@ -301,11 +311,11 @@ mod tests {
         let hash = crate::hash::sha256_hash(b"removable");
         db.import_hashes(&[(hash.clone(), "Test.Sig".to_string())])
             .unwrap();
-        assert!(db.sha256_lookup_raw(&hash).is_some());
+        assert!(db.sha256_lookup_raw(&hash).unwrap().is_some());
 
         let removed = db.remove_hashes(std::slice::from_ref(&hash)).unwrap();
         assert_eq!(removed, 1);
-        assert!(db.sha256_lookup_raw(&hash).is_none());
+        assert!(db.sha256_lookup_raw(&hash).unwrap().is_none());
 
         // Removing again should return 0.
         let removed = db.remove_hashes(&[hash]).unwrap();
@@ -320,10 +330,10 @@ mod tests {
         db.import_md5_hashes(&[(hash.clone(), "MD5.Test-1".to_string())])
             .unwrap();
 
-        let result = db.md5_lookup(b"md5_sample");
+        let result = db.md5_lookup(b"md5_sample").unwrap();
         assert_eq!(result, Some("MD5.Test-1".to_string()));
 
-        assert!(db.md5_lookup(b"other").is_none());
+        assert!(db.md5_lookup(b"other").unwrap().is_none());
     }
 
     #[test]

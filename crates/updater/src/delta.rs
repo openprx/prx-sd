@@ -4,6 +4,8 @@
 //! versions: which hashes to add or remove and which YARA rules to change.
 //! Patches are serialized with `bincode` and compressed with `zstd`.
 
+use std::io::Read;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
@@ -45,10 +47,24 @@ pub enum RuleAction {
     Update,
 }
 
+/// Maximum decompressed size for delta patches (256 MB).
+///
+/// Prevents malicious or corrupted compressed data from exhausting memory
+/// during decompression.
+const MAX_DELTA_DECOMPRESSED_SIZE: u64 = 256 * 1024 * 1024;
+
 /// Decompress a zstd-compressed blob and deserialize it into a `DeltaPatch`.
+///
+/// Decompression is capped at [`MAX_DELTA_DECOMPRESSED_SIZE`] to prevent
+/// memory exhaustion from decompression bombs.
 pub fn decode_delta(compressed: &[u8]) -> Result<DeltaPatch> {
-    let decompressed =
-        zstd::decode_all(compressed).context("failed to decompress delta patch (zstd)")?;
+    let decoder = zstd::Decoder::new(std::io::Cursor::new(compressed))
+        .context("failed to create zstd decoder for delta patch")?;
+    let mut limited = decoder.take(MAX_DELTA_DECOMPRESSED_SIZE);
+    let mut decompressed = Vec::new();
+    limited
+        .read_to_end(&mut decompressed)
+        .context("failed to decompress delta patch (zstd)")?;
 
     let patch: DeltaPatch =
         bincode::deserialize(&decompressed).context("failed to deserialize delta patch")?;
