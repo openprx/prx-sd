@@ -17,9 +17,11 @@ members = [
 exclude = ["gui/src-tauri"]
 
 [workspace.package]
+authors = ["g1e2x87"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+description = "Open-source antivirus engine with hash, YARA, and heuristic detection"
 repository = "https://github.com/openprx/prx-sd"
 
 [workspace.dependencies]
