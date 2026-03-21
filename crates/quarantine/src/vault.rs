@@ -140,7 +140,55 @@ impl Quarantine {
     ///
     /// Decrypts the file and writes it to `to`. The quarantine entry
     /// is **not** removed; call [`delete`] separately if desired.
+    ///
+    /// The restore path is validated to prevent path traversal attacks:
+    /// - Paths containing `..` components are rejected.
+    /// - Restoring to system-critical directories is denied.
     pub fn restore(&self, id: QuarantineId, to: &Path) -> Result<()> {
+        // Path traversal protection: reject `..` components.
+        for component in to.components() {
+            if matches!(component, std::path::Component::ParentDir) {
+                anyhow::bail!(
+                    "restore path contains '..' component, which is not allowed: {}",
+                    to.display()
+                );
+            }
+        }
+
+        // Resolve symlinks to prevent bypass via symbolic links.
+        // If the path doesn't exist yet, canonicalize the parent directory.
+        let resolved = if to.exists() {
+            to.canonicalize().with_context(|| {
+                format!("failed to resolve restore path: {}", to.display())
+            })?
+        } else if let Some(parent) = to.parent() {
+            if parent.exists() {
+                let resolved_parent = parent.canonicalize().with_context(|| {
+                    format!("failed to resolve parent of restore path: {}", parent.display())
+                })?;
+                resolved_parent.join(to.file_name().unwrap_or_default())
+            } else {
+                to.to_path_buf()
+            }
+        } else {
+            to.to_path_buf()
+        };
+
+        // Deny restoring to system-critical directories (check resolved path).
+        let denied_prefixes: &[&str] = &[
+            "/etc", "/usr", "/bin", "/sbin", "/boot", "/proc", "/sys",
+            "/lib", "/lib64", "/dev", "/run/systemd",
+        ];
+        let path_str = resolved.to_string_lossy();
+        for prefix in denied_prefixes {
+            if path_str.starts_with(prefix) {
+                anyhow::bail!(
+                    "restoring to system directory is denied: {}",
+                    resolved.display()
+                );
+            }
+        }
+
         let meta = self.load_meta(id)?;
 
         let encrypted_path = self.vault_dir.join(format!("{id}.enc"));

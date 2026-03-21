@@ -125,7 +125,7 @@ async fn scan_after_md5_import_detects() {
         .unwrap();
 
     // Verify direct DB lookup works.
-    let lookup = db.md5_lookup(sample);
+    let lookup = db.md5_lookup(sample).unwrap();
     assert_eq!(lookup, Some("Test.MD5.Sample".to_string()));
 
     // Also import as SHA-256 so the scan pipeline detects it.

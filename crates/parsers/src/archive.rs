@@ -297,9 +297,11 @@ fn extract_targz(data: &[u8], max_depth: u32) -> Result<Vec<(String, Vec<u8>)>> 
 // ── GZIP (standalone, not tar) ───────────────────────────────────────
 
 fn inspect_gzip(data: &[u8]) -> Result<ArchiveInfo> {
-    let mut gz = flate2::read::GzDecoder::new(Cursor::new(data));
+    let gz = flate2::read::GzDecoder::new(Cursor::new(data));
+    let mut limited = gz.take(MAX_EXTRACTION_BYTES);
     let mut decompressed = Vec::new();
-    gz.read_to_end(&mut decompressed)
+    limited
+        .read_to_end(&mut decompressed)
         .context("failed to decompress gzip")?;
 
     Ok(ArchiveInfo {
@@ -314,9 +316,11 @@ fn inspect_gzip(data: &[u8]) -> Result<ArchiveInfo> {
 }
 
 fn extract_gzip(data: &[u8], max_depth: u32) -> Result<Vec<(String, Vec<u8>)>> {
-    let mut gz = flate2::read::GzDecoder::new(Cursor::new(data));
+    let gz = flate2::read::GzDecoder::new(Cursor::new(data));
+    let mut limited = gz.take(MAX_EXTRACTION_BYTES);
     let mut decompressed = Vec::new();
-    gz.read_to_end(&mut decompressed)
+    limited
+        .read_to_end(&mut decompressed)
         .context("failed to decompress gzip")?;
 
     // Check if the decompressed content is itself an archive

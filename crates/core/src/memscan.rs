@@ -265,16 +265,26 @@ pub fn scan_process(pid: u32, yara: &YaraEngine, db: &SignatureDatabase) -> Resu
         }
 
         // 2. Hash lookup
-        if let Some(sig_name) = db.hash_lookup(&data) {
-            matches.push(MemRegionMatch {
-                region_start: region.start,
-                region_end: region.end,
-                permissions: region.permissions.clone(),
-                rule_name: sig_name.clone(),
-            });
-            if worst_level < ThreatLevel::Malicious {
-                worst_level = ThreatLevel::Malicious;
-                worst_name = Some(sig_name);
+        match db.hash_lookup(&data) {
+            Ok(Some(sig_name)) => {
+                matches.push(MemRegionMatch {
+                    region_start: region.start,
+                    region_end: region.end,
+                    permissions: region.permissions.clone(),
+                    rule_name: sig_name.clone(),
+                });
+                if worst_level < ThreatLevel::Malicious {
+                    worst_level = ThreatLevel::Malicious;
+                    worst_name = Some(sig_name);
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(
+                    pid,
+                    region_start = region.start,
+                    "signature database lookup failed: {e}"
+                );
             }
         }
     }

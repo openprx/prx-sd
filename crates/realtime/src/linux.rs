@@ -214,10 +214,16 @@ impl FanotifyMonitor {
 
                     while offset + FAN_EVENT_METADATA_LEN <= total {
                         // SAFETY: We verified offset + FAN_EVENT_METADATA_LEN <= total,
-                        // so the pointer is within the buf bounds and properly aligned
-                        // for the repr(C) FanotifyEventMetadata struct.
+                        // so the pointer is within the buf bounds. We use
+                        // read_unaligned because the buffer is a byte array whose
+                        // natural alignment is 1, while FanotifyEventMetadata
+                        // contains u64 fields requiring 8-byte alignment. The
+                        // kernel typically returns aligned event_len values, but
+                        // we do not rely on that assumption.
                         let meta = unsafe {
-                            &*(buf.as_ptr().add(offset) as *const FanotifyEventMetadata)
+                            std::ptr::read_unaligned(
+                                buf.as_ptr().add(offset) as *const FanotifyEventMetadata,
+                            )
                         };
 
                         if meta.vers != FANOTIFY_METADATA_VERSION {

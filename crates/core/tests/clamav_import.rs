@@ -83,14 +83,14 @@ fn import_synthetic_cvd_then_lookup_detects() {
     assert_eq!(stats.cvd_version, 500);
 
     // Verify direct MD5 lookups.
-    let result_a = db.md5_lookup(sample_a);
+    let result_a = db.md5_lookup(sample_a).unwrap();
     assert_eq!(result_a, Some("ClamAV.Test.Alpha".to_string()));
 
-    let result_b = db.md5_lookup(sample_b);
+    let result_b = db.md5_lookup(sample_b).unwrap();
     assert_eq!(result_b, Some("ClamAV.Test.Bravo".to_string()));
 
     // Unknown content should not match.
-    assert!(db.md5_lookup(b"something else entirely").is_none());
+    assert!(db.md5_lookup(b"something else entirely").unwrap().is_none());
 
     // Verify DB stats reflect the imports.
     let db_stats = db.get_stats().unwrap();
@@ -192,6 +192,6 @@ fn import_cvd_with_hsb_sha256_entries() {
     assert_eq!(stats.md5_imported, 0);
 
     // Verify SHA-256 lookup.
-    let result = db.hash_lookup(sample);
+    let result = db.hash_lookup(sample).unwrap();
     assert_eq!(result, Some("ClamAV.SHA256.Test".to_string()));
 }
