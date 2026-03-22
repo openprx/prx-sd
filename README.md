@@ -185,6 +185,8 @@ Documentation is available in 10 languages: [docs/README.md](docs/README.md)
 
 ## Links
 
+- [Documentation](https://docs.openprx.dev/en/prx-sd/) — Full PRX-SD documentation (10 languages)
+- [Community](https://community.openprx.dev) — OpenPRX community forum
 - [CLI Reference](docs/CLI.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Building](docs/BUILDING.md)
