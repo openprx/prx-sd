@@ -14,7 +14,7 @@ use std::path::Path;
 mod inner {
     use super::*;
     use wasmtime::*;
-    use wasmtime_wasi::preview1::WasiP1Ctx;
+    use wasmtime_wasi::p1::WasiP1Ctx;
     use wasmtime_wasi::WasiCtxBuilder;
 
     /// Per-instance state that host functions read/write.
@@ -84,7 +84,7 @@ mod inner {
             store.set_fuel(1_000_000_000)?;
 
             let mut linker: Linker<PluginState> = Linker::new(engine);
-            wasmtime_wasi::preview1::add_to_linker_sync(&mut linker, |s| &mut s.wasi)
+            wasmtime_wasi::p1::add_to_linker_sync(&mut linker, |s| &mut s.wasi)
                 .context("failed to add WASI to linker")?;
             register_host_functions(&mut linker)?;
 
@@ -148,7 +148,7 @@ mod inner {
             store.set_fuel(fuel)?;
 
             let mut linker: Linker<PluginState> = Linker::new(&self.engine);
-            wasmtime_wasi::preview1::add_to_linker_sync(&mut linker, |s| &mut s.wasi)
+            wasmtime_wasi::p1::add_to_linker_sync(&mut linker, |s| &mut s.wasi)
                 .context("failed to add WASI to linker (scan)")?;
             register_host_functions(&mut linker)?;
 

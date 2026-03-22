@@ -11,13 +11,9 @@ prx-sd-core = { path = "../../crates/core" }
 prx-sd-signatures = { path = "../../crates/signatures" }
 prx-sd-quarantine = { path = "../../crates/quarantine" }
 prx-sd-realtime = { path = "../../crates/realtime" }
-prx-sd-updater = { path = "../../crates/updater" }
-tokio = { version = "1", features = ["full"] }
-anyhow = "1"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 dirs = "5"
-chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json"] }
 sha2 = "0.10"
 

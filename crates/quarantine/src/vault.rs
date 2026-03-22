@@ -88,13 +88,13 @@ impl Quarantine {
         // Generate a random nonce.
         let mut nonce_bytes = [0u8; 12];
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt the file contents.
         let cipher =
             Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
         let ciphertext = cipher
-            .encrypt(nonce, data.as_ref())
+            .encrypt(&nonce, data.as_ref())
             .map_err(|e| anyhow::anyhow!("encryption failed: {e}"))?;
 
         // Write encrypted data.
@@ -199,11 +199,11 @@ impl Quarantine {
             )
         })?;
 
-        let nonce = Nonce::from_slice(&meta.nonce);
+        let nonce = Nonce::from(meta.nonce);
         let cipher =
             Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
         let plaintext = cipher
-            .decrypt(nonce, ciphertext.as_ref())
+            .decrypt(&nonce, ciphertext.as_ref())
             .map_err(|e| anyhow::anyhow!("decryption failed: {e}"))?;
 
         // Ensure parent directory exists.

@@ -2,6 +2,7 @@
 name = "prx-sd-core"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 prx-sd-signatures = { workspace = true }
@@ -12,10 +13,7 @@ rayon = { workspace = true }
 walkdir = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-thiserror = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-chrono = { workspace = true }
 reqwest = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -35,3 +33,6 @@ rand = { workspace = true }
 [[bench]]
 name = "scan_bench"
 harness = false
+
+[lints]
+workspace = true
