@@ -1,3 +1,7 @@
+// This crate uses unsafe for Linux syscalls (seccomp-bpf, clone, ptrace,
+// landlock, setrlimit). All unsafe blocks have SAFETY comments.
+#![allow(unsafe_code)]
+
 //! Sandbox execution environment for the prx-sd antivirus engine.
 //!
 //! Provides multi-platform behavioral analysis of suspicious files by

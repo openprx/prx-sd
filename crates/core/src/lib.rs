@@ -1,3 +1,7 @@
+// This crate uses unsafe for libc::kill in rootkit detection.
+// All unsafe blocks have SAFETY comments.
+#![allow(unsafe_code)]
+
 //! `prx-sd-core` -- Scan coordination engine for the prx-sd antivirus toolkit.
 //!
 //! This crate glues together signature matching, YARA rules, format parsing,

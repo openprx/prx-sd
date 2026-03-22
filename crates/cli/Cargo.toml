@@ -2,6 +2,7 @@
 name = "sd"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [[bin]]
 name = "sd"
@@ -24,7 +25,6 @@ tracing-subscriber = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
-uuid = { workspace = true }
 walkdir = { workspace = true }
 notify = { workspace = true }
 reqwest = { workspace = true }
@@ -39,3 +39,6 @@ sha2 = { workspace = true }
 serde_json = { workspace = true }
 flate2 = { workspace = true }
 tar = { workspace = true }
+
+[lints]
+workspace = true

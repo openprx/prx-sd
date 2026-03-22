@@ -1,3 +1,8 @@
+// This crate uses unsafe for Linux syscalls (fanotify, libc). All unsafe blocks
+// have SAFETY comments. The workspace-level `unsafe_code = "deny"` is relaxed
+// here; `undocumented_unsafe_blocks = "deny"` still enforces documentation.
+#![allow(unsafe_code)]
+
 //! Real-time file system monitoring for the prx-sd antivirus engine.
 //!
 //! This crate provides a unified [`FileSystemMonitor`] trait with

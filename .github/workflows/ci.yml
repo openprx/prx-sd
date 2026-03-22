@@ -27,10 +27,15 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --all-features -- -D warnings
 
       - name: Check compilation
-        run: cargo check --workspace
+        run: cargo check --workspace --all-features
+
+      - name: Check unused dependencies
+        run: |
+          cargo install cargo-machete --locked
+          cargo machete
 
   test:
     name: Test
