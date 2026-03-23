@@ -22,7 +22,7 @@ fn default_config() -> Value {
             "block_mode": false,
             "channel_capacity": 4096
         },
-        "update_server_url": "https://update.prx-sd.dev/v1",
+        "update_server_url": null,
         "quarantine": {
             "auto_quarantine": false,
             "max_vault_size_mb": 1024

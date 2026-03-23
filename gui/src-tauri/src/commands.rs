@@ -375,7 +375,7 @@ pub async fn update_signatures(
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string())
             })
-            .unwrap_or_else(|| "https://update.prx-sd.dev/v1".to_string())
+            .ok_or_else(|| "No update server URL configured. Run 'sd update' from CLI or set update_server_url in config.".to_string())?
     };
 
     let manifest_url = format!("{}/manifest.json", server_url.trim_end_matches('/'));

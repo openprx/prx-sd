@@ -79,7 +79,7 @@ pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
         .context("failed to build HTTP client")?;
 
     let release: Release = client
-        .get("https://api.github.com/repos/prx-sd/prx-sd/releases/latest")
+        .get("https://api.github.com/repos/openprx/prx-sd/releases/latest")
         .send()
         .await
         .context("failed to query GitHub releases")?
