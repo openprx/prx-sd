@@ -7,30 +7,54 @@ PRX-SD provides multi-layered threat detection combining hash signatures, YARA r
 ## Features
 
 - **Multi-layer Detection** — SHA-256/MD5 hash matching, 38K+ YARA rules (via YARA-X), heuristic scoring, and optional ONNX-based ML inference
-- **Real-time Protection** — File system monitoring with process interception (fanotify on Linux, FSEvents on macOS, ReadDirectoryChangesW on Windows)
+- **Real-time Protection** — File system monitoring with process interception (fanotify on Linux, FSEvents on macOS, ReadDirectoryChangesW on Windows); fanotify pre-execution blocking requires root and is Linux only
 - **Ransomware Defense** — Detects bulk encryption patterns and auto-blocks malicious processes
-- **Memory Scanning** — Scan running process memory for in-memory threats (Linux)
+- **Memory Scanning** — Scan running process memory for in-memory threats (Linux only, requires root)
 - **Network Protection** — IOC-based IP/domain/URL filtering, DNS proxy with adblock engine
 - **Automated Response** — Kill processes, quarantine files (AES-256-GCM encrypted vault), clean persistence mechanisms
 - **ClamAV Compatible** — Import ClamAV `.cvd`/`.hdb`/`.hsb` signature databases
 - **VirusTotal Integration** — Cloud lookup for unknown files (free API, 500 queries/day)
-- **Rootkit Detection** — Hidden process detection, kernel module verification, LD_PRELOAD checks
+- **Rootkit Detection** — Hidden process detection, kernel module verification, LD_PRELOAD checks (Linux only, requires root)
+- **eBPF Runtime Monitoring** — Kernel-level syscall tracing and anomaly detection (Linux only, feature-gated via `--features ebpf`)
 - **Sandboxing** — Process isolation via ptrace/seccomp/namespaces with behavior analysis
 - **Desktop GUI** — Tauri 2 + Vue 3 application with system tray, drag-and-drop scanning, dashboard
 - **Plugin System** — Extend with custom WebAssembly (WASM) plugins
 - **Cross-platform** — Linux (x86_64, aarch64), macOS (x86_64, aarch64), Windows (x86_64)
 
-## Quick Start
+## Installation
 
-### Install (Linux / macOS)
+### Install Script (Linux / macOS)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/openprx/prx-sd/main/install.sh | bash
 ```
 
-Or build from source (see [Building](docs/BUILDING.md)).
+### Homebrew (macOS / Linux)
 
-### Basic Usage
+```bash
+brew install openprx/tap/sd
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add openprx https://github.com/openprx/scoop-bucket
+scoop install sd
+```
+
+### Build from Source
+
+```bash
+# Prerequisites: Rust 1.70+, pkg-config, openssl-dev
+git clone https://github.com/openprx/prx-sd.git
+cd prx-sd
+cargo build --release
+# Binary: target/release/sd
+```
+
+See [Building](docs/BUILDING.md) for full build instructions including GUI and cross-compilation.
+
+## Basic Usage
 
 ```bash
 # Scan a file
@@ -115,6 +139,12 @@ PRX-SD provides 20+ commands. Here are the most common ones:
 | `sd config show\|set\|reset` | Manage configuration |
 | `sd schedule add\|remove\|status` | Scheduled scanning |
 | `sd policy show\|set\|reset` | Remediation policy |
+| `sd scan-memory [--pid PID]` | Scan process memory for in-memory threats (Linux only) |
+| `sd check-rootkit` | Detect rootkit indicators (Linux only) |
+| `sd scan-usb [DEVICE]` | Scan USB/removable media |
+| `sd adblock` | DNS-level ad/malware blocking |
+| `sd community` | Community threat intelligence sharing |
+| `sd dns-proxy` | Local DNS proxy with filtering |
 | `sd info` | Engine and database info |
 | `sd status` | Daemon status |
 | `sd self-update` | Update the sd binary |
@@ -135,22 +165,25 @@ PRX-SD ships with a minimal embedded signature set for basic detection out of th
 
 Update signatures:
 
+`sd update` downloads from [openprx/prx-sd-signatures](https://github.com/openprx/prx-sd-signatures) on GitHub by default — no configuration needed. A custom update server URL can be set for air-gapped or mirrored environments.
+
 ```bash
+# Default: downloads from GitHub (no config needed)
 sd update
+
+# Check for updates without downloading
+sd update --check-only
+
+# Force re-download
+sd update --force
+
+# Use a custom update server (for air-gapped environments)
+sd config set update_server_url https://my-mirror.example.com/v1
+sd update
+
+# Reset to GitHub default
+sd config set update_server_url null
 ```
-
-## Building from Source
-
-```bash
-# Prerequisites: Rust 1.70+, pkg-config, openssl-dev
-git clone https://github.com/openprx/prx-sd.git
-cd prx-sd
-cargo build --release
-
-# The binary is at target/release/sd
-```
-
-See [Building](docs/BUILDING.md) for full build instructions including GUI and cross-compilation.
 
 ## Platform Support
 
@@ -161,6 +194,19 @@ See [Building](docs/BUILDING.md) for full build instructions including GUI and c
 | macOS x86_64 | FSEvents | - | - | LaunchAgent |
 | macOS aarch64 | FSEvents | - | - | LaunchAgent |
 | Windows x86_64 | ReadDirectoryChangesW | Minifilter (planned) | - | Registry/Tasks |
+
+## Uninstall
+
+```bash
+# Via install script
+curl -fsSL https://raw.githubusercontent.com/openprx/prx-sd/main/install.sh | bash -s -- --uninstall
+
+# Via Homebrew
+brew uninstall sd
+
+# Via Scoop
+scoop uninstall sd
+```
 
 ## Contributing
 
