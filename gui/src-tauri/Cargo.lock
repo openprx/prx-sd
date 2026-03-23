@@ -4144,7 +4144,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-core"
-version = "0.2.0"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "libc",
@@ -4180,7 +4180,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-heuristic"
-version = "0.2.0"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "prx-sd-parsers",
@@ -4190,7 +4190,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-parsers"
-version = "0.2.0"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "flate2",
@@ -4204,7 +4204,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-quarantine"
-version = "0.2.0"
+version = "0.2.3"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -4219,7 +4219,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-realtime"
-version = "0.2.0"
+version = "0.2.3"
 dependencies = [
  "adblock",
  "anyhow",
@@ -4241,7 +4241,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-signatures"
-version = "0.2.0"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "chrono",
