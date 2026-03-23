@@ -67,7 +67,8 @@ impl RegistryMonitor {
     }
 
     /// Create a new `RegistryMonitor` watching the specified registry keys.
-    pub const fn with_keys(watched_keys: Vec<String>) -> Self {
+    #[allow(clippy::missing_const_for_fn)] // not const on Windows (HashMap::new)
+    pub fn with_keys(watched_keys: Vec<String>) -> Self {
         Self {
             watched_keys,
             #[cfg(target_os = "windows")]
@@ -84,7 +85,8 @@ impl RegistryMonitor {
     ///
     /// This must be called before `detect_changes` to establish the initial state.
     /// On non-Windows platforms this is a no-op.
-    pub const fn capture_baseline(&mut self) -> Result<(), String> {
+    #[allow(clippy::missing_const_for_fn)] // not const on Windows (HashMap::insert, ?)
+    pub fn capture_baseline(&mut self) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             for key in &self.watched_keys {
@@ -101,7 +103,8 @@ impl RegistryMonitor {
     /// the internal baseline is updated to the current state.
     ///
     /// On non-Windows platforms this always returns an empty list.
-    pub const fn detect_changes(&mut self) -> Result<Vec<RegistryEvent>, String> {
+    #[allow(clippy::missing_const_for_fn)] // not const on Windows (calls detect_changes_windows)
+    pub fn detect_changes(&mut self) -> Result<Vec<RegistryEvent>, String> {
         #[cfg(target_os = "windows")]
         {
             self.detect_changes_windows()
