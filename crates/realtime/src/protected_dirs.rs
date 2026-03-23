@@ -163,12 +163,13 @@ impl ProtectedDirsEnforcer {
             return ProtectionVerdict::Allowed;
         }
 
-        // Check SSH-specific: only protect .ssh subdirectories, not all of /home
+        // Check SSH-specific: only protect .ssh subdirectories, not all of /home or /Users
         let path_str = path.to_string_lossy();
         let is_ssh_path = path_str.contains("/.ssh/") || path_str.ends_with("/.ssh");
-        let is_home_path = path.starts_with("/home");
+        let is_home_path = path.starts_with("/home") || path.starts_with("/Users");
 
-        // /home is in protected_paths as a catch-all for .ssh — only block if it's actually .ssh
+        // /home (Linux) and /Users (macOS) are in protected_paths as a catch-all for .ssh —
+        // only block if it's actually .ssh
         if is_home_path && !is_ssh_path {
             return ProtectionVerdict::Allowed;
         }
@@ -229,8 +230,8 @@ impl ProtectedDirsEnforcer {
         let path_str = path.to_string_lossy();
         self.config.protected_paths.iter().any(|protected| {
             if path.starts_with(protected) {
-                // Special case for /home — only .ssh
-                if protected == Path::new("/home") {
+                // Special case for /home (Linux) and /Users (macOS) — only .ssh
+                if protected == Path::new("/home") || protected == Path::new("/Users") {
                     path_str.contains("/.ssh/") || path_str.ends_with("/.ssh")
                 } else {
                     true
