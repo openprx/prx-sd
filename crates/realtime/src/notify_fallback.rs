@@ -42,12 +42,10 @@ impl NotifyMonitor {
                 EventKind::Create(_) => Some(FileEvent::Create { path }),
                 EventKind::Modify(_) => Some(FileEvent::Modify { path }),
                 EventKind::Remove(_) => Some(FileEvent::Delete { path }),
-                EventKind::Access(notify::event::AccessKind::Open(_)) => {
-                    Some(FileEvent::Open { path, pid: 0 })
+                EventKind::Access(notify::event::AccessKind::Open(_)) => Some(FileEvent::Open { path, pid: 0 }),
+                EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write)) => {
+                    Some(FileEvent::CloseWrite { path })
                 }
-                EventKind::Access(notify::event::AccessKind::Close(
-                    notify::event::AccessMode::Write,
-                )) => Some(FileEvent::CloseWrite { path }),
                 _ => None,
             };
 
@@ -70,27 +68,26 @@ impl FileSystemMonitor for NotifyMonitor {
         let tx = self.tx.clone();
         let running = self.running.clone();
 
-        let mut watcher =
-            notify::recommended_watcher(move |res: std::result::Result<Event, notify::Error>| {
-                if !running.load(Ordering::Relaxed) {
-                    return;
-                }
+        let mut watcher = notify::recommended_watcher(move |res: std::result::Result<Event, notify::Error>| {
+            if !running.load(Ordering::Relaxed) {
+                return;
+            }
 
-                match res {
-                    Ok(event) => {
-                        let file_events = Self::convert_event(event);
-                        for fe in file_events {
-                            // Use try_send to avoid blocking the notify thread.
-                            // Events are dropped if the channel is full.
-                            let _ = tx.try_send(fe);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("notify watcher error: {e}");
+            match res {
+                Ok(event) => {
+                    let file_events = Self::convert_event(event);
+                    for fe in file_events {
+                        // Use try_send to avoid blocking the notify thread.
+                        // Events are dropped if the channel is full.
+                        let _ = tx.try_send(fe);
                     }
                 }
-            })
-            .context("failed to create notify watcher")?;
+                Err(e) => {
+                    tracing::error!("notify watcher error: {e}");
+                }
+            }
+        })
+        .context("failed to create notify watcher")?;
 
         for path in paths {
             watcher
@@ -134,6 +131,12 @@ impl Default for NotifyMonitor {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::uninlined_format_args
+    )]
     use super::*;
     use std::fs;
     use tokio::time::{timeout, Duration};

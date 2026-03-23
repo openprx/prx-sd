@@ -57,25 +57,21 @@ impl CommunityConfig {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let data = std::fs::read_to_string(&path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
-        let cfg: Self = serde_json::from_str(&data)
-            .with_context(|| format!("failed to parse {}", path.display()))?;
+        let data = std::fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+        let cfg: Self = serde_json::from_str(&data).with_context(|| format!("failed to parse {}", path.display()))?;
         Ok(cfg)
     }
 
     /// Persist the config to the data directory.
     pub fn save(&self, data_dir: &Path) -> Result<()> {
         let path = Self::config_path(data_dir);
-        let json =
-            serde_json::to_string_pretty(self).context("failed to serialize community config")?;
-        std::fs::write(&path, json)
-            .with_context(|| format!("failed to write {}", path.display()))?;
+        let json = serde_json::to_string_pretty(self).context("failed to serialize community config")?;
+        std::fs::write(&path, json).with_context(|| format!("failed to write {}", path.display()))?;
         Ok(())
     }
 
     /// Returns `true` when the config has valid enrollment credentials.
-    pub fn is_enrolled(&self) -> bool {
+    pub const fn is_enrolled(&self) -> bool {
         self.machine_id.is_some() && self.api_key.is_some()
     }
 }

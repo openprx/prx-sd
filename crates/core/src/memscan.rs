@@ -21,12 +21,7 @@ const MAX_REGION_SIZE: u64 = 16 * 1024 * 1024;
 const READ_CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
 /// Path prefixes considered safe -- regions mapped from these paths are skipped.
-const SAFE_PREFIXES: &[&str] = &[
-    "/usr/lib",
-    "/lib",
-    "/usr/share/locale",
-    "/usr/share/zoneinfo",
-];
+const SAFE_PREFIXES: &[&str] = &["/usr/lib", "/lib", "/usr/share/locale", "/usr/share/zoneinfo"];
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -85,8 +80,7 @@ pub struct MemRegionMatch {
 /// by known-safe system libraries are excluded.
 pub fn parse_proc_maps(pid: u32) -> Result<Vec<MemRegion>> {
     let maps_path = format!("/proc/{pid}/maps");
-    let content =
-        fs::read_to_string(&maps_path).with_context(|| format!("failed to read {maps_path}"))?;
+    let content = fs::read_to_string(&maps_path).with_context(|| format!("failed to read {maps_path}"))?;
 
     let mut regions = Vec::new();
     for line in content.lines() {
@@ -127,10 +121,7 @@ fn parse_maps_line(line: &str) -> Option<MemRegion> {
     let _dev = parts.next();
     let _inode = parts.next();
 
-    let pathname = parts
-        .next()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
+    let pathname = parts.next().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
 
     Some(MemRegion {
         start,
@@ -162,16 +153,15 @@ fn is_safe_mapping(region: &MemRegion) -> bool {
 /// Returns the concatenated bytes of the region.
 pub fn read_region(pid: u32, start: u64, end: u64) -> Result<Vec<u8>> {
     let mem_path = format!("/proc/{pid}/mem");
-    let mut file =
-        fs::File::open(&mem_path).with_context(|| format!("failed to open {mem_path}"))?;
+    let mut file = fs::File::open(&mem_path).with_context(|| format!("failed to open {mem_path}"))?;
 
     let region_size = end
         .checked_sub(start)
         .with_context(|| format!("invalid memory region: end (0x{end:x}) < start (0x{start:x})"))?;
 
-    let total: usize = region_size.try_into().with_context(|| {
-        format!("memory region too large for this platform: {region_size} bytes")
-    })?;
+    let total: usize = region_size
+        .try_into()
+        .with_context(|| format!("memory region too large for this platform: {region_size} bytes"))?;
 
     let mut buf = Vec::with_capacity(total);
 
@@ -183,11 +173,13 @@ pub fn read_region(pid: u32, start: u64, end: u64) -> Result<Vec<u8>> {
 
     while remaining > 0 {
         let to_read = READ_CHUNK_SIZE.min(remaining);
-        let slice = &mut chunk[..to_read];
+        let Some(slice) = chunk.get_mut(..to_read) else {
+            break;
+        };
         match file.read(slice) {
             Ok(0) => break, // EOF
             Ok(n) => {
-                buf.extend_from_slice(&slice[..n]);
+                buf.extend_from_slice(slice.get(..n).unwrap_or(&[]));
                 remaining = remaining.saturating_sub(n);
             }
             Err(e) => {
@@ -207,9 +199,7 @@ pub fn read_region(pid: u32, start: u64, end: u64) -> Result<Vec<u8>> {
 
 /// Read the process name from `/proc/{pid}/comm`.
 fn process_name(pid: u32) -> String {
-    fs::read_to_string(format!("/proc/{pid}/comm"))
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "<unknown>".to_string())
+    fs::read_to_string(format!("/proc/{pid}/comm")).map_or_else(|_| "<unknown>".to_string(), |s| s.trim().to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +210,7 @@ fn process_name(pid: u32) -> String {
 ///
 /// Runs both YARA pattern matching and SHA-256 hash lookups on every readable
 /// (non-safe-library) region.
+#[allow(clippy::cast_possible_truncation)] // Scan durations will never exceed u64::MAX ms
 pub fn scan_process(pid: u32, yara: &YaraEngine, db: &SignatureDatabase) -> Result<MemScanResult> {
     let start = Instant::now();
     let name = process_name(pid);
@@ -313,13 +304,11 @@ pub fn scan_all_processes(yara: &YaraEngine, db: &SignatureDatabase) -> Vec<MemS
     let mut results = Vec::new();
 
     for entry in entries.flatten() {
-        let name = match entry.file_name().into_string() {
-            Ok(n) => n,
-            Err(_) => continue,
+        let Ok(name) = entry.file_name().into_string() else {
+            continue;
         };
-        let pid: u32 = match name.parse() {
-            Ok(p) => p,
-            Err(_) => continue,
+        let Ok(pid) = name.parse::<u32>() else {
+            continue;
         };
 
         match scan_process(pid, yara, db) {

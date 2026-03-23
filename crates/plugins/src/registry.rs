@@ -19,12 +19,8 @@ impl PluginRegistry {
     /// every plugin found in that directory tree.
     pub fn new(plugins_dir: &Path) -> Result<Self> {
         if !plugins_dir.is_dir() {
-            std::fs::create_dir_all(plugins_dir).with_context(|| {
-                format!(
-                    "failed to create plugins directory: {}",
-                    plugins_dir.display()
-                )
-            })?;
+            std::fs::create_dir_all(plugins_dir)
+                .with_context(|| format!("failed to create plugins directory: {}", plugins_dir.display()))?;
         }
         Ok(Self {
             plugins_dir: plugins_dir.to_path_buf(),
@@ -41,12 +37,11 @@ impl PluginRegistry {
             .min_depth(1)
             .max_depth(2)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
         {
             if entry.file_name() == "plugin.json" {
-                let plugin_dir = match entry.path().parent() {
-                    Some(p) => p,
-                    None => continue,
+                let Some(plugin_dir) = entry.path().parent() else {
+                    continue;
                 };
 
                 match PluginHost::load(plugin_dir) {
@@ -83,12 +78,7 @@ impl PluginRegistry {
     /// Run every applicable plugin against the given file and collect
     /// findings.  Plugins whose manifest does not match `file_type` are
     /// silently skipped.
-    pub fn scan_with_plugins(
-        &self,
-        file_data: &[u8],
-        file_path: &str,
-        file_type: &str,
-    ) -> Vec<PluginFinding> {
+    pub fn scan_with_plugins(&self, file_data: &[u8], file_path: &str, file_type: &str) -> Vec<PluginFinding> {
         let mut all_findings = Vec::new();
 
         for plugin in &self.plugins {
@@ -121,7 +111,7 @@ impl PluginRegistry {
 
     /// List metadata for every loaded plugin.
     pub fn list(&self) -> Vec<&PluginInfo> {
-        self.plugins.iter().map(|p| p.info()).collect()
+        self.plugins.iter().map(PluginHost::info).collect()
     }
 
     /// Drop all plugins and re-load from disk (hot reload).
@@ -132,7 +122,7 @@ impl PluginRegistry {
     }
 
     /// Number of currently loaded plugins.
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.plugins.len()
     }
 }

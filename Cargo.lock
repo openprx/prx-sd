@@ -549,6 +549,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "camino"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e629a66d692cb9ff1a1c664e41771b3dcaf961985a9774c0eb0bd1b51cf60a48"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "cap-fs-ext"
 version = "3.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -624,6 +633,29 @@ dependencies = [
  "once_cell",
  "rustix 1.1.4",
  "winx",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e35af189006b9c0f00a064685c727031e3ed2d8020f7ba284d78cc2671bd36ea"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.15.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eee4243f1f26fc7a42710e7439c149e2b10b05472f88090acce52632f231a73a"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2632,6 +2664,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "libbpf-cargo"
+version = "0.24.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "704727a07f185a76c58faa7b8ed08fba3194661c212183aea1174fe2970ee185"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "clap",
+ "libbpf-rs",
+ "memmap2 0.5.10",
+ "regex",
+ "semver",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "libbpf-rs"
+version = "0.24.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93edd9cd673087fa7518fd63ad6c87be2cd9b4e35034b1873f3e3258c018275b"
+dependencies = [
+ "bitflags 2.11.0",
+ "libbpf-sys",
+ "libc",
+ "vsprintf",
+]
+
+[[package]]
+name = "libbpf-sys"
+version = "1.7.0+v1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a109478760b2900aa2a6f2087e9d0de1d9c535b1758602af2845d5d2ccfaed7c"
+dependencies = [
+ "cc",
+ "nix 0.31.2",
+ "pkg-config",
+]
+
+[[package]]
 name = "libbz2-rs-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2931,6 +3004,15 @@ dependencies = [
 
 [[package]]
 name = "memmap2"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "memmap2"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
@@ -2992,6 +3074,18 @@ name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
+dependencies = [
+ "bitflags 2.11.0",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d6d0705320c1e6ba1d912b5e37cf18071b6c2e9b7fa8215a1e8a7651966f5d3"
 dependencies = [
  "bitflags 2.11.0",
  "cfg-if",
@@ -3677,19 +3771,27 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "criterion",
+ "ed25519-dalek",
  "flate2",
  "libc",
  "prx-sd-heuristic",
  "prx-sd-parsers",
+ "prx-sd-quarantine",
+ "prx-sd-realtime",
+ "prx-sd-remediation",
+ "prx-sd-sandbox",
  "prx-sd-signatures",
+ "prx-sd-updater",
  "rand 0.8.5",
  "rayon",
  "reqwest",
  "serde",
+ "serde_json",
  "sha2",
  "tar",
  "tempfile",
@@ -3700,7 +3802,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-heuristic"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "prx-sd-parsers",
@@ -3711,7 +3813,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-parsers"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "flate2",
@@ -3725,7 +3827,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-plugins"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -3738,7 +3840,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-quarantine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3754,15 +3856,18 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-realtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adblock",
  "anyhow",
  "async-trait",
  "chrono",
+ "libbpf-cargo",
+ "libbpf-rs",
  "libc",
- "nix",
+ "nix 0.29.0",
  "notify",
+ "parking_lot",
  "regex",
  "reqwest",
  "serde",
@@ -3770,16 +3875,17 @@ dependencies = [
  "sha2",
  "tempfile",
  "tokio",
+ "toml 0.8.23",
  "tracing",
 ]
 
 [[package]]
 name = "prx-sd-remediation"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
- "nix",
+ "nix 0.29.0",
  "prx-sd-quarantine",
  "serde",
  "serde_json",
@@ -3792,12 +3898,12 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-sandbox"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
  "libc",
- "nix",
+ "nix 0.29.0",
  "serde",
  "serde_json",
  "tokio",
@@ -3806,7 +3912,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-signatures"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3825,7 +3931,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-update-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -3843,7 +3949,7 @@ dependencies = [
 
 [[package]]
 name = "prx-sd-updater"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bincode 1.3.3",
@@ -4490,16 +4596,18 @@ dependencies = [
 
 [[package]]
 name = "sd"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "async-trait",
  "chrono",
  "clap",
  "colored",
  "flate2",
  "indicatif",
  "lettre",
+ "nix 0.29.0",
  "notify",
  "predicates",
  "prx-sd-core",
@@ -4603,6 +4711,15 @@ dependencies = [
  "itoa",
  "serde",
  "serde_core",
+]
+
+[[package]]
+name = "serde_spanned"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf41e0cfaf7226dca15e8197172c295a782857fcb97fad1808a166870dee75a3"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -5121,17 +5238,38 @@ dependencies = [
 
 [[package]]
 name = "toml"
+version = "0.8.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
+dependencies = [
+ "serde",
+ "serde_spanned 0.6.9",
+ "toml_datetime 0.6.11",
+ "toml_edit",
+]
+
+[[package]]
+name = "toml"
 version = "0.9.12+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf92845e79fc2e2def6a5d828f0801e29a2f8acc037becc5ab08595c7d5e9863"
 dependencies = [
  "indexmap",
  "serde_core",
- "serde_spanned",
- "toml_datetime",
+ "serde_spanned 1.0.4",
+ "toml_datetime 0.7.5+spec-1.1.0",
  "toml_parser",
  "toml_writer",
  "winnow 0.7.15",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.6.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22cddaf88f4fbc13c51aebbf5f8eceb5c7c5a9da2ac40a13519eb5b0a0e8f11c"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -5144,6 +5282,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_edit"
+version = "0.22.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41fe8c660ae4257887cf66394862d21dbca4a6ddd26f04a3560410406a2f819a"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_spanned 0.6.9",
+ "toml_datetime 0.6.11",
+ "toml_write",
+ "winnow 0.7.15",
+]
+
+[[package]]
 name = "toml_parser"
 version = "1.0.10+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5151,6 +5303,12 @@ checksum = "7df25b4befd31c4816df190124375d5a20c6b6921e2cad937316de3fccd63420"
 dependencies = [
  "winnow 1.0.0",
 ]
+
+[[package]]
+name = "toml_write"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "toml_writer"
@@ -5387,7 +5545,7 @@ dependencies = [
  "bytes",
  "derive-new",
  "log",
- "memmap2",
+ "memmap2 0.9.10",
  "num-integer",
  "prost",
  "smallvec",
@@ -5558,6 +5716,16 @@ name = "virtue"
 version = "0.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
+
+[[package]]
+name = "vsprintf"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aec2f81b75ca063294776b4f7e8da71d1d5ae81c2b1b149c8d89969230265d63"
+dependencies = [
+ "cc",
+ "libc",
+]
 
 [[package]]
 name = "wait-timeout"
@@ -5972,7 +6140,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "sha2",
- "toml",
+ "toml 0.9.12+spec-1.1.0",
  "wasmtime-environ 41.0.4",
  "windows-sys 0.61.2",
  "zstd",
@@ -6674,6 +6842,9 @@ name = "winnow"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "winnow"
@@ -6890,7 +7061,7 @@ dependencies = [
  "md-5",
  "md2",
  "memchr",
- "memmap2",
+ "memmap2 0.9.10",
  "nom 8.0.0",
  "num-derive",
  "num-traits",

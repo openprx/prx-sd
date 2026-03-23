@@ -29,13 +29,13 @@ impl ThreatLevel {
     /// Map a heuristic / aggregate score to a threat level.
     ///
     /// * 0 ..= 29  → `Clean`
-    /// * 30 ..= 69 → `Suspicious`
-    /// * 70 ..     → `Malicious`
-    pub fn from_score(score: u32) -> Self {
+    /// * 30 ..= 59 → `Suspicious`
+    /// * 60 ..     → `Malicious`
+    pub const fn from_score(score: u32) -> Self {
         match score {
-            0..=29 => ThreatLevel::Clean,
-            30..=69 => ThreatLevel::Suspicious,
-            _ => ThreatLevel::Malicious,
+            0..=29 => Self::Clean,
+            30..=59 => Self::Suspicious,
+            _ => Self::Malicious,
         }
     }
 }
@@ -43,9 +43,9 @@ impl ThreatLevel {
 impl std::fmt::Display for ThreatLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ThreatLevel::Clean => write!(f, "Clean"),
-            ThreatLevel::Suspicious => write!(f, "Suspicious"),
-            ThreatLevel::Malicious => write!(f, "Malicious"),
+            Self::Clean => write!(f, "Clean"),
+            Self::Suspicious => write!(f, "Suspicious"),
+            Self::Malicious => write!(f, "Malicious"),
         }
     }
 }
@@ -53,10 +53,10 @@ impl std::fmt::Display for ThreatLevel {
 impl std::fmt::Display for DetectionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DetectionType::Hash => write!(f, "Hash"),
-            DetectionType::YaraRule => write!(f, "YaraRule"),
-            DetectionType::Heuristic => write!(f, "Heuristic"),
-            DetectionType::Behavioral => write!(f, "Behavioral"),
+            Self::Hash => write!(f, "Hash"),
+            Self::YaraRule => write!(f, "YaraRule"),
+            Self::Heuristic => write!(f, "Heuristic"),
+            Self::Behavioral => write!(f, "Behavioral"),
         }
     }
 }
@@ -112,30 +112,34 @@ impl ScanResult {
 
     /// Merge multiple results for the same path (e.g. different engines) into
     /// one, keeping the highest threat level and collecting all details.
-    pub fn aggregate(path: impl AsRef<Path>, results: &[ScanResult]) -> Self {
+    pub fn aggregate(path: impl AsRef<Path>, results: &[Self]) -> Self {
         let threat_level = results
             .iter()
             .map(|r| r.threat_level)
             .max()
             .unwrap_or(ThreatLevel::Clean);
 
-        // Pick the detection type from the highest-severity sub-result.
+        // Pick the detection type from the highest-severity sub-result,
+        // using explicit priority: Hash(0) > YaraRule(1) > Heuristic(2) > Behavioral(3).
         let detection_type = results
             .iter()
             .filter(|r| r.threat_level == threat_level)
             .filter_map(|r| r.detection_type.clone())
-            .next();
+            .min_by_key(|dt| match dt {
+                DetectionType::Hash => 0,
+                DetectionType::YaraRule => 1,
+                DetectionType::Heuristic => 2,
+                DetectionType::Behavioral => 3,
+            });
 
+        // Pick the threat name from the sub-result that matches the chosen detection type.
         let threat_name = results
             .iter()
             .filter(|r| r.threat_level == threat_level)
-            .filter_map(|r| r.threat_name.clone())
-            .next();
+            .filter(|r| r.detection_type == detection_type)
+            .find_map(|r| r.threat_name.clone());
 
-        let details: Vec<String> = results
-            .iter()
-            .flat_map(|r| r.details.iter().cloned())
-            .collect();
+        let details: Vec<String> = results.iter().flat_map(|r| r.details.iter().cloned()).collect();
 
         let scan_time_ms = results.iter().map(|r| r.scan_time_ms).sum();
 
@@ -164,8 +168,8 @@ mod tests {
         assert_eq!(ThreatLevel::from_score(0), ThreatLevel::Clean);
         assert_eq!(ThreatLevel::from_score(29), ThreatLevel::Clean);
         assert_eq!(ThreatLevel::from_score(30), ThreatLevel::Suspicious);
-        assert_eq!(ThreatLevel::from_score(69), ThreatLevel::Suspicious);
-        assert_eq!(ThreatLevel::from_score(70), ThreatLevel::Malicious);
+        assert_eq!(ThreatLevel::from_score(59), ThreatLevel::Suspicious);
+        assert_eq!(ThreatLevel::from_score(60), ThreatLevel::Malicious);
         assert_eq!(ThreatLevel::from_score(100), ThreatLevel::Malicious);
     }
 

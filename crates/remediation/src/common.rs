@@ -43,15 +43,13 @@ pub fn find_processes_using_file(path: &Path) -> Result<Vec<ProcessInfo>> {
     }
 }
 
-/// Linux implementation: scan /proc/*/fd/ and /proc/*/maps for references to the file.
+/// Linux implementation: scan `/proc/*/fd/` and `/proc/*/maps` for references to the file.
 #[cfg(target_os = "linux")]
+#[allow(clippy::unnecessary_wraps)]
 fn find_processes_linux(path: &Path) -> Result<Vec<ProcessInfo>> {
     use std::fs;
 
-    let target = match path.canonicalize() {
-        Ok(p) => p,
-        Err(_) => path.to_path_buf(),
-    };
+    let target = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let target_str = target.to_string_lossy();
     let mut results: Vec<ProcessInfo> = Vec::new();
     let mut seen_pids = std::collections::HashSet::new();
@@ -59,32 +57,29 @@ fn find_processes_linux(path: &Path) -> Result<Vec<ProcessInfo>> {
     let proc_dir = match fs::read_dir("/proc") {
         Ok(d) => d,
         Err(e) => {
-            tracing::warn!("failed to read /proc: {}", e);
+            tracing::warn!("failed to read /proc: {e}");
             return Ok(Vec::new());
         }
     };
 
     for entry in proc_dir {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
+        let Ok(entry) = entry else {
+            continue;
         };
         let name = entry.file_name();
         let pid_str = name.to_string_lossy();
-        let pid: u32 = match pid_str.parse() {
-            Ok(p) => p,
-            Err(_) => continue,
+        let Ok(pid) = pid_str.parse::<u32>() else {
+            continue;
         };
 
         // Check /proc/<pid>/fd/ for symlinks pointing to the target file.
-        let fd_dir = format!("/proc/{}/fd", pid);
+        let fd_dir = format!("/proc/{pid}/fd");
         let mut found = false;
 
         if let Ok(fds) = fs::read_dir(&fd_dir) {
             for fd_entry in fds {
-                let fd_entry = match fd_entry {
-                    Ok(e) => e,
-                    Err(_) => continue,
+                let Ok(fd_entry) = fd_entry else {
+                    continue;
                 };
                 if let Ok(link_target) = fs::read_link(fd_entry.path()) {
                     if link_target == target {
@@ -97,7 +92,7 @@ fn find_processes_linux(path: &Path) -> Result<Vec<ProcessInfo>> {
 
         // Check /proc/<pid>/maps for memory-mapped references.
         if !found {
-            let maps_path = format!("/proc/{}/maps", pid);
+            let maps_path = format!("/proc/{pid}/maps");
             if let Ok(maps_content) = fs::read_to_string(&maps_path) {
                 if maps_content.contains(target_str.as_ref()) {
                     found = true;
@@ -106,17 +101,16 @@ fn find_processes_linux(path: &Path) -> Result<Vec<ProcessInfo>> {
         }
 
         if found && seen_pids.insert(pid) {
-            let proc_name = fs::read_to_string(format!("/proc/{}/comm", pid))
+            let proc_name = fs::read_to_string(format!("/proc/{pid}/comm"))
                 .unwrap_or_default()
                 .trim()
                 .to_string();
-            let cmdline = fs::read_to_string(format!("/proc/{}/cmdline", pid))
+            let cmdline = fs::read_to_string(format!("/proc/{pid}/cmdline"))
                 .unwrap_or_default()
                 .replace('\0', " ")
                 .trim()
                 .to_string();
-            let status_content =
-                fs::read_to_string(format!("/proc/{}/status", pid)).unwrap_or_default();
+            let status_content = fs::read_to_string(format!("/proc/{pid}/status")).unwrap_or_default();
             let user = status_content
                 .lines()
                 .find(|l| l.starts_with("Uid:"))
@@ -187,8 +181,7 @@ mod tests {
 
     #[test]
     fn find_processes_using_nonexistent_file_returns_empty() {
-        let result =
-            find_processes_using_file(Path::new("/nonexistent/file/that/does/not/exist.bin"));
+        let result = find_processes_using_file(Path::new("/nonexistent/file/that/does/not/exist.bin"));
         // Should not error, just return empty (or possibly empty on this platform)
         assert!(result.is_ok());
         assert!(result.expect("result").is_empty());
@@ -200,12 +193,7 @@ mod tests {
 fn find_processes_macos(path: &Path) -> Result<Vec<ProcessInfo>> {
     use std::process::Command;
 
-    let output = Command::new("lsof")
-        .arg("-t")
-        .arg("-F")
-        .arg("pcun")
-        .arg(path)
-        .output();
+    let output = Command::new("lsof").arg("-t").arg("-F").arg("pcun").arg(path).output();
 
     let output = match output {
         Ok(o) => o,

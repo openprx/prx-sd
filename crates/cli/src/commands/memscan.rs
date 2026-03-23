@@ -18,7 +18,7 @@ fn build_config(data_dir: &Path) -> ScanConfig {
 }
 
 /// Run the memory scan command.
-pub async fn run(pid: Option<u32>, json: bool, data_dir: &Path) -> Result<()> {
+pub fn run(pid: Option<u32>, json: bool, data_dir: &Path) -> Result<()> {
     let config = build_config(data_dir);
     let engine = ScanEngine::new(config).context("failed to initialise scan engine")?;
 
@@ -34,6 +34,7 @@ pub async fn run(pid: Option<u32>, json: bool, data_dir: &Path) -> Result<()> {
         memscan::scan_all_processes(&engine.yara, &engine.signatures)
     };
 
+    #[allow(clippy::cast_possible_truncation)] // Scan duration won't exceed u64::MAX ms.
     let elapsed = start.elapsed().as_millis() as u64;
 
     if json {
@@ -84,10 +85,7 @@ fn print_results(results: &[MemScanResult]) {
 /// Print a summary of the memory scan.
 fn print_summary(results: &[MemScanResult], elapsed_ms: u64) {
     let total = results.len();
-    let clean = results
-        .iter()
-        .filter(|r| r.threat_level == ThreatLevel::Clean)
-        .count();
+    let clean = results.iter().filter(|r| r.threat_level == ThreatLevel::Clean).count();
     let malicious = results
         .iter()
         .filter(|r| r.threat_level == ThreatLevel::Malicious)
@@ -102,18 +100,12 @@ fn print_summary(results: &[MemScanResult], elapsed_ms: u64) {
     println!("  Processes scanned: {total}");
     println!("  Clean:             {}", format!("{clean}").green());
     if suspicious > 0 {
-        println!(
-            "  Suspicious:        {}",
-            format!("{suspicious}").yellow().bold()
-        );
+        println!("  Suspicious:        {}", format!("{suspicious}").yellow().bold());
     } else {
         println!("  Suspicious:        {suspicious}");
     }
     if malicious > 0 {
-        println!(
-            "  Malicious:         {}",
-            format!("{malicious}").red().bold()
-        );
+        println!("  Malicious:         {}", format!("{malicious}").red().bold());
     } else {
         println!("  Malicious:         {malicious}");
     }

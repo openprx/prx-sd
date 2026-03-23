@@ -1,8 +1,8 @@
-//! ClamAV signature format parsers.
+//! `ClamAV` signature format parsers.
 //!
-//! This module provides parsers for common ClamAV signature file formats:
+//! This module provides parsers for common `ClamAV` signature file formats:
 //!
-//! - **CVD** (`.cvd`) - ClamAV Virus Database container files
+//! - **CVD** (`.cvd`) - `ClamAV` Virus Database container files
 //! - **NDB** (`.ndb`) - Hex signature (body-based) files
 //! - **LDB** (`.ldb`) - Logical signature files with boolean expressions
 

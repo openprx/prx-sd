@@ -24,14 +24,14 @@ pub enum PackerType {
 impl std::fmt::Display for PackerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PackerType::UPX => write!(f, "UPX"),
-            PackerType::ASPack => write!(f, "ASPack"),
-            PackerType::Themida => write!(f, "Themida"),
-            PackerType::VMProtect => write!(f, "VMProtect"),
-            PackerType::PECompact => write!(f, "PECompact"),
-            PackerType::MPRESS => write!(f, "MPRESS"),
-            PackerType::Enigma => write!(f, "Enigma"),
-            PackerType::Unknown(hint) => write!(f, "Unknown({hint})"),
+            Self::UPX => write!(f, "UPX"),
+            Self::ASPack => write!(f, "ASPack"),
+            Self::Themida => write!(f, "Themida"),
+            Self::VMProtect => write!(f, "VMProtect"),
+            Self::PECompact => write!(f, "PECompact"),
+            Self::MPRESS => write!(f, "MPRESS"),
+            Self::Enigma => write!(f, "Enigma"),
+            Self::Unknown(hint) => write!(f, "Unknown({hint})"),
         }
     }
 }
@@ -140,8 +140,6 @@ pub fn check_entry_point_anomaly(pe: &PeInfo) -> bool {
         return false;
     }
 
-    let _ep = pe.entry_point;
-
     // Check: EP in the last section (very common for packers).
     if let Some(last) = pe.sections.last() {
         // Sections in goblin store virtual address offsets relative to the
@@ -160,9 +158,13 @@ pub fn check_entry_point_anomaly(pe: &PeInfo) -> bool {
 
             // Simpler check: if the first section is named .text and the EP
             // is NOT in a section whose name starts with .text, that's suspicious.
-            let first = &pe.sections[0];
+            let Some(first) = pe.sections.first() else {
+                return false;
+            };
             if first.name == ".text" || first.name == ".code" {
-                let last = &pe.sections[last_idx];
+                let Some(last) = pe.sections.get(last_idx) else {
+                    return false;
+                };
                 // If the last section has a packer-like name, the EP being
                 // there is suspicious.
                 let name_upper = last.name.to_uppercase();
@@ -194,6 +196,7 @@ pub fn check_entry_point_anomaly(pe: &PeInfo) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unreadable_literal)]
 mod tests {
     use super::*;
     use prx_sd_parsers::pe::SectionInfo;

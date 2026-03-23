@@ -8,9 +8,7 @@
 //! The analyzer is fully cross-platform -- it operates on the abstract
 //! `SandboxResult` structures rather than platform-specific syscall data.
 
-use crate::{
-    BehaviorFinding, FileOpType, ProcessOpType, SandboxResult, SandboxVerdict, ThreatCategory,
-};
+use crate::{BehaviorFinding, FileOpType, ProcessOpType, SandboxResult, SandboxVerdict, ThreatCategory};
 
 // ── Behavior Rule ───────────────────────────────────────────────────────────
 
@@ -64,7 +62,7 @@ impl BehaviorRule {
 
 // ── Rule matchers ───────────────────────────────────────────────────────────
 
-/// Pattern: socket() + connect(external_ip) + dup2(stdin/stdout) + execve(/bin/sh|/bin/bash)
+/// Pattern: `socket()` + `connect(external_ip)` + `dup2(stdin/stdout)` + `execve(/bin/sh|/bin/bash)`
 ///
 /// A reverse shell typically opens a network connection and then duplicates
 /// the socket fd to stdin/stdout before spawning a shell. We detect the
@@ -120,12 +118,10 @@ fn match_credential_theft(result: &SandboxResult) -> bool {
         "wallet.dat", // cryptocurrency wallets
     ];
 
-    result.file_operations.iter().any(|f| {
-        matches!(f.op, FileOpType::Read)
-            && SENSITIVE_PATHS
-                .iter()
-                .any(|sensitive| f.path.contains(sensitive))
-    })
+    result
+        .file_operations
+        .iter()
+        .any(|f| matches!(f.op, FileOpType::Read) && SENSITIVE_PATHS.iter().any(|sensitive| f.path.contains(sensitive)))
 }
 
 /// Pattern: mass file enumeration + read + write (new extension) + delete original.
@@ -180,14 +176,12 @@ fn match_crypto_miner(result: &SandboxResult) -> bool {
 
     result.network_attempts.iter().any(|n| {
         let port_match = MINING_PORTS.contains(&n.port);
-        let addr_match = MINING_KEYWORDS
-            .iter()
-            .any(|kw| n.address.to_lowercase().contains(kw));
+        let addr_match = MINING_KEYWORDS.iter().any(|kw| n.address.to_lowercase().contains(kw));
         port_match || addr_match
     })
 }
 
-/// Pattern: write to persistence locations (crontab, systemd, LaunchAgent, etc.).
+/// Pattern: write to persistence locations (crontab, systemd, `LaunchAgent`, etc.).
 ///
 /// Malware establishes persistence by writing to system locations that
 /// are automatically executed on boot or login.
@@ -215,8 +209,7 @@ fn match_persistence_install(result: &SandboxResult) -> bool {
     ];
 
     result.file_operations.iter().any(|f| {
-        matches!(f.op, FileOpType::Write | FileOpType::Create)
-            && PERSISTENCE_PATHS.iter().any(|pp| f.path.contains(pp))
+        matches!(f.op, FileOpType::Write | FileOpType::Create) && PERSISTENCE_PATHS.iter().any(|pp| f.path.contains(pp))
     })
 }
 
@@ -230,10 +223,7 @@ fn match_dropper(result: &SandboxResult) -> bool {
         .iter()
         .any(|f| matches!(f.op, FileOpType::Write | FileOpType::Create));
 
-    let has_chmod = result
-        .file_operations
-        .iter()
-        .any(|f| matches!(f.op, FileOpType::Chmod));
+    let has_chmod = result.file_operations.iter().any(|f| matches!(f.op, FileOpType::Chmod));
 
     // Also check for direct chmod syscall or file-execute operations.
     let has_exec_file = result
@@ -252,8 +242,8 @@ fn match_dropper(result: &SandboxResult) -> bool {
 /// Pattern: ptrace(TRACEME) on self, /proc/self checks, excessive sleep.
 ///
 /// Anti-analysis techniques include:
-/// - Calling ptrace(PTRACE_TRACEME) to detect debuggers
-/// - Reading /proc/self/status for TracerPid
+/// - Calling `ptrace(PTRACE_TRACEME)` to detect debuggers
+/// - Reading /proc/self/status for `TracerPid`
 /// - Timing-based checks (excessive sleep/gettimeofday calls)
 /// - VM detection via CPUID or /proc/cpuinfo
 fn match_anti_analysis(result: &SandboxResult) -> bool {
@@ -481,10 +471,7 @@ impl BehaviorAnalyzer {
                     rule_name: rule.name.clone(),
                     category: rule.category.clone(),
                     score: rule.score,
-                    description: format!(
-                        "Detected {} behavior pattern (category: {})",
-                        rule.name, rule.category
-                    ),
+                    description: format!("Detected {} behavior pattern (category: {})", rule.name, rule.category),
                 });
             }
         }
@@ -547,10 +534,7 @@ mod tests {
         analyzer.analyze(&mut result);
 
         assert!(result.threat_score >= 70);
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Credential Theft"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Credential Theft"));
     }
 
     #[test]
@@ -566,10 +550,7 @@ mod tests {
 
         analyzer.analyze(&mut result);
 
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Lateral Movement"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Lateral Movement"));
     }
 
     #[test]
@@ -585,10 +566,7 @@ mod tests {
 
         analyzer.analyze(&mut result);
 
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Crypto Miner"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Crypto Miner"));
     }
 
     #[test]
@@ -630,10 +608,7 @@ mod tests {
         assert!(result.threat_score >= 30);
         assert!(result.threat_score < 70);
         assert!(matches!(result.verdict, SandboxVerdict::Suspicious { .. }));
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Anti-Analysis"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Anti-Analysis"));
     }
 
     #[test]
@@ -674,10 +649,7 @@ mod tests {
 
         analyzer.analyze(&mut result);
 
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Reverse Shell"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Reverse Shell"));
         assert!(result.threat_score >= 70);
         assert!(matches!(result.verdict, SandboxVerdict::Malicious { .. }));
     }
@@ -722,10 +694,7 @@ mod tests {
 
         analyzer.analyze(&mut result);
 
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Persistence Install"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Persistence Install"));
     }
 
     #[test]
@@ -751,9 +720,6 @@ mod tests {
 
         analyzer.analyze(&mut result);
 
-        assert!(result
-            .behaviors
-            .iter()
-            .any(|b| b.rule_name == "Privilege Escalation"));
+        assert!(result.behaviors.iter().any(|b| b.rule_name == "Privilege Escalation"));
     }
 }

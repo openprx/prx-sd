@@ -33,6 +33,7 @@ pub struct OfficeInfo {
 
 /// Category of suspicious VBA macro function call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::doc_markdown)]
 pub enum MacroThreatCategory {
     /// Shell, WScript.Shell, cmd.exe, powershell
     ShellExecution,
@@ -65,7 +66,7 @@ pub struct OfficeAnalysis {
     pub has_macros: bool,
     /// Number of detected macro indicators.
     pub macro_count: u32,
-    /// Auto-execution trigger names found (e.g. AutoOpen, Document_Open).
+    /// Auto-execution trigger names found (e.g. `AutoOpen`, `Document_Open`).
     pub auto_exec_macros: Vec<String>,
     /// Suspicious function calls found in macro content.
     pub suspicious_functions: Vec<MacroSuspiciousCall>,
@@ -107,8 +108,7 @@ fn is_ole2(data: &[u8]) -> bool {
 /// archive and inspecting its internal structure.
 fn parse_ooxml(data: &[u8]) -> Result<OfficeInfo> {
     let reader = Cursor::new(data);
-    let mut archive =
-        zip::ZipArchive::new(reader).context("failed to open OOXML document as ZIP")?;
+    let mut archive = zip::ZipArchive::new(reader).context("failed to open OOXML document as ZIP")?;
 
     // Determine specific format from content types
     let format = detect_ooxml_format(&mut archive);
@@ -119,9 +119,8 @@ fn parse_ooxml(data: &[u8]) -> Result<OfficeInfo> {
 
     // Scan all entries in the ZIP
     for i in 0..archive.len() {
-        let mut file = match archive.by_index(i) {
-            Ok(f) => f,
-            Err(_) => continue,
+        let Ok(mut file) = archive.by_index(i) else {
+            continue;
         };
         let name = file.name().to_string();
         let name_lower = name.to_lowercase();
@@ -142,29 +141,26 @@ fn parse_ooxml(data: &[u8]) -> Result<OfficeInfo> {
         }
 
         // Check .rels files for external targets
+        #[allow(clippy::case_sensitive_file_extension_comparisons)]
         if name_lower.ends_with(".rels") {
             let mut content = String::new();
             if file.read_to_string(&mut content).is_ok() {
                 // Look for Target= with TargetMode="External"
-                if content.contains("TargetMode=\"External\"")
-                    || content.contains("TargetMode='External'")
-                {
+                if content.contains("TargetMode=\"External\"") || content.contains("TargetMode='External'") {
                     has_external_links = true;
                 }
             }
         }
 
         // Check XML parts for external references
+        #[allow(clippy::case_sensitive_file_extension_comparisons)]
         if name_lower.ends_with(".xml") && !has_external_links {
             let mut content = String::new();
             if file.read_to_string(&mut content).is_ok()
                 && (content.contains("http://") || content.contains("https://"))
             {
                 // Only flag if it looks like an actual link, not a namespace
-                if content.contains("r:link")
-                    || content.contains("externalLink")
-                    || content.contains("hyperlink")
-                {
+                if content.contains("r:link") || content.contains("externalLink") || content.contains("hyperlink") {
                     has_external_links = true;
                 }
             }
@@ -231,6 +227,7 @@ fn detect_ooxml_format(archive: &mut zip::ZipArchive<Cursor<&[u8]>>) -> OfficeFo
 /// Parse a legacy OLE2 Compound Binary document by scanning raw bytes for
 /// known structural indicators. This is a heuristic approach since fully
 /// parsing the OLE2 FAT/directory structure requires a dedicated crate.
+#[allow(clippy::unnecessary_wraps)]
 fn parse_ole2(data: &[u8]) -> Result<OfficeInfo> {
     let text = String::from_utf8_lossy(data);
 
@@ -239,14 +236,12 @@ fn parse_ole2(data: &[u8]) -> Result<OfficeInfo> {
 
     // Check for VBA macro storage: the string "VBA" in directory entries,
     // or the _VBA_PROJECT stream marker.
-    let has_macros = contains_bytes(data, b"VBA")
-        && (contains_bytes(data, b"_VBA_PROJECT")
-            || contains_bytes(data, b"dir")
-            || contains_bytes(data, b"PROJECT"));
+    let has_macros = contains_bytes(data, b"_VBA_PROJECT")
+        || contains_bytes(data, b"VBA_PROJECT")
+        || (contains_bytes(data, b"VBA") && (contains_bytes(data, b"PROJECT") || contains_bytes(data, b"Macros")));
 
     // External links: look for hyperlink-related OLE markers
-    let has_external_links =
-        text.contains("http://") || text.contains("https://") || contains_bytes(data, b"HYPER");
+    let has_external_links = text.contains("http://") || text.contains("https://") || contains_bytes(data, b"HYPER");
 
     // Embedded objects: look for known OLE object markers
     let mut embedded_objects: Vec<String> = Vec::new();
@@ -296,9 +291,7 @@ fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
     if needle.is_empty() || haystack.len() < needle.len() {
         return false;
     }
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
+    haystack.windows(needle.len()).any(|window| window == needle)
 }
 
 // ─── Macro analysis engine ──────────────────────────────────────────────────
@@ -367,8 +360,7 @@ const SUSPICIOUS_FUNCTIONS: &[(&str, MacroThreatCategory, u32)] = &[
 
 /// DDE-related patterns.
 const DDE_PATTERNS: &[&[u8]] = &[
-    b"DDEAUTO",
-    b"\\dde",
+    b"DDEAUTO", b"\\dde",
     // "DDE" alone in text content (checked case-insensitively via contains_ci)
 ];
 
@@ -400,8 +392,7 @@ pub fn analyze_office(data: &[u8]) -> Result<OfficeAnalysis> {
 /// Analyse macros in an OOXML document (ZIP-based).
 fn analyze_ooxml_macros(data: &[u8]) -> Result<OfficeAnalysis> {
     let reader = Cursor::new(data);
-    let mut archive =
-        zip::ZipArchive::new(reader).context("failed to open OOXML as ZIP for macro analysis")?;
+    let mut archive = zip::ZipArchive::new(reader).context("failed to open OOXML as ZIP for macro analysis")?;
 
     let mut vba_content = Vec::new();
     let mut has_macros = false;
@@ -409,9 +400,8 @@ fn analyze_ooxml_macros(data: &[u8]) -> Result<OfficeAnalysis> {
     let mut has_macro_sheets = false;
 
     for i in 0..archive.len() {
-        let mut file = match archive.by_index(i) {
-            Ok(f) => f,
-            Err(_) => continue,
+        let Ok(mut file) = archive.by_index(i) else {
+            continue;
         };
         let name = file.name().to_lowercase();
 
@@ -440,11 +430,11 @@ fn analyze_ooxml_macros(data: &[u8]) -> Result<OfficeAnalysis> {
         }
 
         // Check .rels for external targets
+        #[allow(clippy::case_sensitive_file_extension_comparisons)]
         if name.ends_with(".rels") {
             let mut content = String::new();
             if file.read_to_string(&mut content).is_ok()
-                && (content.contains("TargetMode=\"External\"")
-                    || content.contains("TargetMode='External'"))
+                && (content.contains("TargetMode=\"External\"") || content.contains("TargetMode='External'"))
             {
                 has_external_links = true;
             }
@@ -470,11 +460,11 @@ fn analyze_ooxml_macros(data: &[u8]) -> Result<OfficeAnalysis> {
 }
 
 /// Analyse macros in an OLE2 (legacy) document by scanning raw bytes.
+#[allow(clippy::unnecessary_wraps)]
 fn analyze_ole2_macros(data: &[u8]) -> Result<OfficeAnalysis> {
-    let has_macros = contains_bytes(data, b"VBA")
-        && (contains_bytes(data, b"_VBA_PROJECT")
-            || contains_bytes(data, b"dir")
-            || contains_bytes(data, b"PROJECT"));
+    let has_macros = contains_bytes(data, b"_VBA_PROJECT")
+        || contains_bytes(data, b"VBA_PROJECT")
+        || (contains_bytes(data, b"VBA") && (contains_bytes(data, b"PROJECT") || contains_bytes(data, b"Macros")));
 
     let has_external_links = {
         let text = String::from_utf8_lossy(data);
@@ -557,7 +547,9 @@ fn count_macro_indicators(text: &str) -> u32 {
     let indicators = ["sub ", "function ", "private sub ", "public sub "];
     let mut count: u32 = 0;
     for ind in &indicators {
-        count = count.saturating_add(text.matches(ind).count() as u32);
+        #[allow(clippy::cast_possible_truncation)]
+        let match_count = text.matches(ind).count() as u32;
+        count = count.saturating_add(match_count);
     }
     count
 }
@@ -567,9 +559,7 @@ fn compute_obfuscation_score(text: &str) -> u32 {
     let mut score: u32 = 0;
 
     // Count Chr() calls — long chains indicate obfuscation
-    let chr_count = text.matches("chr(").count()
-        + text.matches("chrw(").count()
-        + text.matches("chrb(").count();
+    let chr_count = text.matches("chr(").count() + text.matches("chrw(").count() + text.matches("chrb(").count();
 
     if chr_count > 20 {
         score = score.saturating_add(40);
@@ -695,6 +685,7 @@ fn compute_threat_score(
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::format_push_string)]
 mod tests {
     use super::*;
 
@@ -750,10 +741,7 @@ mod tests {
         content.push_str("\nEnd Sub");
 
         let analysis = scan_vba_content(content.as_bytes(), true, false);
-        assert!(
-            analysis.obfuscation_score > 0,
-            "obfuscation score should be > 0"
-        );
+        assert!(analysis.obfuscation_score > 0, "obfuscation score should be > 0");
         assert!(
             analysis.obfuscation_score >= 25,
             "expected >= 25, got {}",
@@ -763,8 +751,7 @@ mod tests {
 
     #[test]
     fn network_and_autoexec_combined() {
-        let content =
-            b"Sub Document_Open()\nSet x = CreateObject(\"MSXML2.XMLHTTP\")\nx.Open \"GET\", url\nEnd Sub";
+        let content = b"Sub Document_Open()\nSet x = CreateObject(\"MSXML2.XMLHTTP\")\nx.Open \"GET\", url\nEnd Sub";
         let analysis = scan_vba_content(content, true, false);
         assert!(!analysis.auto_exec_macros.is_empty());
         let has_network = analysis
@@ -790,13 +777,23 @@ mod tests {
 
     #[test]
     fn macro_count_estimation() {
-        let content =
-            b"Sub Foo()\nEnd Sub\nFunction Bar()\nEnd Function\nPrivate Sub Baz()\nEnd Sub";
+        let content = b"Sub Foo()\nEnd Sub\nFunction Bar()\nEnd Function\nPrivate Sub Baz()\nEnd Sub";
         let analysis = scan_vba_content(content, true, false);
-        assert!(
-            analysis.macro_count >= 3,
-            "expected >= 3, got {}",
-            analysis.macro_count
-        );
+        assert!(analysis.macro_count >= 3, "expected >= 3, got {}", analysis.macro_count);
+    }
+
+    #[test]
+    fn detect_macros_without_vba_string() {
+        // OLE2 header + _VBA_PROJECT but no standalone "VBA" string
+        let mut data = Vec::new();
+        data.extend_from_slice(OLE2_MAGIC);
+        data.extend_from_slice(&[0x00; 100]);
+        data.extend_from_slice(b"WordDocument");
+        data.extend_from_slice(&[0x00; 50]);
+        data.extend_from_slice(b"_VBA_PROJECT");
+        data.extend_from_slice(&[0x00; 50]);
+
+        let info = parse_ole2(&data).unwrap();
+        assert!(info.has_macros, "_VBA_PROJECT alone should detect macros");
     }
 }

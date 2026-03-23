@@ -1,14 +1,13 @@
-//! Import ClamAV signature files (.cvd, .hdb, .hsb) into the signature database.
+//! Import `ClamAV` signature files (.cvd, .hdb, .hsb) into the signature database.
 
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
 
-pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
+pub fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
     let sig_dir = data_dir.join("signatures");
-    let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir)
-        .context("failed to open signature database")?;
+    let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir).context("failed to open signature database")?;
 
     if paths.is_empty() {
         bail!("no ClamAV signature files specified");
@@ -17,7 +16,7 @@ pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
     let mut total_sha256 = 0usize;
     let mut total_md5 = 0usize;
     let mut total_ndb = 0usize;
-    let mut total_ldb = 0usize;
+    let mut total_logic_sigs = 0usize;
 
     for path in paths {
         let ext = path
@@ -59,10 +58,7 @@ pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
             println!("  SHA-1 skipped: {} (not supported)", stats.sha1_skipped);
         }
         if stats.ndb_count > 0 {
-            println!(
-                "  NDB patterns: {} (skipped, requires YARA-X engine)",
-                stats.ndb_count
-            );
+            println!("  NDB patterns: {} (skipped, requires YARA-X engine)", stats.ndb_count);
         }
         if stats.ldb_count > 0 {
             println!(
@@ -81,18 +77,15 @@ pub async fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {
         total_sha256 += stats.sha256_imported;
         total_md5 += stats.md5_imported;
         total_ndb += stats.ndb_count;
-        total_ldb += stats.ldb_count;
+        total_logic_sigs += stats.ldb_count;
     }
 
     println!();
     println!("{} ClamAV import complete", "success:".green().bold());
     println!("  Total SHA-256 hash entries imported: {total_sha256}");
     println!("  Total MD5 hash entries imported: {total_md5}");
-    if total_ndb > 0 || total_ldb > 0 {
-        println!(
-            "  Pattern signatures found but not imported: {} NDB + {} LDB",
-            total_ndb, total_ldb
-        );
+    if total_ndb > 0 || total_logic_sigs > 0 {
+        println!("  Pattern signatures found but not imported: {total_ndb} NDB + {total_logic_sigs} LDB");
         println!("  (These will be usable after YARA-X engine integration)");
     }
 

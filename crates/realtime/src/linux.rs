@@ -24,7 +24,6 @@ const FAN_MARK_MOUNT: libc::c_uint = 0x10;
 
 const FAN_OPEN_PERM: u64 = 0x0001_0000;
 const FAN_CLOSE_WRITE: u64 = 0x0000_0008;
-const FAN_OPEN: u64 = 0x0000_0020;
 const FAN_ACCESS_PERM: u64 = 0x0002_0000;
 const FAN_OPEN_EXEC_PERM: u64 = 0x0004_0000;
 
@@ -64,6 +63,7 @@ fn fanotify_init(flags: libc::c_uint, event_f_flags: libc::c_uint) -> Result<i32
     if fd < 0 {
         Err(std::io::Error::last_os_error()).context("fanotify_init failed")
     } else {
+        #[allow(clippy::cast_possible_truncation)] // fanotify fd fits in i32
         Ok(fd as i32)
     }
 }
@@ -75,20 +75,11 @@ fn fanotify_mark(
     dirfd: libc::c_int,
     path: Option<&CString>,
 ) -> Result<()> {
-    let pathname = path.map(|p| p.as_ptr()).unwrap_or(std::ptr::null());
+    let pathname = path.map_or(std::ptr::null(), |p| p.as_ptr());
 
     // SAFETY: All pointer arguments are either valid CString pointers or null.
     // fanotify_fd is a valid fd from fanotify_init. Scalar args are passed by value.
-    let ret = unsafe {
-        libc::syscall(
-            libc::SYS_fanotify_mark,
-            fanotify_fd,
-            flags,
-            mask,
-            dirfd,
-            pathname,
-        )
-    };
+    let ret = unsafe { libc::syscall(libc::SYS_fanotify_mark, fanotify_fd, flags, mask, dirfd, pathname) };
     if ret < 0 {
         Err(std::io::Error::last_os_error()).context("fanotify_mark failed")
     } else {
@@ -103,26 +94,134 @@ fn fd_to_path(fd: i32) -> Option<PathBuf> {
 }
 
 /// Send a permission response (allow/deny) for a fanotify event.
+///
+/// Uses `poll` with a 5-second timeout to avoid blocking indefinitely
+/// when the kernel fanotify queue is under pressure.  On timeout the
+/// response defaults to ALLOW so legitimate processes are not blocked.
 fn write_response(fanotify_fd: i32, event_fd: i32, allow: bool) {
     let resp = FanotifyResponse {
         fd: event_fd,
         response: if allow { FAN_ALLOW } else { FAN_DENY },
     };
+
+    // Poll for writability with a 5-second timeout.
+    let mut pfd = libc::pollfd {
+        fd: fanotify_fd,
+        events: libc::POLLOUT,
+        revents: 0,
+    };
+    // SAFETY: pfd is a stack-allocated pollfd with a valid fd from fanotify_init.
+    let poll_ret = unsafe { libc::poll(&raw mut pfd, 1, 5_000) };
+    if poll_ret < 0 {
+        let err = std::io::Error::last_os_error();
+        tracing::error!(event_fd, ?err, "fanotify write_response: poll failed");
+        // Attempt ALLOW as last resort to avoid blocking the process forever.
+        let fallback = FanotifyResponse {
+            fd: event_fd,
+            response: FAN_ALLOW,
+        };
+        // SAFETY: valid fanotify fd and valid repr(C) struct.
+        unsafe {
+            libc::write(
+                fanotify_fd,
+                (&raw const fallback).cast::<libc::c_void>(),
+                std::mem::size_of::<FanotifyResponse>(),
+            );
+        }
+        return;
+    }
+    if poll_ret == 0 {
+        tracing::warn!(
+            event_fd,
+            "fanotify write_response: poll timed out (5s), defaulting to ALLOW"
+        );
+        let fallback = FanotifyResponse {
+            fd: event_fd,
+            response: FAN_ALLOW,
+        };
+        // SAFETY: valid fanotify fd and valid repr(C) struct.
+        unsafe {
+            libc::write(
+                fanotify_fd,
+                (&raw const fallback).cast::<libc::c_void>(),
+                std::mem::size_of::<FanotifyResponse>(),
+            );
+        }
+        return;
+    }
+
     // SAFETY: fanotify_fd is a valid fanotify fd. resp is a valid repr(C) struct
     // and the pointer and size are correct for the duration of the write call.
-    unsafe {
+    let written = unsafe {
         libc::write(
             fanotify_fd,
-            &resp as *const FanotifyResponse as *const libc::c_void,
+            (&raw const resp).cast::<libc::c_void>(),
             std::mem::size_of::<FanotifyResponse>(),
-        );
+        )
+    };
+    if written < 0 {
+        let err = std::io::Error::last_os_error();
+        tracing::error!(event_fd, ?err, "fanotify write_response: write failed");
+    }
+}
+
+/// Process a single fanotify event — extracted to reduce nesting depth.
+fn process_fanotify_event(
+    fanotify_fd: i32,
+    meta: &FanotifyEventMetadata,
+    pid: u32,
+    mask: u64,
+    is_exec_perm: bool,
+    is_perm: bool,
+    hash_checker: Option<&HashChecker>,
+    tx: &mpsc::Sender<FileEvent>,
+) {
+    let Some(path) = fd_to_path(meta.fd) else {
+        // No path resolved — still need to respond to perm events.
+        if is_perm {
+            write_response(fanotify_fd, meta.fd, true);
+        }
+        return;
+    };
+
+    if is_exec_perm {
+        // FAN_OPEN_EXEC_PERM: pre-execution blocking path.
+        // Perform synchronous hash check if a checker is available.
+        let allow = hash_checker.is_none_or(|checker| {
+            let malicious = hash_file_from_fd(meta.fd).is_some_and(|digest| checker(&digest));
+            if malicious {
+                tracing::warn!("BLOCKED execution of malicious file: {} (pid={})", path.display(), pid,);
+            }
+            !malicious
+        });
+
+        write_response(fanotify_fd, meta.fd, allow);
+
+        let event = FileEvent::Execute { path, pid };
+        let _ = tx.try_send(event);
+    } else {
+        // Non-exec permission events: always allow (for now).
+        if is_perm {
+            write_response(fanotify_fd, meta.fd, true);
+        }
+
+        let event = if (mask & FAN_CLOSE_WRITE) != 0 {
+            FileEvent::CloseWrite { path }
+        } else {
+            // FAN_OPEN_PERM, FAN_OPEN, or any other event — emit as Open.
+            FileEvent::Open { path, pid }
+        };
+
+        let _ = tx.try_send(event);
     }
 }
 
 // ── FanotifyMonitor ─────────────────────────────────────────────────────────
 
 /// Callback that receives a SHA-256 hash and returns `true` when the file is
-/// known-malicious.  Used by the fanotify event loop to perform a synchronous
+/// known-malicious.
+///
+/// Used by the fanotify event loop to perform a synchronous
 /// fast-path check before allowing an execution to proceed.
 pub type HashChecker = Arc<dyn Fn(&[u8]) -> bool + Send + Sync>;
 
@@ -172,6 +271,11 @@ impl FanotifyMonitor {
         }
     }
 
+    /// Return a mutable reference to the event receiver for draining events.
+    pub const fn event_receiver_mut(&mut self) -> &mut mpsc::Receiver<FileEvent> {
+        &mut self.rx
+    }
+
     /// Start the event processing loop in a background thread.
     fn spawn_event_loop(
         fanotify_fd: i32,
@@ -187,13 +291,8 @@ impl FanotifyMonitor {
                 while running.load(Ordering::Relaxed) {
                     // SAFETY: fanotify_fd is a valid fd. buf is a valid mutable buffer
                     // and buf.len() is its exact capacity.
-                    let bytes_read = unsafe {
-                        libc::read(
-                            fanotify_fd,
-                            buf.as_mut_ptr() as *mut libc::c_void,
-                            buf.len(),
-                        )
-                    };
+                    let bytes_read =
+                        unsafe { libc::read(fanotify_fd, buf.as_mut_ptr().cast::<libc::c_void>(), buf.len()) };
 
                     if bytes_read <= 0 {
                         if !running.load(Ordering::Relaxed) {
@@ -210,7 +309,7 @@ impl FanotifyMonitor {
                     }
 
                     let mut offset = 0usize;
-                    let total = bytes_read as usize;
+                    let total = bytes_read.cast_unsigned();
 
                     while offset + FAN_EVENT_METADATA_LEN <= total {
                         // SAFETY: We verified offset + FAN_EVENT_METADATA_LEN <= total,
@@ -221,9 +320,7 @@ impl FanotifyMonitor {
                         // kernel typically returns aligned event_len values, but
                         // we do not rely on that assumption.
                         let meta = unsafe {
-                            std::ptr::read_unaligned(
-                                buf.as_ptr().add(offset) as *const FanotifyEventMetadata,
-                            )
+                            std::ptr::read_unaligned(buf.as_ptr().add(offset).cast::<FanotifyEventMetadata>())
                         };
 
                         if meta.vers != FANOTIFY_METADATA_VERSION {
@@ -238,72 +335,21 @@ impl FanotifyMonitor {
 
                         // Process the event.
                         if meta.fd >= 0 {
-                            let path = fd_to_path(meta.fd);
-                            let pid = meta.pid as u32;
+                            let pid = meta.pid.cast_unsigned();
                             let mask = meta.mask;
                             let is_exec_perm = (mask & FAN_OPEN_EXEC_PERM) != 0;
-                            let is_perm = (mask & FAN_OPEN_PERM) != 0
-                                || (mask & FAN_ACCESS_PERM) != 0
-                                || is_exec_perm;
+                            let is_perm = (mask & FAN_OPEN_PERM) != 0 || (mask & FAN_ACCESS_PERM) != 0 || is_exec_perm;
 
-                            if let Some(path) = path {
-                                if is_exec_perm {
-                                    // FAN_OPEN_EXEC_PERM: pre-execution blocking path.
-                                    // Perform synchronous hash check if a checker is available.
-                                    let allow = match hash_checker.as_ref() {
-                                        Some(checker) => {
-                                            let malicious = hash_file_from_fd(meta.fd)
-                                                .map(|digest| checker(&digest))
-                                                .unwrap_or(false);
-                                            if malicious {
-                                                tracing::warn!(
-                                                    "BLOCKED execution of malicious file: {} (pid={})",
-                                                    path.display(),
-                                                    pid,
-                                                );
-                                            }
-                                            !malicious
-                                        }
-                                        None => true,
-                                    };
-
-                                    write_response(fanotify_fd, meta.fd, allow);
-
-                                    let event = FileEvent::Execute {
-                                        path: path.clone(),
-                                        pid,
-                                    };
-                                    let _ = tx.try_send(event);
-                                } else {
-                                    // Non-exec permission events: always allow (for now).
-                                    if is_perm {
-                                        write_response(fanotify_fd, meta.fd, true);
-                                    }
-
-                                    let event = if (mask & FAN_OPEN_PERM) != 0
-                                        || (mask & FAN_OPEN) != 0
-                                    {
-                                        FileEvent::Open {
-                                            path: path.clone(),
-                                            pid,
-                                        }
-                                    } else if (mask & FAN_CLOSE_WRITE) != 0 {
-                                        FileEvent::CloseWrite { path: path.clone() }
-                                    } else {
-                                        FileEvent::Open {
-                                            path: path.clone(),
-                                            pid,
-                                        }
-                                    };
-
-                                    let _ = tx.try_send(event);
-                                }
-                            } else {
-                                // No path resolved — still need to respond to perm events.
-                                if is_perm {
-                                    write_response(fanotify_fd, meta.fd, true);
-                                }
-                            }
+                            process_fanotify_event(
+                                fanotify_fd,
+                                &meta,
+                                pid,
+                                mask,
+                                is_exec_perm,
+                                is_perm,
+                                hash_checker.as_ref(),
+                                &tx,
+                            );
 
                             // SAFETY: meta.fd is a valid fd provided by the kernel
                             // via fanotify for this event. We close it exactly once.
@@ -332,34 +378,22 @@ impl FileSystemMonitor for FanotifyMonitor {
         // Initialize fanotify with content class (for permission events) and non-blocking.
         let flags = FAN_CLASS_CONTENT | FAN_CLOEXEC | FAN_NONBLOCK;
         let event_f_flags = (libc::O_RDONLY | libc::O_LARGEFILE) as libc::c_uint;
-        let fd = fanotify_init(flags, event_f_flags)
-            .context("failed to initialize fanotify (requires CAP_SYS_ADMIN)")?;
+        let fd =
+            fanotify_init(flags, event_f_flags).context("failed to initialize fanotify (requires CAP_SYS_ADMIN)")?;
 
         // Mark each path for monitoring.
         let mark_mask = FAN_OPEN_PERM | FAN_CLOSE_WRITE | FAN_OPEN_EXEC_PERM;
 
         for path in paths {
-            let c_path =
-                CString::new(path.as_os_str().as_bytes()).context("invalid path for fanotify")?;
-            fanotify_mark(
-                fd,
-                FAN_MARK_ADD | FAN_MARK_MOUNT,
-                mark_mask,
-                AT_FDCWD,
-                Some(&c_path),
-            )
-            .with_context(|| format!("failed to mark path: {}", path.display()))?;
+            let c_path = CString::new(path.as_os_str().as_bytes()).context("invalid path for fanotify")?;
+            fanotify_mark(fd, FAN_MARK_ADD | FAN_MARK_MOUNT, mark_mask, AT_FDCWD, Some(&c_path))
+                .with_context(|| format!("failed to mark path: {}", path.display()))?;
         }
 
         self.fanotify_fd = Some(fd);
         self.running.store(true, Ordering::Release);
 
-        let handle = Self::spawn_event_loop(
-            fd,
-            self.tx.clone(),
-            self.running.clone(),
-            self.hash_checker.clone(),
-        )?;
+        let handle = Self::spawn_event_loop(fd, self.tx.clone(), self.running.clone(), self.hash_checker.clone())?;
         self.event_loop_handle = Some(handle);
 
         tracing::info!("fanotify monitor started, watching {} path(s)", paths.len());
@@ -409,18 +443,37 @@ impl Default for FanotifyMonitor {
 
 /// Compute the SHA-256 hash of a file given its fd (via `/proc/self/fd/{fd}`).
 ///
-/// Returns `None` if the file cannot be read.
+/// Returns `None` if the file cannot be read, exceeds 128 MiB, or takes
+/// longer than 5 seconds (e.g. file on a stalled network mount).
 fn hash_file_from_fd(fd: i32) -> Option<[u8; 32]> {
+    const MAX_HASH_BYTES: u64 = 128 * 1024 * 1024; // 128 MiB
+    const HASH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
     let proc_path = format!("/proc/self/fd/{fd}");
     let mut file = std::fs::File::open(&proc_path).ok()?;
     let mut hasher = Sha256::new();
     let mut read_buf = [0u8; 8192];
+    let deadline = std::time::Instant::now() + HASH_TIMEOUT;
+    let mut total_read: u64 = 0;
+
     loop {
+        if std::time::Instant::now() > deadline {
+            tracing::warn!(fd, "hash_file_from_fd: timed out after 5s");
+            return None;
+        }
+        if total_read > MAX_HASH_BYTES {
+            tracing::warn!(fd, total_read, "hash_file_from_fd: exceeded 128 MiB limit");
+            return None;
+        }
         let n = file.read(&mut read_buf).ok()?;
         if n == 0 {
             break;
         }
-        hasher.update(&read_buf[..n]);
+        total_read += n as u64;
+        // n is bounded by read_buf.len() (8192) from the read() call above.
+        if let Some(slice) = read_buf.get(..n) {
+            hasher.update(slice);
+        }
     }
     let result = hasher.finalize();
     Some(result.into())

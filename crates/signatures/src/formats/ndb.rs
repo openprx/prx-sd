@@ -1,4 +1,4 @@
-//! Parser for ClamAV `.ndb` hex signature files.
+//! Parser for `ClamAV` `.ndb` hex signature files.
 //!
 //! NDB signatures define body-based (hex pattern) detection rules. Each line
 //! has the format:
@@ -7,9 +7,9 @@
 //! MalwareName:TargetType:Offset:HexSignature
 //! ```
 //!
-//! - **TargetType**: 0 = any, 1 = PE, 2 = OLE2, etc.
+//! - **`TargetType`**: 0 = any, 1 = PE, 2 = OLE2, etc.
 //! - **Offset**: `*` (any), absolute number, `EP+n`/`EP-n`, `EOF-n`, `SE<section>`.
-//! - **HexSignature**: hex-encoded byte pattern.
+//! - **`HexSignature`**: hex-encoded byte pattern.
 
 use anyhow::{bail, Context, Result};
 
@@ -62,20 +62,18 @@ pub fn parse_ndb(content: &str) -> Result<Vec<NdbSignature>> {
             );
         }
 
-        let name = parts[0].to_string();
+        let name = parts.first().context("NDB: missing name field")?.to_string();
 
-        let target_type = parts[1].parse::<u32>().with_context(|| {
-            format!(
-                "NDB line {}: invalid target type '{}'",
-                line_num + 1,
-                parts[1]
-            )
-        })?;
+        let target_str = *parts.get(1).context("NDB: missing target type field")?;
+        let target_type = target_str
+            .parse::<u32>()
+            .with_context(|| format!("NDB line {}: invalid target type '{target_str}'", line_num + 1,))?;
 
-        let offset = parse_offset(parts[2])
-            .with_context(|| format!("NDB line {}: invalid offset '{}'", line_num + 1, parts[2]))?;
+        let offset_str = *parts.get(2).context("NDB: missing offset field")?;
+        let offset = parse_offset(offset_str)
+            .with_context(|| format!("NDB line {}: invalid offset '{offset_str}'", line_num + 1))?;
 
-        let hex_pattern = parts[3].to_string();
+        let hex_pattern = parts.get(3).context("NDB: missing hex pattern field")?.to_string();
 
         signatures.push(NdbSignature {
             name,
@@ -126,9 +124,7 @@ fn parse_offset(s: &str) -> Result<NdbOffset> {
     }
 
     // Absolute offset (plain number)
-    let n = s
-        .parse::<u64>()
-        .with_context(|| format!("invalid offset: '{s}'"))?;
+    let n = s.parse::<u64>().with_context(|| format!("invalid offset: '{s}'"))?;
     Ok(NdbOffset::Absolute(n))
 }
 
@@ -147,15 +143,15 @@ pub fn parse_hex_pattern(hex: &str) -> Result<Vec<u8>> {
     let mut bytes = Vec::with_capacity(hex.len() / 2);
 
     for i in (0..hex.len()).step_by(2) {
-        let pair = &hex[i..i + 2];
+        let pair = hex.get(i..i + 2).context("hex pattern slice out of bounds")?;
         if pair == "??" {
             // Wildcard byte - represent as 0x00 placeholder.
             // Callers performing matching should handle wildcards separately.
             bytes.push(0x00);
             continue;
         }
-        let byte = u8::from_str_radix(pair, 16)
-            .with_context(|| format!("invalid hex byte at position {i}: '{pair}'"))?;
+        let byte =
+            u8::from_str_radix(pair, 16).with_context(|| format!("invalid hex byte at position {i}: '{pair}'"))?;
         bytes.push(byte);
     }
 
@@ -163,6 +159,7 @@ pub fn parse_hex_pattern(hex: &str) -> Result<Vec<u8>> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

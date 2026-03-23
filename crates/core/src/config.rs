@@ -44,7 +44,7 @@ pub struct ScanConfig {
     /// Directory where quarantined files are stored.
     pub quarantine_dir: PathBuf,
 
-    /// VirusTotal API key for cloud hash lookups. Empty string disables VT.
+    /// `VirusTotal` API key for cloud hash lookups. Empty string disables VT.
     #[serde(default)]
     pub vt_api_key: String,
 }
@@ -52,7 +52,7 @@ pub struct ScanConfig {
 impl Default for ScanConfig {
     fn default() -> Self {
         let num_cpus = std::thread::available_parallelism()
-            .map(|n| n.get())
+            .map(std::num::NonZero::get)
             .unwrap_or(4);
 
         Self {
@@ -78,42 +78,49 @@ impl ScanConfig {
     }
 
     /// Builder-style setter for `max_file_size`.
-    pub fn with_max_file_size(mut self, bytes: u64) -> Self {
+    #[must_use]
+    pub const fn with_max_file_size(mut self, bytes: u64) -> Self {
         self.max_file_size = bytes;
         self
     }
 
     /// Builder-style setter for `scan_threads`.
-    pub fn with_scan_threads(mut self, n: usize) -> Self {
+    #[must_use]
+    pub const fn with_scan_threads(mut self, n: usize) -> Self {
         self.scan_threads = n;
         self
     }
 
     /// Builder-style setter for `timeout_per_file_ms`.
-    pub fn with_timeout(mut self, ms: u64) -> Self {
+    #[must_use]
+    pub const fn with_timeout(mut self, ms: u64) -> Self {
         self.timeout_per_file_ms = ms;
         self
     }
 
     /// Builder-style setter for `heuristic_threshold`.
-    pub fn with_heuristic_threshold(mut self, threshold: u32) -> Self {
+    #[must_use]
+    pub const fn with_heuristic_threshold(mut self, threshold: u32) -> Self {
         self.heuristic_threshold = threshold;
         self
     }
 
     /// Builder-style setter for `signatures_dir`.
+    #[must_use]
     pub fn with_signatures_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.signatures_dir = dir.into();
         self
     }
 
     /// Builder-style setter for `yara_rules_dir`.
+    #[must_use]
     pub fn with_yara_rules_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.yara_rules_dir = dir.into();
         self
     }
 
     /// Builder-style setter for `quarantine_dir`.
+    #[must_use]
     pub fn with_quarantine_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.quarantine_dir = dir.into();
         self
@@ -137,16 +144,23 @@ impl ScanConfig {
 /// Minimal glob matcher supporting `*` (any chars) and `?` (single char).
 /// This is intentionally simple; for production use consider the `glob` crate.
 fn glob_match(pattern: &str, text: &str) -> bool {
-    // Convert to a simple regex-like DP match.
     glob_match_inner(
         &pattern.chars().collect::<Vec<_>>(),
         &text.chars().collect::<Vec<_>>(),
         0,
         0,
+        0,
     )
 }
 
-fn glob_match_inner(pattern: &[char], text: &[char], pi: usize, ti: usize) -> bool {
+#[allow(clippy::indexing_slicing)] // pi/ti are always bounds-checked before indexing
+fn glob_match_inner(pattern: &[char], text: &[char], pi: usize, ti: usize, depth: usize) -> bool {
+    // Guard against pathological patterns (e.g. "****...****") that would
+    // otherwise cause exponential recursion / stack overflow.
+    const MAX_DEPTH: usize = 100;
+    if depth > MAX_DEPTH {
+        return false;
+    }
     if pi == pattern.len() {
         return ti == text.len();
     }
@@ -154,13 +168,13 @@ fn glob_match_inner(pattern: &[char], text: &[char], pi: usize, ti: usize) -> bo
         // '*' matches zero or more characters.
         // Try matching zero chars, then one, two, ...
         for skip in 0..=(text.len() - ti) {
-            if glob_match_inner(pattern, text, pi + 1, ti + skip) {
+            if glob_match_inner(pattern, text, pi + 1, ti + skip, depth + 1) {
                 return true;
             }
         }
         false
     } else if ti < text.len() && (pattern[pi] == '?' || pattern[pi] == text[ti]) {
-        glob_match_inner(pattern, text, pi + 1, ti + 1)
+        glob_match_inner(pattern, text, pi + 1, ti + 1, depth + 1)
     } else {
         false
     }

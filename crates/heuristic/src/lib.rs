@@ -42,15 +42,15 @@ pub enum Finding {
     /// The binary appears to contain self-modifying code (writable + executable
     /// section attributes combined with high entropy).
     SelfModifying,
-    /// UPX packer specifically detected (subset of PackerDetected kept for
+    /// UPX packer specifically detected (subset of `PackerDetected` kept for
     /// backwards compatibility / granularity).
     UPXPacked,
     /// Unusually high number of imports (may indicate API-hashing unpacker stub).
     HighImportCount,
     /// A section with a suspicious name was found (e.g. non-standard, packer-like).
     SuspiciousSection(String),
-    /// A code section (IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_EXECUTE) is also
-    /// writable (IMAGE_SCN_MEM_WRITE), which is abnormal for legitimate software.
+    /// A code section (`IMAGE_SCN_CNT_CODE` or `IMAGE_SCN_MEM_EXECUTE`) is also
+    /// writable (`IMAGE_SCN_MEM_WRITE`), which is abnormal for legitimate software.
     WritableCodeSection,
     /// The PE has zero imports, suggesting manual API resolution or packing.
     NoImports,
@@ -61,7 +61,7 @@ pub enum Finding {
     PackerDetected(String),
     /// Office document contains VBA macros.
     OfficeMacros,
-    /// Office VBA macro with auto-execution trigger (e.g. AutoOpen).
+    /// Office VBA macro with auto-execution trigger (e.g. `AutoOpen`).
     OfficeAutoExecMacro(String),
     /// Office VBA macro contains shell execution calls.
     OfficeShellExecution,
@@ -77,7 +77,7 @@ pub enum Finding {
     PdfJavaScript,
     /// PDF contains a Launch/SubmitForm/ImportData action.
     PdfLaunchAction,
-    /// PDF auto-executes JavaScript via OpenAction.
+    /// PDF auto-executes JavaScript via `OpenAction`.
     PdfAutoExecJavaScript,
     /// A known CVE exploit pattern was detected in a PDF.
     PdfCvePattern(String),
@@ -88,45 +88,45 @@ pub enum Finding {
 impl std::fmt::Display for Finding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Finding::HighEntropy(e) => write!(f, "High overall entropy: {e:.2}"),
-            Finding::PackedSection { name, entropy } => {
+            Self::HighEntropy(e) => write!(f, "High overall entropy: {e:.2}"),
+            Self::PackedSection { name, entropy } => {
                 write!(f, "Packed section '{name}' (entropy {entropy:.2})")
             }
-            Finding::SuspiciousApi(api) => write!(f, "Suspicious API import: {api}"),
-            Finding::ZeroTimestamp => write!(f, "PE timestamp is zero"),
-            Finding::AntiDebug => write!(f, "Anti-debug API imports detected"),
-            Finding::SelfModifying => write!(f, "Self-modifying code indicators"),
-            Finding::UPXPacked => write!(f, "UPX packer detected"),
-            Finding::HighImportCount => write!(f, "Unusually high import count"),
-            Finding::SuspiciousSection(name) => write!(f, "Suspicious section: {name}"),
-            Finding::WritableCodeSection => write!(f, "Writable code section (W+X)"),
-            Finding::NoImports => write!(f, "No imports found"),
-            Finding::ResourceAnomaly(desc) => write!(f, "Resource anomaly: {desc}"),
-            Finding::PackerDetected(name) => write!(f, "Packer detected: {name}"),
-            Finding::OfficeMacros => write!(f, "Office document contains VBA macros"),
-            Finding::OfficeAutoExecMacro(name) => {
+            Self::SuspiciousApi(api) => write!(f, "Suspicious API import: {api}"),
+            Self::ZeroTimestamp => write!(f, "PE timestamp is zero"),
+            Self::AntiDebug => write!(f, "Anti-debug API imports detected"),
+            Self::SelfModifying => write!(f, "Self-modifying code indicators"),
+            Self::UPXPacked => write!(f, "UPX packer detected"),
+            Self::HighImportCount => write!(f, "Unusually high import count"),
+            Self::SuspiciousSection(name) => write!(f, "Suspicious section: {name}"),
+            Self::WritableCodeSection => write!(f, "Writable code section (W+X)"),
+            Self::NoImports => write!(f, "No imports found"),
+            Self::ResourceAnomaly(desc) => write!(f, "Resource anomaly: {desc}"),
+            Self::PackerDetected(name) => write!(f, "Packer detected: {name}"),
+            Self::OfficeMacros => write!(f, "Office document contains VBA macros"),
+            Self::OfficeAutoExecMacro(name) => {
                 write!(f, "Office auto-exec macro: {name}")
             }
-            Finding::OfficeShellExecution => {
+            Self::OfficeShellExecution => {
                 write!(f, "Office macro contains shell execution")
             }
-            Finding::OfficeNetworkAccess => {
+            Self::OfficeNetworkAccess => {
                 write!(f, "Office macro contains network access")
             }
-            Finding::OfficeDde => write!(f, "Office document contains DDE"),
-            Finding::OfficeObfuscation(score) => {
+            Self::OfficeDde => write!(f, "Office document contains DDE"),
+            Self::OfficeObfuscation(score) => {
                 write!(f, "Office macro obfuscation (score: {score})")
             }
-            Finding::OfficeMacroThreatScore(s) => {
+            Self::OfficeMacroThreatScore(s) => {
                 write!(f, "Office macro threat score: {s}")
             }
-            Finding::PdfJavaScript => write!(f, "PDF contains JavaScript"),
-            Finding::PdfLaunchAction => write!(f, "PDF contains Launch action"),
-            Finding::PdfAutoExecJavaScript => {
+            Self::PdfJavaScript => write!(f, "PDF contains JavaScript"),
+            Self::PdfLaunchAction => write!(f, "PDF contains Launch action"),
+            Self::PdfAutoExecJavaScript => {
                 write!(f, "PDF auto-executes JavaScript")
             }
-            Finding::PdfCvePattern(cve) => write!(f, "PDF CVE pattern: {cve}"),
-            Finding::PdfThreatScore(s) => write!(f, "PDF threat score: {s}"),
+            Self::PdfCvePattern(cve) => write!(f, "PDF CVE pattern: {cve}"),
+            Self::PdfThreatScore(s) => write!(f, "PDF threat score: {s}"),
         }
     }
 }
@@ -148,11 +148,11 @@ impl ThreatLevel {
     /// * `0..=29`  -> `Clean`
     /// * `30..=59` -> `Suspicious`
     /// * `60..`    -> `Malicious`
-    pub fn from_score(score: u32) -> Self {
+    pub const fn from_score(score: u32) -> Self {
         match score {
-            0..=29 => ThreatLevel::Clean,
-            30..=59 => ThreatLevel::Suspicious,
-            _ => ThreatLevel::Malicious,
+            0..=29 => Self::Clean,
+            30..=59 => Self::Suspicious,
+            _ => Self::Malicious,
         }
     }
 }
@@ -160,9 +160,9 @@ impl ThreatLevel {
 impl std::fmt::Display for ThreatLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ThreatLevel::Clean => write!(f, "Clean"),
-            ThreatLevel::Suspicious => write!(f, "Suspicious"),
-            ThreatLevel::Malicious => write!(f, "Malicious"),
+            Self::Clean => write!(f, "Clean"),
+            Self::Suspicious => write!(f, "Suspicious"),
+            Self::Malicious => write!(f, "Malicious"),
         }
     }
 }
@@ -192,7 +192,7 @@ pub struct HeuristicEngine {
 impl HeuristicEngine {
     /// Create a new heuristic engine instance with fallback ML model.
     pub fn new() -> Self {
-        HeuristicEngine {
+        Self {
             ml_model: ml_model::MlModel::new_fallback(),
         }
     }
@@ -205,7 +205,7 @@ impl HeuristicEngine {
             debug!("failed to load ML models: {e}, using fallback");
             ml_model::MlModel::new_fallback()
         });
-        HeuristicEngine { ml_model }
+        Self { ml_model }
     }
 
     /// Run all heuristic checks against `data` (the raw file bytes) and
@@ -254,11 +254,7 @@ impl HeuristicEngine {
 
         // If HighEntropy is the ONLY finding, suppress it regardless of
         // file type — entropy alone is not a reliable malware indicator.
-        if non_entropy_findings == 0
-            && findings
-                .iter()
-                .any(|f| matches!(f, Finding::HighEntropy(_)))
-        {
+        if non_entropy_findings == 0 && findings.iter().any(|f| matches!(f, Finding::HighEntropy(_))) {
             debug!("suppressing lone HighEntropy finding (need corroborating evidence)");
             findings.clear();
         }
@@ -320,9 +316,7 @@ impl HeuristicEngine {
             && parsed.as_pdf().is_none()
             && parsed.as_office().is_none()
         {
-            let only_entropy = findings
-                .iter()
-                .all(|f| matches!(f, Finding::HighEntropy(_)));
+            let only_entropy = findings.iter().all(|f| matches!(f, Finding::HighEntropy(_)));
             if only_entropy && !findings.is_empty() {
                 debug!("suppressing HighEntropy on non-executable file");
                 findings.clear();
@@ -338,6 +332,7 @@ impl HeuristicEngine {
         // Blend ML prediction into the heuristic score.
         // The ML score can boost or confirm the heuristic score.
         if let Some(pred) = &ml_prediction {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let ml_contribution = (pred.malicious_probability * 30.0 * pred.confidence) as u32;
             score = (score + ml_contribution).min(100);
             if pred.malicious_probability > 0.7 {
@@ -366,6 +361,7 @@ impl HeuristicEngine {
 
     /// Run ML-based scoring on the parsed file, returning a prediction
     /// if the file type is supported (PE or ELF).
+    #[allow(clippy::option_if_let_else)] // Chained if-let-else is clearer than map_or_else here
     pub fn ml_score(&self, data: &[u8], parsed: &ParsedFile) -> Option<ml_model::MlPrediction> {
         if let Some(pe) = parsed.as_pe() {
             let features = ml_features::extract_pe_features(pe, data);
@@ -379,12 +375,8 @@ impl HeuristicEngine {
     }
 
     /// PE-specific heuristic checks.
-    fn analyze_pe(
-        &self,
-        pe: &prx_sd_parsers::pe::PeInfo,
-        data: &[u8],
-        findings: &mut Vec<Finding>,
-    ) {
+    #[allow(clippy::unused_self)] // Method for future ML model integration
+    fn analyze_pe(&self, pe: &prx_sd_parsers::pe::PeInfo, data: &[u8], findings: &mut Vec<Finding>) {
         // PE section characteristics bit flags (from the PE/COFF specification).
         const IMAGE_SCN_MEM_EXECUTE: u32 = 0x2000_0000;
         const IMAGE_SCN_MEM_WRITE: u32 = 0x8000_0000;
@@ -456,10 +448,22 @@ impl HeuristicEngine {
             if data.windows(pattern.len()).any(|w| w == *pattern) {
                 let name = String::from_utf8_lossy(pattern).to_string();
                 // Avoid duplicates from the import-table scan above.
-                if !findings
-                    .iter()
-                    .any(|f| matches!(f, Finding::SuspiciousApi(n) if n == &name))
-                {
+                // Strip trailing A/W suffix for comparison, because imports
+                // like VirtualAllocExW and raw strings VirtualAllocEx refer
+                // to the same API.
+                let name_base = name
+                    .strip_suffix('A')
+                    .or_else(|| name.strip_suffix('W'))
+                    .unwrap_or(&name);
+                let already_found = findings.iter().any(|f| {
+                    if let Finding::SuspiciousApi(n) = f {
+                        let n_base = n.strip_suffix('A').or_else(|| n.strip_suffix('W')).unwrap_or(n);
+                        n_base.eq_ignore_ascii_case(name_base)
+                    } else {
+                        false
+                    }
+                });
+                if !already_found {
                     findings.push(Finding::SuspiciousApi(name));
                 }
             }
@@ -469,7 +473,7 @@ impl HeuristicEngine {
         if let Some(packer) = detect_packer(pe) {
             let name = packer.to_string();
             debug!(%name, "packer detected");
-            findings.push(Finding::PackerDetected(name.clone()));
+            findings.push(Finding::PackerDetected(name));
 
             if matches!(packer, packer::PackerType::UPX) {
                 findings.push(Finding::UPXPacked);
@@ -481,10 +485,7 @@ impl HeuristicEngine {
             debug!("entry point anomaly detected");
             // Entry point anomalies strengthen packer suspicion. If no packer
             // was detected by section name, record a suspicious section.
-            if !findings
-                .iter()
-                .any(|f| matches!(f, Finding::PackerDetected(_)))
-            {
+            if !findings.iter().any(|f| matches!(f, Finding::PackerDetected(_))) {
                 findings.push(Finding::SuspiciousSection("EP anomaly".to_string()));
             }
         }
@@ -512,12 +513,8 @@ impl HeuristicEngine {
     }
 
     /// ELF-specific heuristic checks (Linux malware detection).
-    fn analyze_elf(
-        &self,
-        elf: &prx_sd_parsers::elf::ElfInfo,
-        data: &[u8],
-        findings: &mut Vec<Finding>,
-    ) {
+    #[allow(clippy::unused_self)] // Method for future ML model integration
+    fn analyze_elf(&self, elf: &prx_sd_parsers::elf::ElfInfo, data: &[u8], findings: &mut Vec<Finding>) {
         // High-entropy ELF sections (packed/encrypted)
         for section in &elf.sections {
             if section.entropy > 7.0 && section.raw_size > 512 {
@@ -573,12 +570,8 @@ impl HeuristicEngine {
     }
 
     /// Mach-O-specific heuristic checks (macOS malware detection).
-    fn analyze_macho(
-        &self,
-        macho: &prx_sd_parsers::macho::MachOInfo,
-        data: &[u8],
-        findings: &mut Vec<Finding>,
-    ) {
+    #[allow(clippy::unused_self)] // Method for future ML model integration
+    fn analyze_macho(&self, macho: &prx_sd_parsers::macho::MachOInfo, data: &[u8], findings: &mut Vec<Finding>) {
         // High-entropy Mach-O sections
         for section in &macho.sections {
             if section.entropy > 7.0 && section.raw_size > 512 {
@@ -629,6 +622,7 @@ impl HeuristicEngine {
     }
 
     /// Office-specific macro analysis.
+    #[allow(clippy::unused_self)] // Method for future ML model integration
     fn analyze_office_macros(&self, data: &[u8], findings: &mut Vec<Finding>) {
         let analysis = match prx_sd_parsers::office::analyze_office(data) {
             Ok(a) => a,
@@ -679,6 +673,7 @@ impl HeuristicEngine {
     }
 
     /// PDF-specific exploit analysis.
+    #[allow(clippy::unused_self)] // Method for future ML model integration
     fn analyze_pdf_exploits(&self, data: &[u8], findings: &mut Vec<Finding>) {
         let analysis = match prx_sd_parsers::pdf::analyze_pdf(data) {
             Ok(a) => a,
@@ -725,6 +720,13 @@ impl Default for HeuristicEngine {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::float_cmp,
+    clippy::expect_used,
+    clippy::unreadable_literal,
+    clippy::needless_collect
+)]
 mod tests {
     use super::*;
     use prx_sd_parsers::pe::{ImportInfo, PeInfo, SectionInfo};
@@ -801,26 +803,13 @@ mod tests {
         let engine = HeuristicEngine::new();
         let result = engine.analyze(&data, &parsed);
 
-        assert!(
-            result.score >= 60,
-            "expected malicious score, got {}",
-            result.score
-        );
+        assert!(result.score >= 60, "expected malicious score, got {}", result.score);
         assert_eq!(result.threat_level, ThreatLevel::Malicious);
 
         // Should have packer-related findings.
-        assert!(result
-            .findings
-            .iter()
-            .any(|f| matches!(f, Finding::PackerDetected(_))));
-        assert!(result
-            .findings
-            .iter()
-            .any(|f| matches!(f, Finding::UPXPacked)));
-        assert!(result
-            .findings
-            .iter()
-            .any(|f| matches!(f, Finding::NoImports)));
+        assert!(result.findings.iter().any(|f| matches!(f, Finding::PackerDetected(_))));
+        assert!(result.findings.iter().any(|f| matches!(f, Finding::UPXPacked)));
+        assert!(result.findings.iter().any(|f| matches!(f, Finding::NoImports)));
     }
 
     #[test]

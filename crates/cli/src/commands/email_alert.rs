@@ -61,16 +61,14 @@ impl EmailConfig {
             return Ok(Self::default());
         }
         let content = std::fs::read_to_string(&path).context("failed to read email_config.json")?;
-        let config: Self =
-            serde_json::from_str(&content).context("failed to parse email_config.json")?;
+        let config: Self = serde_json::from_str(&content).context("failed to parse email_config.json")?;
         Ok(config)
     }
 
     /// Persist email configuration to `data_dir/email_config.json`.
     pub fn save(&self, data_dir: &Path) -> Result<()> {
         let path = data_dir.join(EMAIL_CONFIG_FILE);
-        let json =
-            serde_json::to_string_pretty(self).context("failed to serialize email config")?;
+        let json = serde_json::to_string_pretty(self).context("failed to serialize email config")?;
         std::fs::write(&path, json).context("failed to write email_config.json")?;
         Ok(())
     }
@@ -138,10 +136,7 @@ pub async fn send_threat_alert(config: &EmailConfig, alert: &ThreatAlert) -> Res
         .map_err(|e| anyhow::anyhow!("invalid from address '{}': {}", config.from, e))?;
 
     let html_body = build_html_body(alert);
-    let subject = format!(
-        "[PRX-SD ALERT] {} — {}",
-        alert.threat_level, alert.threat_name
-    );
+    let subject = format!("[PRX-SD ALERT] {} — {}", alert.threat_level, alert.threat_name);
 
     let creds = Credentials::new(config.username.clone(), config.password.clone());
 
@@ -164,7 +159,7 @@ pub async fn send_threat_alert(config: &EmailConfig, alert: &ThreatAlert) -> Res
         let to_mailbox: Mailbox = match recipient.parse() {
             Ok(m) => m,
             Err(e) => {
-                errors.push(format!("invalid recipient '{}': {}", recipient, e));
+                errors.push(format!("invalid recipient '{recipient}': {e}"));
                 continue;
             }
         };
@@ -178,23 +173,20 @@ pub async fn send_threat_alert(config: &EmailConfig, alert: &ThreatAlert) -> Res
         {
             Ok(msg) => msg,
             Err(e) => {
-                errors.push(format!("failed to build email for '{}': {}", recipient, e));
+                errors.push(format!("failed to build email for '{recipient}': {e}"));
                 continue;
             }
         };
 
         if let Err(e) = mailer.send(email).await {
-            errors.push(format!("failed to send to '{}': {}", recipient, e));
+            errors.push(format!("failed to send to '{recipient}': {e}"));
         }
     }
 
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!(
-            "some emails failed:\n{}",
-            errors.join("\n")
-        ))
+        Err(anyhow::anyhow!("some emails failed:\n{}", errors.join("\n")))
     }
 }
 
@@ -202,19 +194,14 @@ pub async fn send_threat_alert(config: &EmailConfig, alert: &ThreatAlert) -> Res
 
 /// Get the current hostname.
 fn get_hostname() -> String {
-    std::fs::read_to_string("/etc/hostname")
-        .map(|s| s.trim().to_owned())
-        .unwrap_or_else(|_| "unknown".to_owned())
+    std::fs::read_to_string("/etc/hostname").map_or_else(|_| "unknown".to_owned(), |s| s.trim().to_owned())
 }
 
 /// Interactive-style configuration: write a default config for the user to edit.
-pub async fn run_configure(data_dir: &Path) -> Result<()> {
+pub fn run_configure(data_dir: &Path) -> Result<()> {
     let config_path = data_dir.join(EMAIL_CONFIG_FILE);
     if config_path.exists() {
-        println!(
-            "Email configuration already exists at: {}",
-            config_path.display()
-        );
+        println!("Email configuration already exists at: {}", config_path.display());
         println!("Edit the file directly or delete it and re-run this command.");
         let config = EmailConfig::load(data_dir)?;
         println!("\nCurrent settings:");
@@ -230,10 +217,7 @@ pub async fn run_configure(data_dir: &Path) -> Result<()> {
 
     let config = EmailConfig::default();
     config.save(data_dir)?;
-    println!(
-        "Created default email configuration at: {}",
-        config_path.display()
-    );
+    println!("Created default email configuration at: {}", config_path.display());
     println!("Edit the file to set your SMTP credentials and recipients.");
     println!("Then run 'sd email-alert test' to verify connectivity.");
     Ok(())
@@ -268,12 +252,7 @@ pub async fn run_test(data_dir: &Path) -> Result<()> {
 }
 
 /// Send an alert with custom parameters (for programmatic use).
-pub async fn run_send(
-    threat_name: &str,
-    threat_level: &str,
-    file_path: &str,
-    data_dir: &Path,
-) -> Result<()> {
+pub async fn run_send(threat_name: &str, threat_level: &str, file_path: &str, data_dir: &Path) -> Result<()> {
     let config = EmailConfig::load(data_dir)?;
 
     if !config.enabled {

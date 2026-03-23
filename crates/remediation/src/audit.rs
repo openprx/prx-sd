@@ -45,11 +45,10 @@ impl AuditLogger {
     /// Appends a single JSON line to `audit-YYYY-MM-DD.jsonl`.
     pub fn log(&self, record: &ThreatAuditRecord) -> Result<()> {
         let date = record.timestamp.format("%Y-%m-%d");
-        let filename = format!("audit-{}.jsonl", date);
+        let filename = format!("audit-{date}.jsonl");
         let filepath = self.log_dir.join(filename);
 
-        let json_line =
-            serde_json::to_string(record).context("failed to serialize audit record")?;
+        let json_line = serde_json::to_string(record).context("failed to serialize audit record")?;
 
         let mut file = fs::OpenOptions::new()
             .create(true)
@@ -57,7 +56,7 @@ impl AuditLogger {
             .open(&filepath)
             .with_context(|| format!("failed to open audit log: {}", filepath.display()))?;
 
-        writeln!(file, "{}", json_line)
+        writeln!(file, "{json_line}")
             .with_context(|| format!("failed to write to audit log: {}", filepath.display()))?;
 
         tracing::debug!(
@@ -78,12 +77,12 @@ impl AuditLogger {
         let mut current = from;
 
         while current <= to {
-            let filename = format!("audit-{}.jsonl", current);
+            let filename = format!("audit-{current}.jsonl");
             let filepath = self.log_dir.join(&filename);
 
             if filepath.exists() {
-                let file = fs::File::open(&filepath)
-                    .with_context(|| format!("failed to open: {}", filepath.display()))?;
+                let file =
+                    fs::File::open(&filepath).with_context(|| format!("failed to open: {}", filepath.display()))?;
                 let reader = BufReader::new(file);
 
                 for line_result in reader.lines() {
@@ -135,30 +134,29 @@ impl AuditLogger {
             .with_context(|| format!("failed to read audit dir: {}", self.log_dir.display()))?;
 
         for entry in dir_entries {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(_) => continue,
+            let Ok(entry) = entry else {
+                continue;
             };
             let path = entry.path();
             let name = path
                 .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
+                .map_or_else(String::new, |n| n.to_string_lossy().to_string());
 
-            if !name.starts_with("audit-") || !name.ends_with(".jsonl") {
+            let is_jsonl = std::path::Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl"));
+            if !name.starts_with("audit-") || !is_jsonl {
                 continue;
             }
 
-            let file = match fs::File::open(&path) {
-                Ok(f) => f,
-                Err(_) => continue,
+            let Ok(file) = fs::File::open(&path) else {
+                continue;
             };
             let reader = BufReader::new(file);
 
             for line_result in reader.lines() {
-                let line = match line_result {
-                    Ok(l) => l,
-                    Err(_) => continue,
+                let Ok(line) = line_result else {
+                    continue;
                 };
                 if line.trim().is_empty() {
                     continue;
@@ -169,9 +167,7 @@ impl AuditLogger {
                 };
 
                 total_threats += 1;
-                *by_threat_level
-                    .entry(record.threat_level.clone())
-                    .or_insert(0) += 1;
+                *by_threat_level.entry(record.threat_level.clone()).or_insert(0) += 1;
 
                 for action_result in &record.actions_taken {
                     if !action_result.success {
@@ -204,15 +200,12 @@ impl AuditLogger {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::items_after_statements)]
 mod tests {
     use super::*;
     use crate::{RemediationAction, RemediationResult};
 
-    fn make_record(
-        threat_level: &str,
-        actions: Vec<RemediationResult>,
-        date: &str,
-    ) -> ThreatAuditRecord {
+    fn make_record(threat_level: &str, actions: Vec<RemediationResult>, date: &str) -> ThreatAuditRecord {
         let timestamp = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
             .expect("parse date")
             .and_hms_opt(12, 0, 0)
@@ -328,12 +321,10 @@ mod tests {
         );
         let r3 = make_record(
             "malicious",
-            vec![RemediationResult::success(
-                RemediationAction::PersistenceCleaned {
-                    persistence_type: crate::PersistenceType::Crontab,
-                    detail: "removed cron entry".to_string(),
-                },
-            )],
+            vec![RemediationResult::success(RemediationAction::PersistenceCleaned {
+                persistence_type: crate::PersistenceType::Crontab,
+                detail: "removed cron entry".to_string(),
+            })],
             "2025-06-11",
         );
 
@@ -386,12 +377,7 @@ mod tests {
         use std::io::Write;
         writeln!(file, "{{this is not valid json}}").expect("write bad line");
         // Write another valid record line manually
-        writeln!(
-            file,
-            "{}",
-            serde_json::to_string(&record).expect("serialize")
-        )
-        .expect("write good line");
+        writeln!(file, "{}", serde_json::to_string(&record).expect("serialize")).expect("write good line");
 
         let from = NaiveDate::from_ymd_opt(2025, 6, 10).expect("from");
         let to = NaiveDate::from_ymd_opt(2025, 6, 10).expect("to");

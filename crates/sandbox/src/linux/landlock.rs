@@ -73,17 +73,15 @@ struct LandlockPathBeneathAttr {
 
 // ── Syscall wrappers ────────────────────────────────────────────────────────
 
-fn sys_landlock_create_ruleset(
-    attr: *const LandlockRulesetAttr,
-    size: usize,
-    flags: u32,
-) -> Result<i32> {
+fn sys_landlock_create_ruleset(attr: *const LandlockRulesetAttr, size: usize, flags: u32) -> Result<i32> {
     // SAFETY: Valid pointer to a repr(C) LandlockRulesetAttr struct and correct size.
     // The syscall reads exactly `size` bytes from the pointer.
     let ret = unsafe { libc::syscall(444, attr, size, flags) };
     if ret < 0 {
         Err(std::io::Error::last_os_error()).context("landlock_create_ruleset failed")
     } else {
+        // Landlock fd values are small non-negative integers; truncation is safe.
+        #[allow(clippy::cast_possible_truncation)]
         Ok(ret as i32)
     }
 }
@@ -147,7 +145,7 @@ impl LandlockSandbox {
     /// Create a new Landlock sandbox with no rules.
     ///
     /// By default all file system access will be denied once applied.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             allowed_read_paths: Vec::new(),
             allowed_write_paths: Vec::new(),
@@ -166,8 +164,8 @@ impl LandlockSandbox {
 
     /// Add a Landlock rule for a single path with the given access rights.
     fn add_rule(ruleset_fd: i32, path: &Path, access: u64) -> Result<()> {
-        let c_path = CString::new(path.as_os_str().as_bytes())
-            .with_context(|| format!("invalid path: {}", path.display()))?;
+        let c_path =
+            CString::new(path.as_os_str().as_bytes()).with_context(|| format!("invalid path: {}", path.display()))?;
 
         // SAFETY: c_path is a valid null-terminated CString. O_PATH | O_CLOEXEC are safe flags.
         let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_PATH | libc::O_CLOEXEC) };
@@ -181,8 +179,7 @@ impl LandlockSandbox {
             parent_fd: fd,
         };
 
-        let result =
-            sys_landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &path_beneath, 0);
+        let result = sys_landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &raw const path_beneath, 0);
 
         // SAFETY: fd is a valid open file descriptor returned by open() above.
         unsafe { libc::close(fd) };
@@ -203,9 +200,8 @@ impl LandlockSandbox {
         let attr = LandlockRulesetAttr {
             handled_access_fs: LANDLOCK_ACCESS_FS_ALL,
         };
-        let ruleset_fd =
-            sys_landlock_create_ruleset(&attr, std::mem::size_of::<LandlockRulesetAttr>(), 0)
-                .context("failed to create landlock ruleset")?;
+        let ruleset_fd = sys_landlock_create_ruleset(&raw const attr, std::mem::size_of::<LandlockRulesetAttr>(), 0)
+            .context("failed to create landlock ruleset")?;
 
         // Add read-only path rules.
         for path in &self.allowed_read_paths {
@@ -232,8 +228,7 @@ impl LandlockSandbox {
         if ret != 0 {
             // SAFETY: ruleset_fd is a valid fd from sys_landlock_create_ruleset.
             unsafe { libc::close(ruleset_fd) };
-            return Err(std::io::Error::last_os_error())
-                .context("prctl(PR_SET_NO_NEW_PRIVS) failed");
+            return Err(std::io::Error::last_os_error()).context("prctl(PR_SET_NO_NEW_PRIVS) failed");
         }
 
         // Enforce the ruleset.

@@ -4,7 +4,7 @@
 //! - Sleep/timing checks (extended delays to outlast sandbox timeout)
 //! - VM/hypervisor detection (CPUID, MAC address, hardware fingerprinting)
 //! - Environment fingerprinting (username, hostname, disk size, process count)
-//! - Debugger detection (ptrace, IsDebuggerPresent, timing checks)
+//! - Debugger detection (ptrace, `IsDebuggerPresent`, timing checks)
 //! - User interaction checks (mouse movement, click count, screen resolution)
 
 use serde::{Deserialize, Serialize};
@@ -38,13 +38,13 @@ pub struct EvasionTechnique {
 /// Categories of anti-sandbox evasion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvasionCategory {
-    /// Timing-based evasion (sleep, GetTickCount, rdtsc).
+    /// Timing-based evasion (sleep, `GetTickCount`, rdtsc).
     Timing,
     /// Virtual machine detection (CPUID, registry, hardware).
     VmDetection,
     /// Environment fingerprinting (username, hostname, processes).
     EnvironmentCheck,
-    /// Debugger detection (ptrace, IsDebuggerPresent, int3).
+    /// Debugger detection (ptrace, `IsDebuggerPresent`, int3).
     DebuggerDetection,
     /// User interaction check (mouse, keyboard, window focus).
     UserInteraction,
@@ -80,11 +80,7 @@ pub fn detect_evasion(data: &[u8]) -> AntiSandboxResult {
     // ── Hardware fingerprinting ────────────────────────────────────────
     check_hardware_fingerprinting(&strings, &mut techniques);
 
-    let evasion_score = techniques
-        .iter()
-        .map(|t| t.severity * 5)
-        .sum::<u32>()
-        .min(100);
+    let evasion_score = techniques.iter().map(|t| t.severity * 5).sum::<u32>().min(100);
 
     AntiSandboxResult {
         is_evasive: evasion_score >= 30,
@@ -136,9 +132,7 @@ fn check_timing_evasion(strings: &[String], data: &[u8], out: &mut Vec<EvasionTe
                 name: format!("Sleep API: {pat}"),
                 mitre_id: Some("T1497.003".to_string()),
                 category: EvasionCategory::Timing,
-                description:
-                    "References sleep function (may use extended delay to evade sandbox timeout)"
-                        .to_string(),
+                description: "References sleep function (may use extended delay to evade sandbox timeout)".to_string(),
                 severity: 2,
             });
             break;
@@ -206,16 +200,13 @@ fn check_vm_detection(strings: &[String], data: &[u8], out: &mut Vec<EvasionTech
     // CPUID check (x86: 0F A2)
     if contains_bytes(data, &[0x0F, 0xA2]) {
         // CPUID is common, only flag if combined with other VM checks
-        let has_other_vm = out
-            .iter()
-            .any(|t| t.category == EvasionCategory::VmDetection);
+        let has_other_vm = out.iter().any(|t| t.category == EvasionCategory::VmDetection);
         if has_other_vm {
             out.push(EvasionTechnique {
                 name: "CPUID instruction".to_string(),
                 mitre_id: Some("T1497.001".to_string()),
                 category: EvasionCategory::VmDetection,
-                description: "Contains CPUID instruction (combined with other VM checks)"
-                    .to_string(),
+                description: "Contains CPUID instruction (combined with other VM checks)".to_string(),
                 severity: 4,
             });
         }
@@ -261,9 +252,7 @@ fn check_environment_fingerprinting(strings: &[String], out: &mut Vec<EvasionTec
             name: "Multiple environment checks".to_string(),
             mitre_id: Some("T1497.001".to_string()),
             category: EvasionCategory::EnvironmentCheck,
-            description: format!(
-                "{env_count} environment queries detected (sandbox fingerprinting)"
-            ),
+            description: format!("{env_count} environment queries detected (sandbox fingerprinting)"),
             severity: 5,
         });
     }
@@ -298,18 +287,21 @@ fn check_debugger_detection(strings: &[String], data: &[u8], out: &mut Vec<Evasi
             name: "ptrace anti-debug".to_string(),
             mitre_id: Some("T1622".to_string()),
             category: EvasionCategory::DebuggerDetection,
-            description: "References ptrace (Linux anti-debug via PTRACE_TRACEME self-attach)"
-                .to_string(),
+            description: "References ptrace (Linux anti-debug via PTRACE_TRACEME self-attach)".to_string(),
             severity: 5,
         });
     }
 
-    // INT 3 breakpoint (0xCC) density check — many int3s may indicate anti-debug
+    // INT 3 breakpoint (0xCC) density check -- many int3s may indicate anti-debug
+    #[allow(clippy::naive_bytecount)] // avoiding external dependency for simple count
     let int3_count = data.iter().filter(|&&b| b == 0xCC).count();
     let ratio = if data.is_empty() {
         0.0
     } else {
-        int3_count as f64 / data.len() as f64
+        #[allow(clippy::cast_precision_loss)] // precision loss acceptable for ratio computation
+        {
+            int3_count as f64 / data.len() as f64
+        }
     };
     if ratio > 0.01 && int3_count > 50 {
         out.push(EvasionTechnique {
@@ -360,16 +352,8 @@ fn check_hardware_fingerprinting(strings: &[String], out: &mut Vec<EvasionTechni
         ("Win32_DiskDrive", "Disk WMI query", 5),
         ("Win32_PhysicalMemory", "RAM WMI query", 4),
         ("Win32_Processor", "CPU WMI query", 3),
-        (
-            "HARDWARE\\DESCRIPTION\\System\\BIOS",
-            "BIOS registry key",
-            5,
-        ),
-        (
-            "SYSTEM\\ControlSet001\\Services\\Disk\\Enum",
-            "Disk registry enum",
-            5,
-        ),
+        ("HARDWARE\\DESCRIPTION\\System\\BIOS", "BIOS registry key", 5),
+        ("SYSTEM\\ControlSet001\\Services\\Disk\\Enum", "Disk registry enum", 5),
         ("/sys/class/dmi/id/", "Linux DMI hardware info", 4),
         ("/sys/devices/virtual/", "Linux virtual device check", 5),
         ("systemd-detect-virt", "Linux VM detection command", 6),
@@ -418,6 +402,7 @@ fn contains_bytes(data: &[u8], needle: &[u8]) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -460,10 +445,7 @@ mod tests {
         // Add a timing API string to trigger combined detection
         data.extend_from_slice(b"GetTickCount\x00Sleep(\x00");
         let result = detect_evasion(&data);
-        assert!(result
-            .techniques
-            .iter()
-            .any(|t| t.category == EvasionCategory::Timing));
+        assert!(result.techniques.iter().any(|t| t.category == EvasionCategory::Timing));
     }
 
     #[test]
@@ -471,28 +453,19 @@ mod tests {
         let data = b"\x00cuckoomon.dll\x00sbiedll.dll\x00";
         let result = detect_evasion(data);
         assert!(result.is_evasive);
-        let sandbox_techs: Vec<_> = result
-            .techniques
-            .iter()
-            .filter(|t| t.severity >= 7)
-            .collect();
-        assert!(!sandbox_techs.is_empty());
+        assert!(result.techniques.iter().any(|t| t.severity >= 7));
     }
 
     #[test]
     fn test_environment_fingerprinting() {
-        let data =
-            b"GetComputerNameA\x00GetUserNameW\x00NUMBER_OF_PROCESSORS\x00GetDiskFreeSpace\x00";
+        let data = b"GetComputerNameA\x00GetUserNameW\x00NUMBER_OF_PROCESSORS\x00GetDiskFreeSpace\x00";
         let result = detect_evasion(data);
         assert!(result
             .techniques
             .iter()
             .any(|t| t.category == EvasionCategory::EnvironmentCheck));
         // Should detect "multiple environment checks"
-        assert!(result
-            .techniques
-            .iter()
-            .any(|t| t.name.contains("Multiple")));
+        assert!(result.techniques.iter().any(|t| t.name.contains("Multiple")));
     }
 
     #[test]

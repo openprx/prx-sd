@@ -9,14 +9,14 @@ use prx_sd_core::rootkit::{self, RootkitScanResult};
 use prx_sd_core::ThreatLevel;
 
 /// Run the rootkit check command.
-pub async fn run(json: bool, _data_dir: &Path) -> Result<()> {
+pub fn run(json: bool, _data_dir: &Path) -> Result<()> {
     eprintln!("Checking for rootkit indicators...");
 
     let result = rootkit::scan_rootkit();
 
     if json {
-        let out = serde_json::to_string_pretty(&result)
-            .map_err(|e| anyhow::anyhow!("failed to serialize results: {e}"))?;
+        let out =
+            serde_json::to_string_pretty(&result).map_err(|e| anyhow::anyhow!("failed to serialize results: {e}"))?;
         println!("{out}");
     } else {
         print_result(&result);
@@ -54,11 +54,7 @@ fn print_result(result: &RootkitScanResult) {
             result.hidden_processes.len()
         );
         for hp in &result.hidden_processes {
-            println!(
-                "       PID {}: {}",
-                format!("{}", hp.pid).red(),
-                hp.detection_method
-            );
+            println!("       PID {}: {}", format!("{}", hp.pid).red(), hp.detection_method);
         }
     }
 

@@ -55,7 +55,11 @@ pub async fn sha256_file(path: &Path) -> Result<Vec<u8>> {
         if n == 0 {
             break;
         }
-        hasher.update(&buf[..n]);
+        // n is always <= buf.len() per the AsyncRead contract,
+        // but we use .get() to satisfy clippy::indexing_slicing.
+        if let Some(chunk) = buf.get(..n) {
+            hasher.update(chunk);
+        }
     }
 
     Ok(hasher.finalize().to_vec())
@@ -63,9 +67,11 @@ pub async fn sha256_file(path: &Path) -> Result<Vec<u8>> {
 
 /// Encode raw bytes as a lowercase hex string.
 fn hex_encode(bytes: &[u8]) -> String {
+    use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for &b in bytes {
-        s.push_str(&format!("{b:02x}"));
+        // write! to a String never fails, but we handle it for safety.
+        let _ = write!(s, "{b:02x}");
     }
     s
 }
@@ -78,10 +84,7 @@ mod tests {
     fn test_sha256_known_vector() {
         // SHA-256 of empty string
         let hash = sha256_hex(b"");
-        assert_eq!(
-            hash,
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        );
+        assert_eq!(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     }
 
     #[test]
@@ -94,10 +97,7 @@ mod tests {
     #[test]
     fn test_sha256_abc() {
         let hash = sha256_hex(b"abc");
-        assert_eq!(
-            hash,
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
+        assert_eq!(hash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
     #[test]

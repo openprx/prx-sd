@@ -13,24 +13,20 @@ use anyhow::{Context, Result};
 pub const EICAR_RULE: &str = include_str!("../../../signatures-db/yara/test/eicar.yar");
 
 /// Generic ransomware detection rules.
-pub const RANSOMWARE_RULE: &str =
-    include_str!("../../../signatures-db/yara/malware/ransomware.yar");
+pub const RANSOMWARE_RULE: &str = include_str!("../../../signatures-db/yara/malware/ransomware.yar");
 
 /// Linux-specific malware detection rules.
-pub const LINUX_MALWARE_RULE: &str =
-    include_str!("../../../signatures-db/yara/malware/linux_malware.yar");
+pub const LINUX_MALWARE_RULE: &str = include_str!("../../../signatures-db/yara/malware/linux_malware.yar");
 
 /// Cross-platform malware detection rules.
-pub const CROSS_PLATFORM_RULE: &str =
-    include_str!("../../../signatures-db/yara/malware/cross_platform.yar");
+pub const CROSS_PLATFORM_RULE: &str = include_str!("../../../signatures-db/yara/malware/cross_platform.yar");
 
 /// Common packer detection rules.
 pub const PACKER_RULE: &str = include_str!("../../../signatures-db/yara/packer/common_packers.yar");
 
 /// Embedded SHA-256 hash blocklist (compiled into binary).
-/// Format: "hex_hash malware_name" per line.
-pub const EMBEDDED_HASHES: &str =
-    include_str!("../../../signatures-db/hashes/sha256_blocklist.txt");
+/// Format: `hex_hash` `malware_name` per line.
+pub const EMBEDDED_HASHES: &str = include_str!("../../../signatures-db/hashes/sha256_blocklist.txt");
 
 /// Import embedded hashes into the signature database at `signatures_dir`.
 /// Skips if the database already has entries (avoids re-importing on every run).
@@ -50,12 +46,11 @@ pub fn import_embedded_hashes(signatures_dir: &std::path::Path) -> Result<usize>
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let parts: Vec<&str> = line.splitn(2, ' ').collect();
-        if parts.len() != 2 {
+        let Some((hex_str, name_str)) = line.split_once(' ') else {
             continue;
-        }
-        let hex = parts[0].trim();
-        let name = parts[1].trim().to_string();
+        };
+        let hex = hex_str.trim();
+        let name = name_str.trim().to_string();
         if let Ok(bytes) = decode_hex(hex) {
             entries.push((bytes, name));
         }
@@ -65,9 +60,7 @@ pub fn import_embedded_hashes(signatures_dir: &std::path::Path) -> Result<usize>
         return Ok(0);
     }
 
-    let count = db
-        .import_hashes(&entries)
-        .context("failed to import embedded hashes")?;
+    let count = db.import_hashes(&entries).context("failed to import embedded hashes")?;
     Ok(count)
 }
 
@@ -77,7 +70,10 @@ fn decode_hex(s: &str) -> Result<Vec<u8>> {
     }
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| anyhow::anyhow!("{e}")))
+        .map(|i| {
+            let pair = s.get(i..i + 2).ok_or_else(|| anyhow::anyhow!("index out of bounds"))?;
+            u8::from_str_radix(pair, 16).map_err(|e| anyhow::anyhow!("{e}"))
+        })
         .collect()
 }
 
@@ -117,6 +113,7 @@ pub fn write_embedded_rules(yara_dir: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]

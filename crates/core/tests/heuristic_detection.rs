@@ -5,6 +5,36 @@
 //! requires corroborating indicators to avoid false positives on legitimate
 //! compressed/encrypted files.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
@@ -87,12 +117,7 @@ async fn pe_with_injection_apis_triggers_heuristic() {
     let engine = setup_heuristic_only_engine(&tmp, 60);
 
     let pe = make_suspicious_pe(
-        &[
-            "VirtualAllocEx",
-            "WriteProcessMemory",
-            "CreateRemoteThread",
-            "cmd.exe",
-        ],
+        &["VirtualAllocEx", "WriteProcessMemory", "CreateRemoteThread", "cmd.exe"],
         true,
     );
     let path = tmp.path().join("injector.exe");
@@ -132,11 +157,7 @@ async fn low_entropy_text_file_is_clean() {
     let engine = setup_heuristic_only_engine(&tmp, 60);
 
     let path = tmp.path().join("readme.txt");
-    fs::write(
-        &path,
-        "This is a normal readme file with typical text content.",
-    )
-    .unwrap();
+    fs::write(&path, "This is a normal readme file with typical text content.").unwrap();
 
     let result = engine.scan_file(&path).await.expect("scan");
     assert_eq!(result.threat_level, ThreatLevel::Clean);

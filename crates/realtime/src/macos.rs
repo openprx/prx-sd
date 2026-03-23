@@ -56,10 +56,7 @@ impl MacOSMonitor {
         let mut results = Vec::new();
 
         // Handle rename events specially: notify may provide two paths (from, to)
-        if matches!(
-            event.kind,
-            EventKind::Modify(notify::event::ModifyKind::Name(_))
-        ) {
+        if matches!(event.kind, EventKind::Modify(notify::event::ModifyKind::Name(_))) {
             if event.paths.len() >= 2 {
                 results.push(FileEvent::Rename {
                     from: event.paths[0].clone(),
@@ -79,9 +76,9 @@ impl MacOSMonitor {
                     // FSEvents does not provide PID; set to 0
                     Some(FileEvent::Open { path, pid: 0 })
                 }
-                EventKind::Access(notify::event::AccessKind::Close(
-                    notify::event::AccessMode::Write,
-                )) => Some(FileEvent::CloseWrite { path }),
+                EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write)) => {
+                    Some(FileEvent::CloseWrite { path })
+                }
                 _ => None,
             };
 
@@ -104,27 +101,26 @@ impl FileSystemMonitor for MacOSMonitor {
         let tx = self.tx.clone();
         let running = self.running.clone();
 
-        let mut watcher =
-            notify::recommended_watcher(move |res: std::result::Result<Event, notify::Error>| {
-                if !running.load(Ordering::Relaxed) {
-                    return;
-                }
+        let mut watcher = notify::recommended_watcher(move |res: std::result::Result<Event, notify::Error>| {
+            if !running.load(Ordering::Relaxed) {
+                return;
+            }
 
-                match res {
-                    Ok(event) => {
-                        let file_events = Self::convert_event(event);
-                        for fe in file_events {
-                            // Use try_send to avoid blocking the FSEvents callback thread.
-                            // Events are dropped if the channel is full.
-                            let _ = tx.try_send(fe);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("macOS FSEvents watcher error: {e}");
+            match res {
+                Ok(event) => {
+                    let file_events = Self::convert_event(event);
+                    for fe in file_events {
+                        // Use try_send to avoid blocking the FSEvents callback thread.
+                        // Events are dropped if the channel is full.
+                        let _ = tx.try_send(fe);
                     }
                 }
-            })
-            .context("failed to create macOS FSEvents watcher")?;
+                Err(e) => {
+                    tracing::error!("macOS FSEvents watcher error: {e}");
+                }
+            }
+        })
+        .context("failed to create macOS FSEvents watcher")?;
 
         for path in paths {
             watcher
@@ -135,10 +131,7 @@ impl FileSystemMonitor for MacOSMonitor {
         self.running.store(true, Ordering::Release);
         self.watcher = Some(watcher);
 
-        tracing::info!(
-            "macOS FSEvents monitor started, watching {} path(s)",
-            paths.len()
-        );
+        tracing::info!("macOS FSEvents monitor started, watching {} path(s)", paths.len());
 
         Ok(())
     }

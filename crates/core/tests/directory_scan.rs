@@ -4,6 +4,36 @@
 //! traversal, exclusion filtering, file-size limits, and mixed-threat
 //! detection within a directory tree.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use std::fs;
 
 use prx_sd_core::{ScanConfig, ScanEngine, ThreatLevel};
@@ -45,10 +75,7 @@ fn test_scan_directory_mixed() {
 
     let engine = setup_engine(
         &tmp,
-        &[
-            (MALWARE_A, "Test.Malware.Alpha"),
-            (MALWARE_B, "Test.Malware.Bravo"),
-        ],
+        &[(MALWARE_A, "Test.Malware.Alpha"), (MALWARE_B, "Test.Malware.Bravo")],
     );
 
     // Create a scan target directory with 5 clean + 2 malicious files.
@@ -78,11 +105,7 @@ fn test_scan_directory_mixed() {
         .filter(|r| r.threat_level == ThreatLevel::Clean)
         .collect();
 
-    assert_eq!(
-        malicious.len(),
-        2,
-        "should detect exactly 2 malicious files"
-    );
+    assert_eq!(malicious.len(), 2, "should detect exactly 2 malicious files");
     // The remaining files should be clean (heuristics should not trigger on
     // simple ASCII).  If heuristics mark them as Suspicious we still accept
     // that -- the key assertion is that the two malicious files are found.

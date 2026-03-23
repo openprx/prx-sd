@@ -18,9 +18,15 @@ pub fn shannon_entropy(data: &[u8]) -> f64 {
 
     let mut freq = [0u64; 256];
     for &byte in data {
-        freq[byte as usize] += 1;
+        // SAFETY: `byte` is `u8` so `byte as usize` is always in 0..=255,
+        // which is within bounds of the 256-element array.
+        #[allow(clippy::indexing_slicing)]
+        {
+            freq[byte as usize] += 1;
+        }
     }
 
+    #[allow(clippy::cast_precision_loss)]
     let len = data.len() as f64;
     let mut entropy = 0.0;
 
@@ -28,6 +34,7 @@ pub fn shannon_entropy(data: &[u8]) -> f64 {
         if count == 0 {
             continue;
         }
+        #[allow(clippy::cast_precision_loss)]
         let p = count as f64 / len;
         entropy -= p * p.log2();
     }
@@ -54,6 +61,7 @@ pub fn block_entropy(data: &[u8], block_size: usize) -> Vec<f64> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 

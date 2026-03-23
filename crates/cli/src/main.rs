@@ -1,3 +1,5 @@
+// CLI binary — printing to stdout/stderr is the primary interface.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -42,7 +44,7 @@ pub enum ConfigAction {
     Show,
     /// Set a configuration key to a value.
     Set {
-        /// Configuration key (dot-separated, e.g. "scan.max_file_size").
+        /// Configuration key (dot-separated, e.g. "`scan.max_file_size`").
         key: String,
         /// New value for the key.
         value: String,
@@ -149,6 +151,42 @@ pub enum ScheduleAction {
     Status,
 }
 
+/// Subcommands for eBPF runtime management.
+#[derive(Subcommand)]
+pub enum RuntimeAction {
+    /// Show eBPF runtime status, capabilities, and event metrics.
+    Status,
+}
+
+/// Monitoring backend selection.
+#[derive(Clone, Debug, Default)]
+pub enum MonitorBackend {
+    /// Automatically pick the best backend (ebpf → fanotify → notify).
+    #[default]
+    Auto,
+    /// Cross-platform `notify` crate (inotify on Linux, `FSEvents` on macOS).
+    Notify,
+    /// eBPF-based kernel telemetry (Linux only, requires `--features ebpf`).
+    Ebpf,
+    /// Linux fanotify with permission-event blocking (requires `CAP_SYS_ADMIN`).
+    Fanotify,
+}
+
+impl std::str::FromStr for MonitorBackend {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "auto" => Ok(Self::Auto),
+            "notify" => Ok(Self::Notify),
+            "ebpf" => Ok(Self::Ebpf),
+            "fanotify" => Ok(Self::Fanotify),
+            other => Err(format!(
+                "unknown backend '{other}', expected: auto, notify, ebpf, fanotify"
+            )),
+        }
+    }
+}
+
 /// Subcommands for community threat intelligence sharing.
 #[derive(Subcommand)]
 pub enum CommunityAction {
@@ -199,6 +237,12 @@ enum Commands {
         /// Run as a background daemon.
         #[arg(long)]
         daemon: bool,
+        /// Monitoring backend: auto, notify, or ebpf.
+        #[arg(long, default_value = "auto")]
+        backend: MonitorBackend,
+        /// Path to an eBPF policy TOML file for runtime response rules.
+        #[arg(long)]
+        ebpf_policy: Option<PathBuf>,
     },
     /// Manage quarantined files.
     Quarantine {
@@ -226,12 +270,12 @@ enum Commands {
     Info,
     /// Import hash signatures from a blocklist file into the signature database.
     Import {
-        /// Path to the blocklist file (one "hex_hash malware_name" per line).
+        /// Path to the blocklist file (one "`hex_hash` `malware_name`" per line).
         path: PathBuf,
     },
-    /// Import ClamAV signature files (.cvd, .hdb, .hsb) into the database.
+    /// Import `ClamAV` signature files (.cvd, .hdb, .hsb) into the database.
     ImportClamav {
-        /// Paths to ClamAV signature files (main.cvd, daily.cvd, .hdb, .hsb).
+        /// Paths to `ClamAV` signature files (main.cvd, daily.cvd, .hdb, .hsb).
         #[arg(required = true)]
         paths: Vec<PathBuf>,
     },
@@ -260,6 +304,15 @@ enum Commands {
         /// Interval in hours between automatic signature updates.
         #[arg(long, default_value = "4")]
         update_hours: u32,
+        /// Enable eBPF-based runtime behaviour monitoring (Linux only).
+        #[arg(long)]
+        ebpf: bool,
+        /// If eBPF fails to start, continue with file-only monitoring instead of aborting.
+        #[arg(long)]
+        ebpf_fail_open: bool,
+        /// Path to an eBPF policy TOML file for runtime response rules.
+        #[arg(long)]
+        ebpf_policy: Option<PathBuf>,
     },
     /// Scan USB/removable devices.
     ScanUsb {
@@ -324,6 +377,11 @@ enum Commands {
         #[command(subcommand)]
         action: CommunityAction,
     },
+    /// Manage eBPF runtime (status, diagnostics).
+    Runtime {
+        #[command(subcommand)]
+        action: RuntimeAction,
+    },
     /// Start local DNS proxy with adblock + IOC + custom blocklist filtering.
     DnsProxy {
         /// Listen address (default: 127.0.0.1:53).
@@ -339,11 +397,7 @@ enum Commands {
 }
 
 #[derive(Parser)]
-#[command(
-    name = "sd",
-    version,
-    about = "PRX-SD: Open-source Rust antivirus engine"
-)]
+#[command(name = "sd", version, about = "PRX-SD: Open-source Rust antivirus engine")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -360,15 +414,15 @@ struct Cli {
 impl Cli {
     /// Resolve the data directory, creating it if it does not exist.
     fn resolve_data_dir(&self) -> Result<PathBuf> {
-        let dir = match &self.data_dir {
-            Some(d) => d.clone(),
-            None => {
+        let dir = self.data_dir.as_ref().map_or_else(
+            || {
                 let home = std::env::var("HOME")
                     .or_else(|_| std::env::var("USERPROFILE"))
                     .unwrap_or_else(|_| "/tmp".to_string());
                 PathBuf::from(home).join(".prx-sd")
-            }
-        };
+            },
+            Clone::clone,
+        );
         std::fs::create_dir_all(&dir)?;
         Ok(dir)
     }
@@ -402,8 +456,7 @@ fn first_run_setup(data_dir: &Path) -> Result<()> {
     eprintln!("  Created data directories at {}", data_dir.display());
 
     // 2. Write embedded YARA rules so basic detection works offline.
-    embedded_rules::write_embedded_rules(&yara_dir)
-        .context("failed to write embedded YARA rules")?;
+    embedded_rules::write_embedded_rules(&yara_dir).context("failed to write embedded YARA rules")?;
     eprintln!("  Installed built-in detection rules");
 
     // 3. Import embedded hash signatures (EICAR, WannaCry, etc.) into LMDB.
@@ -417,11 +470,10 @@ fn first_run_setup(data_dir: &Path) -> Result<()> {
     let config_path = data_dir.join("config.json");
     if !config_path.exists() {
         let config = prx_sd_core::ScanConfig::default()
-            .with_signatures_dir(signatures_dir.clone())
-            .with_yara_rules_dir(yara_dir.clone())
-            .with_quarantine_dir(quarantine_dir.clone());
-        let json =
-            serde_json::to_string_pretty(&config).context("failed to serialize default config")?;
+            .with_signatures_dir(signatures_dir)
+            .with_yara_rules_dir(yara_dir)
+            .with_quarantine_dir(quarantine_dir);
+        let json = serde_json::to_string_pretty(&config).context("failed to serialize default config")?;
         std::fs::write(&config_path, json).context("failed to write default config")?;
         eprintln!("  Created default configuration");
     }
@@ -489,27 +541,28 @@ async fn main() -> Result<()> {
             paths,
             block,
             daemon,
-        } => commands::realtime::run(paths, block, daemon, &data_dir).await,
-        Commands::Quarantine { action } => commands::quarantine::run(action, &data_dir).await,
+            backend,
+            ebpf_policy,
+        } => commands::realtime::run(paths, block, daemon, backend, ebpf_policy, &data_dir).await,
+        Commands::Quarantine { action } => commands::quarantine::run(action, &data_dir),
         Commands::Update {
             check_only,
             force,
             server_url,
         } => commands::update::run(check_only, force, server_url, &data_dir).await,
-        Commands::Config { action } => commands::config::run(action, &data_dir).await,
-        Commands::Info => commands::info::run(&data_dir).await,
-        Commands::Import { path } => commands::import::run(&path, &data_dir).await,
-        Commands::ImportClamav { paths } => commands::import_clamav::run(&paths, &data_dir).await,
+        Commands::Config { action } => commands::config::run(action, &data_dir),
+        Commands::Info => commands::info::run(&data_dir),
+        Commands::Import { path } => commands::import::run(&path, &data_dir),
+        Commands::ImportClamav { paths } => commands::import_clamav::run(&paths, &data_dir),
         Commands::Schedule { action } => match action {
-            ScheduleAction::Add {
-                scan_path,
-                frequency,
-            } => commands::schedule::run_add(&scan_path, &frequency, &data_dir).await,
-            ScheduleAction::Remove => commands::schedule::run_remove().await,
-            ScheduleAction::Status => commands::schedule::run_status().await,
+            ScheduleAction::Add { scan_path, frequency } => {
+                commands::schedule::run_add(&scan_path, &frequency, &data_dir)
+            }
+            ScheduleAction::Remove => commands::schedule::run_remove(),
+            ScheduleAction::Status => commands::schedule::run_status(),
         },
         Commands::Policy { action, key, value } => {
-            commands::policy::run(&action, key.as_deref(), value.as_deref(), &data_dir).await
+            commands::policy::run(&action, key.as_deref(), value.as_deref(), &data_dir)
         }
         Commands::ScanUsb {
             device,
@@ -518,55 +571,50 @@ async fn main() -> Result<()> {
         Commands::Daemon {
             paths,
             update_hours,
-        } => commands::daemon::run(&data_dir, paths, update_hours).await,
+            ebpf,
+            ebpf_fail_open,
+            ebpf_policy,
+        } => commands::daemon::run(&data_dir, paths, update_hours, ebpf, ebpf_fail_open, ebpf_policy).await,
         #[cfg(target_os = "linux")]
-        Commands::ScanMemory { pid, json } => commands::memscan::run(pid, json, &data_dir).await,
+        Commands::ScanMemory { pid, json } => commands::memscan::run(pid, json, &data_dir),
         #[cfg(target_os = "linux")]
-        Commands::CheckRootkit { json } => commands::rootkit::run(json, &data_dir).await,
+        Commands::CheckRootkit { json } => commands::rootkit::run(json, &data_dir),
         Commands::Webhook { action } => match action {
-            WebhookAction::List => commands::webhook::run_list(&data_dir).await,
-            WebhookAction::Add { name, url, format } => {
-                commands::webhook::run_add(&name, &url, &format, &data_dir).await
-            }
-            WebhookAction::Remove { name } => commands::webhook::run_remove(&name, &data_dir).await,
+            WebhookAction::List => commands::webhook::run_list(&data_dir),
+            WebhookAction::Add { name, url, format } => commands::webhook::run_add(&name, &url, &format, &data_dir),
+            WebhookAction::Remove { name } => commands::webhook::run_remove(&name, &data_dir),
             WebhookAction::Test => commands::webhook::run_test(&data_dir).await,
         },
         Commands::EmailAlert { action } => match action {
-            EmailAlertAction::Configure => commands::email_alert::run_configure(&data_dir).await,
+            EmailAlertAction::Configure => commands::email_alert::run_configure(&data_dir),
             EmailAlertAction::Test => commands::email_alert::run_test(&data_dir).await,
             EmailAlertAction::Send {
                 threat_name,
                 threat_level,
                 file_path,
-            } => {
-                commands::email_alert::run_send(&threat_name, &threat_level, &file_path, &data_dir)
-                    .await
-            }
+            } => commands::email_alert::run_send(&threat_name, &threat_level, &file_path, &data_dir).await,
         },
-        Commands::Report { output, input } => commands::report::run(&output, &input).await,
-        Commands::Status => commands::status::run(&data_dir).await,
-        Commands::SelfUpdate { check_only } => {
-            commands::self_update::run(check_only, &data_dir).await
-        }
-        Commands::InstallIntegration => commands::integration::run(&data_dir).await,
+        Commands::Report { output, input } => commands::report::run(&output, &input),
+        Commands::Status => commands::status::run(&data_dir),
+        Commands::SelfUpdate { check_only } => commands::self_update::run(check_only, &data_dir).await,
+        Commands::InstallIntegration => commands::integration::run(&data_dir),
         Commands::Adblock { action } => match action {
-            AdblockAction::Enable => commands::adblock::run_enable(&data_dir).await,
-            AdblockAction::Disable => commands::adblock::run_disable(&data_dir).await,
-            AdblockAction::Sync => commands::adblock::run_sync(&data_dir).await,
-            AdblockAction::Stats => commands::adblock::run_stats(&data_dir).await,
-            AdblockAction::Check { url } => commands::adblock::run_check(&url, &data_dir).await,
-            AdblockAction::Log { count } => commands::adblock::run_log(&data_dir, count).await,
-            AdblockAction::Add {
-                name,
-                url,
-                category,
-            } => commands::adblock::run_add(&name, &url, &category, &data_dir).await,
-            AdblockAction::Remove { name } => commands::adblock::run_remove(&name, &data_dir).await,
+            AdblockAction::Enable => commands::adblock::run_enable(&data_dir),
+            AdblockAction::Disable => commands::adblock::run_disable(&data_dir),
+            AdblockAction::Sync => commands::adblock::run_sync(&data_dir),
+            AdblockAction::Stats => commands::adblock::run_stats(&data_dir),
+            AdblockAction::Check { url } => commands::adblock::run_check(&url, &data_dir),
+            AdblockAction::Log { count } => commands::adblock::run_log(&data_dir, count),
+            AdblockAction::Add { name, url, category } => commands::adblock::run_add(&name, &url, &category, &data_dir),
+            AdblockAction::Remove { name } => commands::adblock::run_remove(&name, &data_dir),
         },
         Commands::Community { action } => match action {
-            CommunityAction::Status => commands::community::run_status(&data_dir).await,
+            CommunityAction::Status => commands::community::run_status(&data_dir),
             CommunityAction::Enroll => commands::community::run_enroll(&data_dir).await,
-            CommunityAction::Disable => commands::community::run_disable(&data_dir).await,
+            CommunityAction::Disable => commands::community::run_disable(&data_dir),
+        },
+        Commands::Runtime { action } => match action {
+            RuntimeAction::Status => commands::runtime::run_status().await,
         },
         Commands::DnsProxy {
             listen,

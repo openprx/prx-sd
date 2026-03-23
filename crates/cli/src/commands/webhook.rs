@@ -47,21 +47,17 @@ impl WebhookConfig {
     pub fn load(data_dir: &Path) -> Result<Self> {
         let path = data_dir.join(WEBHOOK_FILE);
         if !path.exists() {
-            return Ok(Self {
-                webhooks: Vec::new(),
-            });
+            return Ok(Self { webhooks: Vec::new() });
         }
         let content = std::fs::read_to_string(&path).context("failed to read webhooks.json")?;
-        let config: Self =
-            serde_json::from_str(&content).context("failed to parse webhooks.json")?;
+        let config: Self = serde_json::from_str(&content).context("failed to parse webhooks.json")?;
         Ok(config)
     }
 
     /// Persist webhook configuration to `data_dir/webhooks.json`.
     pub fn save(&self, data_dir: &Path) -> Result<()> {
         let path = data_dir.join(WEBHOOK_FILE);
-        let json =
-            serde_json::to_string_pretty(self).context("failed to serialize webhook config")?;
+        let json = serde_json::to_string_pretty(self).context("failed to serialize webhook config")?;
         std::fs::write(&path, json).context("failed to write webhooks.json")?;
         Ok(())
     }
@@ -102,7 +98,7 @@ pub fn format_discord_payload(alert: &ThreatAlert) -> serde_json::Value {
     serde_json::json!({
         "embeds": [{
             "title": "\u{1f6a8} PRX-SD Threat Alert",
-            "color": 16711680,
+            "color": 16_711_680,
             "fields": [
                 { "name": "Threat", "value": &alert.threat_name, "inline": true },
                 { "name": "Level", "value": &alert.threat_level, "inline": true },
@@ -158,10 +154,7 @@ pub async fn send_alert(config: &WebhookConfig, alert: &ThreatAlert) -> Result<(
                 if !resp.status().is_success() {
                     let status = resp.status();
                     let body = resp.text().await.unwrap_or_default();
-                    errors.push(format!(
-                        "webhook '{}': HTTP {} — {}",
-                        endpoint.name, status, body
-                    ));
+                    errors.push(format!("webhook '{}': HTTP {} — {}", endpoint.name, status, body));
                 }
             }
             Err(e) => {
@@ -173,10 +166,7 @@ pub async fn send_alert(config: &WebhookConfig, alert: &ThreatAlert) -> Result<(
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!(
-            "some webhooks failed:\n{}",
-            errors.join("\n")
-        ))
+        Err(anyhow::anyhow!("some webhooks failed:\n{}", errors.join("\n")))
     }
 }
 
@@ -187,23 +177,20 @@ fn parse_format(s: &str) -> Result<WebhookFormat> {
         "discord" => Ok(WebhookFormat::Discord),
         "generic" | "json" => Ok(WebhookFormat::Generic),
         other => Err(anyhow::anyhow!(
-            "unknown webhook format '{}'. Expected: slack, discord, generic",
-            other
+            "unknown webhook format '{other}'. Expected: slack, discord, generic"
         )),
     }
 }
 
 /// Get the current hostname.
 fn get_hostname() -> String {
-    std::fs::read_to_string("/etc/hostname")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "unknown".to_string())
+    std::fs::read_to_string("/etc/hostname").map_or_else(|_| "unknown".to_string(), |s| s.trim().to_string())
 }
 
 // ── CLI handlers ──────────────────────────────────────────────────────
 
 /// List all configured webhook endpoints.
-pub async fn run_list(data_dir: &Path) -> Result<()> {
+pub fn run_list(data_dir: &Path) -> Result<()> {
     let config = WebhookConfig::load(data_dir)?;
 
     if config.webhooks.is_empty() {
@@ -229,13 +216,13 @@ pub async fn run_list(data_dir: &Path) -> Result<()> {
 }
 
 /// Add a new webhook endpoint.
-pub async fn run_add(name: &str, url: &str, format: &str, data_dir: &Path) -> Result<()> {
+pub fn run_add(name: &str, url: &str, format: &str, data_dir: &Path) -> Result<()> {
     let fmt = parse_format(format)?;
     let mut config = WebhookConfig::load(data_dir)?;
 
     // Check for duplicate names.
     if config.webhooks.iter().any(|w| w.name == name) {
-        return Err(anyhow::anyhow!("a webhook named '{}' already exists", name));
+        return Err(anyhow::anyhow!("a webhook named '{name}' already exists"));
     }
 
     config.webhooks.push(WebhookEndpoint {
@@ -246,22 +233,22 @@ pub async fn run_add(name: &str, url: &str, format: &str, data_dir: &Path) -> Re
     });
 
     config.save(data_dir)?;
-    println!("Added webhook '{}'.", name);
+    println!("Added webhook '{name}'.");
     Ok(())
 }
 
 /// Remove a webhook endpoint by name.
-pub async fn run_remove(name: &str, data_dir: &Path) -> Result<()> {
+pub fn run_remove(name: &str, data_dir: &Path) -> Result<()> {
     let mut config = WebhookConfig::load(data_dir)?;
     let before = config.webhooks.len();
     config.webhooks.retain(|w| w.name != name);
 
     if config.webhooks.len() == before {
-        return Err(anyhow::anyhow!("no webhook named '{}' found", name));
+        return Err(anyhow::anyhow!("no webhook named '{name}' found"));
     }
 
     config.save(data_dir)?;
-    println!("Removed webhook '{}'.", name);
+    println!("Removed webhook '{name}'.");
     Ok(())
 }
 
@@ -285,10 +272,7 @@ pub async fn run_test(data_dir: &Path) -> Result<()> {
         action_taken: "Test — no action taken".to_string(),
     };
 
-    println!(
-        "Sending test alert to {} enabled endpoint(s)...",
-        enabled_count
-    );
+    println!("Sending test alert to {enabled_count} enabled endpoint(s)...");
 
     match send_alert(&config, &alert).await {
         Ok(()) => {

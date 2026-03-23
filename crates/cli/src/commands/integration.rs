@@ -5,16 +5,13 @@ use anyhow::{Context, Result};
 /// File manager integration asset files, embedded at compile time.
 #[cfg(target_os = "linux")]
 mod assets {
-    pub const NAUTILUS_SCRIPT: &str =
-        include_str!("../../../../packaging/filemanager/nautilus/prx-sd-scan");
-    pub const DOLPHIN_DESKTOP: &str =
-        include_str!("../../../../packaging/filemanager/dolphin/prx-sd-scan.desktop");
-    pub const NEMO_ACTION: &str =
-        include_str!("../../../../packaging/filemanager/nemo/prx-sd-scan.nemo_action");
+    pub const NAUTILUS_SCRIPT: &str = include_str!("../../../../packaging/filemanager/nautilus/prx-sd-scan");
+    pub const DOLPHIN_DESKTOP: &str = include_str!("../../../../packaging/filemanager/dolphin/prx-sd-scan.desktop");
+    pub const NEMO_ACTION: &str = include_str!("../../../../packaging/filemanager/nemo/prx-sd-scan.nemo_action");
 }
 
 /// Install file manager right-click scan integration for the current platform.
-pub async fn run(_data_dir: &Path) -> Result<()> {
+pub fn run(_data_dir: &Path) -> Result<()> {
     #[cfg(target_os = "linux")]
     {
         install_linux()?;
@@ -48,12 +45,7 @@ fn install_linux() -> Result<()> {
 
     // Nautilus (GNOME Files)
     let nautilus_dir = home.join(".local/share/nautilus/scripts");
-    if let Err(e) = install_file(
-        &nautilus_dir,
-        "Scan with PRX-SD",
-        assets::NAUTILUS_SCRIPT,
-        true,
-    ) {
+    if let Err(e) = install_file(&nautilus_dir, "Scan with PRX-SD", assets::NAUTILUS_SCRIPT, true) {
         tracing::debug!("Skipping Nautilus integration: {e:#}");
     } else {
         eprintln!("  Installed Nautilus (GNOME Files) integration");
@@ -62,12 +54,7 @@ fn install_linux() -> Result<()> {
 
     // Dolphin (KDE)
     let dolphin_dir = home.join(".local/share/kservices5/ServiceMenus");
-    if let Err(e) = install_file(
-        &dolphin_dir,
-        "prx-sd-scan.desktop",
-        assets::DOLPHIN_DESKTOP,
-        false,
-    ) {
+    if let Err(e) = install_file(&dolphin_dir, "prx-sd-scan.desktop", assets::DOLPHIN_DESKTOP, false) {
         tracing::debug!("Skipping Dolphin integration: {e:#}");
     } else {
         eprintln!("  Installed Dolphin (KDE) integration");
@@ -76,12 +63,7 @@ fn install_linux() -> Result<()> {
 
     // Nemo (Cinnamon)
     let nemo_dir = home.join(".local/share/nemo/actions");
-    if let Err(e) = install_file(
-        &nemo_dir,
-        "prx-sd-scan.nemo_action",
-        assets::NEMO_ACTION,
-        false,
-    ) {
+    if let Err(e) = install_file(&nemo_dir, "prx-sd-scan.nemo_action", assets::NEMO_ACTION, false) {
         tracing::debug!("Skipping Nemo integration: {e:#}");
     } else {
         eprintln!("  Installed Nemo (Cinnamon) integration");
@@ -113,22 +95,17 @@ fn install_macos() -> Result<()> {
     let services_dir = Path::new(&home).join("Library/Services");
     let workflow_dir = services_dir.join("Scan with PRX-SD.workflow/Contents");
 
-    std::fs::create_dir_all(&workflow_dir)
-        .context("failed to create workflow directory in ~/Library/Services")?;
+    std::fs::create_dir_all(&workflow_dir).context("failed to create workflow directory in ~/Library/Services")?;
 
     // Write Info.plist
-    let info_plist = include_str!(
-        "../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/Info.plist"
-    );
-    std::fs::write(workflow_dir.join("Info.plist"), info_plist)
-        .context("failed to write Info.plist")?;
+    let info_plist =
+        include_str!("../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/Info.plist");
+    std::fs::write(workflow_dir.join("Info.plist"), info_plist).context("failed to write Info.plist")?;
 
     // Write document.wflow
-    let document_wflow = include_str!(
-        "../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/document.wflow"
-    );
-    std::fs::write(workflow_dir.join("document.wflow"), document_wflow)
-        .context("failed to write document.wflow")?;
+    let document_wflow =
+        include_str!("../../../../packaging/filemanager/macos/Scan with PRX-SD.workflow/Contents/document.wflow");
+    std::fs::write(workflow_dir.join("document.wflow"), document_wflow).context("failed to write document.wflow")?;
 
     eprintln!("  Installed Finder Quick Action: \"Scan with PRX-SD\"");
     eprintln!();
@@ -141,12 +118,10 @@ fn install_macos() -> Result<()> {
 /// Write a file into the given directory, creating the directory if needed.
 #[cfg(target_os = "linux")]
 fn install_file(dir: &Path, filename: &str, content: &str, executable: bool) -> Result<()> {
-    std::fs::create_dir_all(dir)
-        .with_context(|| format!("failed to create directory {}", dir.display()))?;
+    std::fs::create_dir_all(dir).with_context(|| format!("failed to create directory {}", dir.display()))?;
 
     let dest = dir.join(filename);
-    std::fs::write(&dest, content)
-        .with_context(|| format!("failed to write {}", dest.display()))?;
+    std::fs::write(&dest, content).with_context(|| format!("failed to write {}", dest.display()))?;
 
     if executable {
         #[cfg(unix)]

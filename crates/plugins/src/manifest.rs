@@ -54,8 +54,8 @@ impl Default for PluginPermissions {
 impl PluginManifest {
     /// Load a manifest from a `plugin.json` file.
     pub fn load(path: &Path) -> Result<Self> {
-        let contents = std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read manifest at {}", path.display()))?;
+        let contents =
+            std::fs::read_to_string(path).with_context(|| format!("failed to read manifest at {}", path.display()))?;
         let manifest: Self = serde_json::from_str(&contents)
             .with_context(|| format!("failed to parse manifest at {}", path.display()))?;
         Ok(manifest)
@@ -79,7 +79,7 @@ impl PluginManifest {
     }
 }
 
-fn current_platform() -> &'static str {
+const fn current_platform() -> &'static str {
     if cfg!(target_os = "linux") {
         "linux"
     } else if cfg!(target_os = "macos") {

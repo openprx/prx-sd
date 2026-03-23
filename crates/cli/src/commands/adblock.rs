@@ -16,7 +16,7 @@ use colored::Colorize;
 use prx_sd_realtime::adblock_filter::{AdblockCategory, AdblockFilterManager};
 
 /// Returns the platform-specific hosts file path for display purposes.
-fn hosts_file_display() -> &'static str {
+const fn hosts_file_display() -> &'static str {
     #[cfg(target_os = "windows")]
     {
         r"C:\Windows\System32\drivers\etc\hosts"
@@ -28,7 +28,7 @@ fn hosts_file_display() -> &'static str {
 }
 
 /// Returns the platform-specific hint for running with elevated privileges.
-fn elevate_hint() -> &'static str {
+const fn elevate_hint() -> &'static str {
     #[cfg(target_os = "windows")]
     {
         "Try running as Administrator"
@@ -62,26 +62,19 @@ pub fn log_blocked(data_dir: &Path, domain: &str, url: &str, category: &str, sou
         "source": source,
         "action": "blocked",
     });
-    if let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        let _ = writeln!(f, "{}", record);
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{record}");
     }
 }
 
 /// `sd adblock enable` — download lists + install hosts file blocking.
-pub async fn run_enable(data_dir: &Path) -> Result<()> {
+pub fn run_enable(data_dir: &Path) -> Result<()> {
     println!("{} Enabling adblock protection...", ">>>".cyan().bold());
 
     // 1. Init and sync lists
     let mgr = init_manager(data_dir)?;
     let stats = mgr.stats();
-    println!(
-        "  Loaded {} lists ({} rules)",
-        stats.list_count, stats.total_rules
-    );
+    println!("  Loaded {} lists ({} rules)", stats.list_count, stats.total_rules);
 
     // 2. Generate hosts file entries from adblock engine
     // We use the dns_filter module to write entries to /etc/hosts
@@ -95,24 +88,17 @@ pub async fn run_enable(data_dir: &Path) -> Result<()> {
             if let Ok(content) = std::fs::read_to_string(entry.path()) {
                 for line in content.lines() {
                     let line = line.trim();
-                    if line.is_empty()
-                        || line.starts_with('!')
-                        || line.starts_with('#')
-                        || line.starts_with('[')
-                    {
+                    if line.is_empty() || line.starts_with('!') || line.starts_with('#') || line.starts_with('[') {
                         continue;
                     }
                     // Extract domain from ABP rule "||domain.com^"
-                    if let Some(rest) = line.strip_prefix("||") {
-                        if let Some(domain) = rest.strip_suffix('^') {
-                            dns.add_domain(domain);
-                        }
+                    if let Some(domain) = line.strip_prefix("||").and_then(|rest| rest.strip_suffix('^')) {
+                        dns.add_domain(domain);
                     }
                     // Extract domain from hosts line "0.0.0.0 domain.com"
-                    if line.starts_with("0.0.0.0 ") || line.starts_with("127.0.0.1 ") {
-                        if let Some(domain) = line.split_whitespace().nth(1) {
-                            dns.add_domain(domain);
-                        }
+                    let is_hosts_entry = line.starts_with("0.0.0.0 ") || line.starts_with("127.0.0.1 ");
+                    if let Some(domain) = is_hosts_entry.then(|| line.split_whitespace().nth(1)).flatten() {
+                        dns.add_domain(domain);
                     }
                 }
             }
@@ -152,7 +138,7 @@ pub async fn run_enable(data_dir: &Path) -> Result<()> {
 }
 
 /// `sd adblock disable` — remove hosts file blocking entries.
-pub async fn run_disable(data_dir: &Path) -> Result<()> {
+pub fn run_disable(data_dir: &Path) -> Result<()> {
     let mut dns = prx_sd_realtime::DnsFilter::new();
     dns.remove_hosts_blocking()?;
     let flag = adblock_dir(data_dir).join("enabled");
@@ -162,7 +148,7 @@ pub async fn run_disable(data_dir: &Path) -> Result<()> {
 }
 
 /// `sd adblock sync` — force re-download all lists.
-pub async fn run_sync(data_dir: &Path) -> Result<()> {
+pub fn run_sync(data_dir: &Path) -> Result<()> {
     println!("{} Syncing adblock filter lists...", ">>>".cyan().bold());
     let mut mgr = init_manager(data_dir)?;
     let downloaded = mgr.sync()?;
@@ -181,14 +167,14 @@ pub async fn run_sync(data_dir: &Path) -> Result<()> {
     let flag = adblock_dir(data_dir).join("enabled");
     if flag.exists() {
         println!("  Re-applying DNS blocking with updated lists...");
-        run_enable(data_dir).await.ok();
+        run_enable(data_dir).ok();
     }
 
     Ok(())
 }
 
 /// `sd adblock stats` — show engine statistics.
-pub async fn run_stats(data_dir: &Path) -> Result<()> {
+pub fn run_stats(data_dir: &Path) -> Result<()> {
     let mgr = init_manager(data_dir)?;
     let stats = mgr.stats();
     let enabled = adblock_dir(data_dir).join("enabled").exists();
@@ -205,18 +191,13 @@ pub async fn run_stats(data_dir: &Path) -> Result<()> {
     println!("  Lists loaded:  {}", stats.list_count);
     println!("  Total rules:   {}", stats.total_rules);
     println!("  Cache dir:     {}", stats.cache_dir);
-    println!(
-        "  Last sync:     {}",
-        stats.last_sync.as_deref().unwrap_or("never")
-    );
+    println!("  Last sync:     {}", stats.last_sync.as_deref().unwrap_or("never"));
 
     // Show log stats
     let log = log_path(data_dir);
     if log.exists() {
-        let count = std::fs::read_to_string(&log)
-            .map(|c| c.lines().count())
-            .unwrap_or(0);
-        println!("  Blocked log:   {} entries", count);
+        let count = std::fs::read_to_string(&log).map(|c| c.lines().count()).unwrap_or(0);
+        println!("  Blocked log:   {count} entries");
     }
 
     println!();
@@ -227,7 +208,7 @@ pub async fn run_stats(data_dir: &Path) -> Result<()> {
 }
 
 /// `sd adblock check <url>` — check if a URL/domain is blocked.
-pub async fn run_check(url: &str, data_dir: &Path) -> Result<()> {
+pub fn run_check(url: &str, data_dir: &Path) -> Result<()> {
     let mgr = init_manager(data_dir)?;
 
     let full_url = if url.contains("://") {
@@ -255,7 +236,7 @@ pub async fn run_check(url: &str, data_dir: &Path) -> Result<()> {
 }
 
 /// `sd adblock log` — show recent blocked entries.
-pub async fn run_log(data_dir: &Path, count: usize) -> Result<()> {
+pub fn run_log(data_dir: &Path, count: usize) -> Result<()> {
     let log = log_path(data_dir);
     if !log.exists() {
         println!("No adblock log entries yet.");
@@ -276,22 +257,16 @@ pub async fn run_log(data_dir: &Path, count: usize) -> Result<()> {
     );
     println!();
 
-    for line in &lines[start..] {
+    for line in lines.get(start..).unwrap_or_default() {
         if let Ok(record) = serde_json::from_str::<serde_json::Value>(line) {
-            let ts = record
-                .get("timestamp")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
+            let ts = record.get("timestamp").and_then(|v| v.as_str()).unwrap_or("?");
             let domain = record.get("domain").and_then(|v| v.as_str()).unwrap_or("?");
-            let cat = record
-                .get("category")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
+            let cat = record.get("category").and_then(|v| v.as_str()).unwrap_or("?");
             let source = record.get("source").and_then(|v| v.as_str()).unwrap_or("?");
             println!(
                 "  {} {} {:30} [{}] ({})",
                 "🚫".red(),
-                &ts[..19.min(ts.len())],
+                ts.get(..19.min(ts.len())).unwrap_or(ts),
                 domain,
                 cat,
                 source,
@@ -303,7 +278,7 @@ pub async fn run_log(data_dir: &Path, count: usize) -> Result<()> {
 }
 
 /// `sd adblock add <name> <url>` — add a custom filter list.
-pub async fn run_add(name: &str, url: &str, category: &str, data_dir: &Path) -> Result<()> {
+pub fn run_add(name: &str, url: &str, category: &str, data_dir: &Path) -> Result<()> {
     let cat = match category.to_lowercase().as_str() {
         "ads" => AdblockCategory::Ads,
         "tracking" => AdblockCategory::Tracking,
@@ -314,17 +289,12 @@ pub async fn run_add(name: &str, url: &str, category: &str, data_dir: &Path) -> 
 
     let mut mgr = init_manager(data_dir)?;
     let rules = mgr.add_source(name, url, cat)?;
-    println!(
-        "{} Added '{}': {} rules loaded",
-        "success:".green().bold(),
-        name,
-        rules,
-    );
+    println!("{} Added '{}': {} rules loaded", "success:".green().bold(), name, rules,);
     Ok(())
 }
 
 /// `sd adblock remove <name>` — remove a filter list.
-pub async fn run_remove(name: &str, data_dir: &Path) -> Result<()> {
+pub fn run_remove(name: &str, data_dir: &Path) -> Result<()> {
     let mut mgr = init_manager(data_dir)?;
     mgr.remove_source(name)?;
     println!("{} Removed '{}'", "success:".green().bold(), name);

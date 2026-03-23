@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -53,18 +54,13 @@ fn load_server_url(data_dir: &Path) -> String {
     DEFAULT_SERVER_URL.to_string()
 }
 
-pub async fn run(
-    check_only: bool,
-    force: bool,
-    server_url: Option<String>,
-    data_dir: &Path,
-) -> Result<()> {
+pub async fn run(check_only: bool, force: bool, server_url: Option<String>, data_dir: &Path) -> Result<()> {
     let base_url = server_url.unwrap_or_else(|| load_server_url(data_dir));
     let local_version = read_local_version(data_dir);
 
     println!("{} Checking for signature updates...", ">>>".cyan().bold());
-    println!("  Server:        {}", base_url);
-    println!("  Local version: {}", local_version);
+    println!("  Server:        {base_url}");
+    println!("  Local version: {local_version}");
 
     // Fetch manifest from the update server.
     let manifest_url = format!("{}/manifest.json", base_url.trim_end_matches('/'));
@@ -131,12 +127,10 @@ pub async fn run(
 
     let pb = ProgressBar::new(manifest.size);
     pb.set_style(
-        match ProgressStyle::with_template(
+        ProgressStyle::with_template(
             "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})",
-        ) {
-            Ok(style) => style.progress_chars("#>-"),
-            Err(_) => ProgressStyle::default_bar(),
-        },
+        )
+        .map_or_else(|_| ProgressStyle::default_bar(), |style| style.progress_chars("#>-")),
     );
 
     let response = client
@@ -147,10 +141,7 @@ pub async fn run(
         .error_for_status()
         .context("update download failed")?;
 
-    let bytes = response
-        .bytes()
-        .await
-        .context("failed to read update payload body")?;
+    let bytes = response.bytes().await.context("failed to read update payload body")?;
 
     pb.set_position(bytes.len() as u64);
     pb.finish_and_clear();
@@ -161,16 +152,12 @@ pub async fn run(
         let mut hasher = Sha256::new();
         hasher.update(&bytes);
         let hash_bytes = hasher.finalize();
-        let digest = hash_bytes
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>();
+        let digest = hash_bytes.iter().fold(String::new(), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        });
         if digest != manifest.sha256 {
-            anyhow::bail!(
-                "SHA-256 mismatch: expected {}, got {}",
-                manifest.sha256,
-                digest
-            );
+            anyhow::bail!("SHA-256 mismatch: expected {}, got {}", manifest.sha256, digest);
         }
         println!("  {} SHA-256 verified", "OK".green());
     }
@@ -185,11 +172,7 @@ pub async fn run(
     // Update version marker.
     write_local_version(data_dir, manifest.version)?;
 
-    println!(
-        "\n{} Signatures updated to v{}.",
-        "OK".green().bold(),
-        manifest.version
-    );
+    println!("\n{} Signatures updated to v{}.", "OK".green().bold(), manifest.version);
 
     Ok(())
 }

@@ -2,6 +2,7 @@
 //!
 //! These tests spawn the actual binary and verify command-line behavior.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 use assert_cmd::Command;
 use predicates::prelude::*;
 use sha2::{Digest, Sha256};
@@ -23,11 +24,7 @@ fn setup_data_dir() -> tempfile::TempDir {
 
     // Write a trivial YARA rule so the yara dir is non-empty and
     // first_run_setup is skipped.
-    fs::write(
-        yara_dir.join("stub.yar"),
-        r#"rule Stub { condition: false }"#,
-    )
-    .unwrap();
+    fs::write(yara_dir.join("stub.yar"), r"rule Stub { condition: false }").unwrap();
 
     // Write a minimal config.json so first-run setup is skipped.
     let config = serde_json::json!({});
@@ -46,8 +43,12 @@ fn sd_cmd() -> Command {
 
 /// Compute the SHA-256 hex digest of the given data.
 fn sha256_hex(data: &[u8]) -> String {
+    use std::fmt::Write;
     let hash = Sha256::digest(data);
-    hash.iter().map(|b| format!("{b:02x}")).collect()
+    hash.iter().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    })
 }
 
 #[test]
@@ -180,12 +181,7 @@ fn quarantine_list_exits_success() {
     let data_dir = setup_data_dir();
 
     sd_cmd()
-        .args([
-            "--data-dir",
-            data_dir.path().to_str().unwrap(),
-            "quarantine",
-            "list",
-        ])
+        .args(["--data-dir", data_dir.path().to_str().unwrap(), "quarantine", "list"])
         .assert()
         .success();
 }
@@ -271,18 +267,13 @@ fn scan_with_auto_quarantine() {
 
     // The quarantine list should now show the entry.
     sd_cmd()
-        .args([
-            "--data-dir",
-            data_dir.path().to_str().unwrap(),
-            "quarantine",
-            "list",
-        ])
+        .args(["--data-dir", data_dir.path().to_str().unwrap(), "quarantine", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Test.Quarantine.AQ"));
 }
 
-/// 3. Import hash, scan with --json, verify JSON has threat_level "Malicious".
+/// 3. Import hash, scan with --json, verify JSON has `threat_level` "Malicious".
 #[test]
 fn scan_with_json_output_contains_threat() {
     let data_dir = setup_data_dir();
@@ -353,14 +344,8 @@ fn scan_with_report_generates_html() {
     assert!(report_path.exists(), "HTML report file must exist");
     let html = fs::read_to_string(&report_path).unwrap();
     assert!(html.contains("<!DOCTYPE html>"), "report must be HTML");
-    assert!(
-        html.contains("PRX-SD Scan Report"),
-        "report must have title"
-    );
-    assert!(
-        html.contains("Total Files"),
-        "report must show summary stats"
-    );
+    assert!(html.contains("PRX-SD Scan Report"), "report must have title");
+    assert!(html.contains("Total Files"), "report must show summary stats");
 }
 
 /// 5. Policy show → set → show (verify change) → reset.
@@ -378,14 +363,7 @@ fn policy_show_set_reset_flow() {
 
     // Set on_malicious to "kill,quarantine".
     sd_cmd()
-        .args([
-            "--data-dir",
-            dd,
-            "policy",
-            "set",
-            "on_malicious",
-            "kill,quarantine",
-        ])
+        .args(["--data-dir", dd, "policy", "set", "on_malicious", "kill,quarantine"])
         .assert()
         .success()
         .stdout(predicate::str::contains("policy updated"));
@@ -427,7 +405,7 @@ fn config_set_and_show() {
         .stdout(predicate::str::contains("test123"));
 }
 
-/// 7. Import ClamAV .hdb file with synthetic MD5 entries.
+/// 7. Import `ClamAV` .hdb file with synthetic MD5 entries.
 #[test]
 fn import_clamav_with_synthetic_hdb() {
     let data_dir = setup_data_dir();
@@ -476,13 +454,7 @@ fn quarantine_full_lifecycle() {
     fs::write(&malfile, malware_content).unwrap();
 
     sd_cmd()
-        .args([
-            "--data-dir",
-            dd,
-            "scan",
-            "--auto-quarantine",
-            malfile.to_str().unwrap(),
-        ])
+        .args(["--data-dir", dd, "scan", "--auto-quarantine", malfile.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Quarantined"));
@@ -559,11 +531,7 @@ rule E2E_Test_Malware {
 
     // Create a file containing the matching string.
     let target = data_dir.path().join("yara_target.bin");
-    fs::write(
-        &target,
-        b"some preamble YARA_E2E_DETECTION_MARKER_XYZ_42 some epilogue",
-    )
-    .unwrap();
+    fs::write(&target, b"some preamble YARA_E2E_DETECTION_MARKER_XYZ_42 some epilogue").unwrap();
 
     sd_cmd()
         .args([
@@ -655,7 +623,9 @@ fn scan_excludes_pattern() {
         .map(|v| v["path"].as_str().unwrap_or("").to_string())
         .collect();
     assert!(
-        !paths.iter().any(|p| p.ends_with(".log")),
+        !paths.iter().any(|p| std::path::Path::new(p)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))),
         "excluded .log file should not appear in scan results: {paths:?}"
     );
     assert!(
@@ -694,7 +664,7 @@ fn info_command_shows_database_stats() {
         .stdout(predicate::str::contains("3"));
 }
 
-/// 13. Import ClamAV synthetic CVD file (512-byte header + tar.gz with .hdb).
+/// 13. Import `ClamAV` synthetic CVD file (512-byte header + tar.gz with .hdb).
 #[test]
 fn import_clamav_with_synthetic_cvd() {
     use flate2::write::GzEncoder;

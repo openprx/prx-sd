@@ -44,9 +44,7 @@ fn hostname() -> String {
     #[cfg(unix)]
     {
         // Read /etc/hostname directly; no unwrap.
-        std::fs::read_to_string("/etc/hostname")
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|_| "unknown".to_string())
+        std::fs::read_to_string("/etc/hostname").map_or_else(|_| "unknown".to_string(), |s| s.trim().to_string())
     }
     #[cfg(not(unix))]
     {
@@ -61,10 +59,7 @@ fn hostname() -> String {
 pub async fn enroll_machine(config: &CommunityConfig) -> Result<EnrollResponse> {
     let client = build_http_client()?;
 
-    let url = format!(
-        "{}/api/v1/machines/enroll",
-        config.server_url.trim_end_matches('/')
-    );
+    let url = format!("{}/api/v1/machines/enroll", config.server_url.trim_end_matches('/'));
 
     let body = EnrollRequest {
         machine_name: hostname(),
@@ -86,10 +81,7 @@ pub async fn enroll_machine(config: &CommunityConfig) -> Result<EnrollResponse> 
         bail!("enrollment failed: HTTP {status} — {text}");
     }
 
-    let enrollment: EnrollResponse = resp
-        .json()
-        .await
-        .context("failed to parse enrollment response")?;
+    let enrollment: EnrollResponse = resp.json().await.context("failed to parse enrollment response")?;
 
     info!(
         machine_id = %enrollment.machine_id,

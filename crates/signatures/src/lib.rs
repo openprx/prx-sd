@@ -5,8 +5,8 @@
 //! Signature management crate for prx-sd.
 //!
 //! Provides hash computation, an LMDB-backed signature database, YARA rule
-//! scanning (stub), parsers for ClamAV signature formats (CVD, NDB, LDB,
-//! HDB, HSB), and a ClamAV CVD importer.
+//! scanning (stub), parsers for `ClamAV` signature formats (CVD, NDB, LDB,
+//! HDB, HSB), and a `ClamAV` CVD importer.
 
 pub mod clamav;
 pub mod database;

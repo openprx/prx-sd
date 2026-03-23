@@ -70,7 +70,7 @@ pub struct ProcessBehaviorScore {
 }
 
 impl ProcessBehaviorScore {
-    fn new(pid: u32, process_name: String) -> Self {
+    const fn new(pid: u32, process_name: String) -> Self {
         Self {
             pid,
             process_name,
@@ -83,7 +83,7 @@ impl ProcessBehaviorScore {
     }
 
     /// Recalculate the total score from counters.
-    fn recalculate(&mut self) {
+    const fn recalculate(&mut self) {
         // Weights: exec=5, connect=3, file_write=1, sensitive=10
         self.total_score = self
             .exec_count
@@ -169,12 +169,12 @@ impl BehaviorMonitor {
     }
 
     /// Return the current configuration.
-    pub fn config(&self) -> &BehaviorConfig {
+    pub const fn config(&self) -> &BehaviorConfig {
         &self.config
     }
 
     /// Return the current score map (for inspection / tests).
-    pub fn scores(&self) -> &HashMap<u32, ProcessBehaviorScore> {
+    pub const fn scores(&self) -> &HashMap<u32, ProcessBehaviorScore> {
         &self.process_scores
     }
 
@@ -197,7 +197,10 @@ impl BehaviorMonitor {
 
         // 1. Network connections
         let connections = check_network_connections(pid);
-        entry.connect_count = connections.len() as u32;
+        #[allow(clippy::cast_possible_truncation)] // connection count won't exceed u32::MAX
+        {
+            entry.connect_count = connections.len() as u32;
+        }
 
         // 2. Children (exec proxy)
         entry.exec_count = count_children(pid);
@@ -228,9 +231,8 @@ impl BehaviorMonitor {
 
     /// Build a verdict from the current score for `pid`.
     fn verdict_for(&self, pid: u32) -> BehaviorVerdict {
-        let entry = match self.process_scores.get(&pid) {
-            Some(e) => e,
-            None => return BehaviorVerdict::Clean,
+        let Some(entry) = self.process_scores.get(&pid) else {
+            return BehaviorVerdict::Clean;
         };
 
         let mut reasons = Vec::new();
@@ -238,22 +240,13 @@ impl BehaviorMonitor {
             reasons.push(format!("spawned {} child processes", entry.exec_count));
         }
         if entry.connect_count > 0 {
-            reasons.push(format!(
-                "{} active network connections",
-                entry.connect_count
-            ));
+            reasons.push(format!("{} active network connections", entry.connect_count));
         }
         if entry.file_write_count > 0 {
-            reasons.push(format!(
-                "{} writable file descriptors",
-                entry.file_write_count
-            ));
+            reasons.push(format!("{} writable file descriptors", entry.file_write_count));
         }
         if entry.sensitive_access > 0 {
-            reasons.push(format!(
-                "{} accesses to sensitive paths",
-                entry.sensitive_access
-            ));
+            reasons.push(format!("{} accesses to sensitive paths", entry.sensitive_access));
         }
 
         if entry.total_score >= self.config.score_threshold_malicious {
@@ -280,20 +273,17 @@ impl BehaviorMonitor {
 
 /// Best-effort process name from `/proc/{pid}/comm`.
 fn process_name_for_pid(pid: u32) -> String {
-    fs::read_to_string(format!("/proc/{pid}/comm"))
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| format!("pid:{pid}"))
+    fs::read_to_string(format!("/proc/{pid}/comm")).map_or_else(|_| format!("pid:{pid}"), |s| s.trim().to_string())
 }
 
 /// List all numeric PID entries in `/proc`.
 fn list_pids() -> Vec<u32> {
-    let entries = match fs::read_dir("/proc") {
-        Ok(e) => e,
-        Err(_) => return Vec::new(),
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Vec::new();
     };
 
     entries
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter_map(|e| e.file_name().to_str().and_then(|s| s.parse::<u32>().ok()))
         .collect()
 }
@@ -301,40 +291,37 @@ fn list_pids() -> Vec<u32> {
 /// Count child threads/tasks of a process via `/proc/{pid}/task`.
 fn count_children(pid: u32) -> u32 {
     let task_dir = format!("/proc/{pid}/task");
-    match fs::read_dir(task_dir) {
-        Ok(entries) => {
-            let count = entries.filter_map(|e| e.ok()).count();
-            // Subtract 1 for the main thread; saturate to avoid underflow.
-            (count as u32).saturating_sub(1)
-        }
-        Err(_) => 0,
-    }
+    fs::read_dir(task_dir).map_or(0, |entries| {
+        let count = entries.filter_map(std::result::Result::ok).count();
+        // Subtract 1 for the main thread; saturate to avoid underflow.
+        // Task count is bounded by OS limits, well within u32 range.
+        #[allow(clippy::cast_possible_truncation)]
+        let count_u32 = count as u32;
+        count_u32.saturating_sub(1)
+    })
 }
 
 /// Inspect `/proc/{pid}/fd` for:
-/// - writable file descriptors (write_count)
-/// - links pointing to sensitive paths (sensitive_count)
+/// - writable file descriptors (`write_count`)
+/// - links pointing to sensitive paths (`sensitive_count`)
 ///
 /// Returns `(file_write_count, sensitive_access_count)`.
 fn check_fd_activity(pid: u32, sensitive_paths: &[String]) -> (u32, u32) {
     let fd_dir = format!("/proc/{pid}/fd");
-    let entries = match fs::read_dir(&fd_dir) {
-        Ok(e) => e,
-        Err(_) => return (0, 0),
+    let Ok(entries) = fs::read_dir(&fd_dir) else {
+        return (0, 0);
     };
 
     let mut write_count: u32 = 0;
     let mut sensitive_count: u32 = 0;
 
-    for entry in entries.filter_map(|e| e.ok()) {
-        let link = match fs::read_link(entry.path()) {
-            Ok(l) => l,
-            Err(_) => continue,
+    for entry in entries.filter_map(std::result::Result::ok) {
+        let Ok(link) = fs::read_link(entry.path()) else {
+            continue;
         };
 
-        let link_str = match link.to_str() {
-            Some(s) => s,
-            None => continue,
+        let Some(link_str) = link.to_str() else {
+            continue;
         };
 
         // Skip stdin/stdout/stderr and special fds
@@ -376,9 +363,8 @@ pub fn check_network_connections(pid: u32) -> Vec<NetworkConnection> {
 
 /// Parse a `/proc/*/net/tcp` file at the given path.
 fn parse_proc_net_tcp(path: &str) -> Vec<NetworkConnection> {
-    let content = match fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(_) => return Vec::new(),
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
     };
 
     let mut connections = Vec::new();
@@ -391,10 +377,15 @@ fn parse_proc_net_tcp(path: &str) -> Vec<NetworkConnection> {
         }
 
         // fields[1] = local_address:port, fields[2] = rem_address:port, fields[3] = state
+        let (Some(&local_field), Some(&remote_field), Some(&state_field)) =
+            (fields.get(1), fields.get(2), fields.get(3))
+        else {
+            continue;
+        };
         if let (Some(local), Some(remote), Some(state)) = (
-            parse_hex_addr(fields[1]),
-            parse_hex_addr(fields[2]),
-            parse_hex_state(fields[3]),
+            parse_hex_addr(local_field),
+            parse_hex_addr(remote_field),
+            parse_hex_state(state_field),
         ) {
             connections.push(NetworkConnection {
                 local_addr: local.0,
@@ -410,14 +401,16 @@ fn parse_proc_net_tcp(path: &str) -> Vec<NetworkConnection> {
 }
 
 /// Parse a hex address:port pair like `0100007F:1F90`.
+#[allow(clippy::many_single_char_names)] // octet names a.b.c.d match IP notation
 fn parse_hex_addr(s: &str) -> Option<(String, u16)> {
     let parts: Vec<&str> = s.split(':').collect();
     if parts.len() != 2 {
         return None;
     }
 
-    let addr_u32 = u32::from_str_radix(parts[0], 16).ok()?;
-    let port = u16::from_str_radix(parts[1], 16).ok()?;
+    // Bounds-checked access for the two-element split result.
+    let addr_u32 = u32::from_str_radix(parts.first()?, 16).ok()?;
+    let port = u16::from_str_radix(parts.get(1)?, 16).ok()?;
 
     // /proc/net/tcp stores addresses in little-endian byte order on little-endian systems.
     let a = (addr_u32 & 0xFF) as u8;
@@ -444,9 +437,8 @@ fn parse_hex_state(s: &str) -> Option<u8> {
 ///
 /// Returns an empty vector if the file cannot be read.
 pub fn parse_audit_events(log_path: &Path) -> Vec<AuditEvent> {
-    let content = match fs::read_to_string(log_path) {
-        Ok(c) => c,
-        Err(_) => return Vec::new(),
+    let Ok(content) = fs::read_to_string(log_path) else {
+        return Vec::new();
     };
 
     let mut events = Vec::new();
@@ -521,13 +513,16 @@ fn extract_field(line: &str, key: &str) -> Option<String> {
             let rest = &line[value_start..];
 
             // Value may be quoted
-            return if let Some(stripped) = rest.strip_prefix('"') {
-                let end = stripped.find('"').unwrap_or(stripped.len());
-                Some(stripped[..end].to_string())
-            } else {
-                let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
-                Some(rest[..end].to_string())
-            };
+            return rest.strip_prefix('"').map_or_else(
+                || {
+                    let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
+                    Some(rest[..end].to_string())
+                },
+                |stripped| {
+                    let end = stripped.find('"').unwrap_or(stripped.len());
+                    Some(stripped[..end].to_string())
+                },
+            );
         }
 
         // Skip past this occurrence and keep searching
@@ -553,23 +548,21 @@ fn extract_audit_timestamp(line: &str) -> String {
 /// Check if a path resolves to a sensitive file by examining `/proc/{pid}/fd`.
 pub fn check_sensitive_file_access(pid: u32, sensitive_paths: &[String]) -> Vec<String> {
     let fd_dir = format!("/proc/{pid}/fd");
-    let entries = match fs::read_dir(&fd_dir) {
-        Ok(e) => e,
-        Err(_) => return Vec::new(),
+    let Ok(entries) = fs::read_dir(&fd_dir) else {
+        return Vec::new();
     };
 
     let mut accessed = Vec::new();
 
-    for entry in entries.filter_map(|e| e.ok()) {
-        let link = match fs::read_link(entry.path()) {
-            Ok(l) => l,
-            Err(_) => continue,
+    for entry in entries.filter_map(std::result::Result::ok) {
+        let Ok(link) = fs::read_link(entry.path()) else {
+            continue;
         };
 
-        let link_str = match link.to_str() {
-            Some(s) => s.to_string(),
-            None => continue,
+        let Some(link_str_ref) = link.to_str() else {
+            continue;
         };
+        let link_str = link_str_ref.to_string();
 
         for sp in sensitive_paths {
             if link_str.starts_with(sp.as_str()) {
@@ -586,6 +579,7 @@ pub fn check_sensitive_file_access(pid: u32, sensitive_paths: &[String]) -> Vec<
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
     use super::*;
     use std::io::Write;
 
@@ -675,10 +669,7 @@ mod tests {
     #[test]
     fn verdict_for_unknown_pid_is_clean() {
         let monitor = BehaviorMonitor::new(BehaviorConfig::default());
-        assert!(matches!(
-            monitor.verdict_for(999_999),
-            BehaviorVerdict::Clean
-        ));
+        assert!(matches!(monitor.verdict_for(999_999), BehaviorVerdict::Clean));
     }
 
     #[test]

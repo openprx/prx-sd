@@ -40,6 +40,7 @@ pub fn parse_macho(data: &[u8]) -> Result<MachOInfo> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn parse_single_macho(macho: &goblin::mach::MachO, data: &[u8]) -> Result<MachOInfo> {
     use goblin::mach::cputype;
 
@@ -87,7 +88,9 @@ fn parse_single_macho(macho: &goblin::mach::MachO, data: &[u8]) -> Result<MachOI
                             .trim_end_matches('\0'),
                     );
 
+                    #[allow(clippy::cast_possible_truncation)]
                     let offset = section.offset as usize;
+                    #[allow(clippy::cast_possible_truncation)]
                     let size = section.size as usize;
                     let section_data = data.get(offset..offset.saturating_add(size)).unwrap_or(&[]);
                     let entropy = shannon_entropy(section_data);
@@ -130,10 +133,11 @@ fn parse_single_macho(macho: &goblin::mach::MachO, data: &[u8]) -> Result<MachOI
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::doc_markdown, clippy::unreadable_literal)]
 mod tests {
     use super::*;
 
-    /// Build a minimal 64-bit Mach-O (x86_64, MH_EXECUTE).
+    /// Build a minimal 64-bit Mach-O (x86_64, `MH_EXECUTE`).
     /// Magic: 0xFEEDFACF, ncmds=0, sizeofcmds=0
     fn make_minimal_macho64() -> Vec<u8> {
         // Mach-O 64-bit header is 32 bytes

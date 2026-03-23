@@ -1,4 +1,4 @@
-//! ClamAV signature importer.
+//! `ClamAV` signature importer.
 //!
 //! Extracts hash-based signatures from `.cvd` container files and imports
 //! them into the LMDB signature database. Supports:
@@ -18,7 +18,7 @@ use crate::formats::hdb::{self, HashKind};
 use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 
-/// Statistics returned after a ClamAV import operation.
+/// Statistics returned after a `ClamAV` import operation.
 #[derive(Debug, Clone)]
 pub struct ClamavImportStats {
     /// CVD version number.
@@ -39,20 +39,21 @@ pub struct ClamavImportStats {
     pub parse_errors: usize,
 }
 
-/// Import hash signatures from a ClamAV `.cvd` file into the database.
+/// Import hash signatures from a `ClamAV` `.cvd` file into the database.
 ///
 /// Reads the CVD file, decompresses the tar.gz payload, scans for `.hdb`
 /// and `.hsb` files, and batch-imports their entries into LMDB.
 pub fn import_cvd(cvd_path: impl AsRef<Path>, db: &SignatureDatabase) -> Result<ClamavImportStats> {
     let cvd_path = cvd_path.as_ref();
-    let raw = std::fs::read(cvd_path)
-        .with_context(|| format!("failed to read CVD file: {}", cvd_path.display()))?;
+    let raw = std::fs::read(cvd_path).with_context(|| format!("failed to read CVD file: {}", cvd_path.display()))?;
 
     import_cvd_bytes(&raw, db)
 }
 
 /// Import hash signatures from raw CVD bytes into the database.
 pub fn import_cvd_bytes(data: &[u8], db: &SignatureDatabase) -> Result<ClamavImportStats> {
+    const BATCH_SIZE: usize = 50_000;
+
     let cvd = parse_cvd(data).context("failed to parse CVD header")?;
 
     tracing::info!(
@@ -84,8 +85,6 @@ pub fn import_cvd_bytes(data: &[u8], db: &SignatureDatabase) -> Result<ClamavImp
     let mut sha256_batch: Vec<(Vec<u8>, String)> = Vec::new();
     let mut md5_batch: Vec<(Vec<u8>, String)> = Vec::new();
 
-    const BATCH_SIZE: usize = 50_000;
-
     for entry_result in entries {
         let mut entry = match entry_result {
             Ok(e) => e,
@@ -104,7 +103,7 @@ pub fn import_cvd_bytes(data: &[u8], db: &SignatureDatabase) -> Result<ClamavImp
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_ascii_lowercase();
 
         match ext.as_str() {
@@ -134,12 +133,9 @@ pub fn import_cvd_bytes(data: &[u8], db: &SignatureDatabase) -> Result<ClamavImp
                 stats.parse_errors += sig_set.skipped;
 
                 for sig in &sig_set.entries {
-                    let hash_bytes = match hdb::decode_hex(&sig.hash_hex) {
-                        Some(b) => b,
-                        None => {
-                            stats.parse_errors += 1;
-                            continue;
-                        }
+                    let Some(hash_bytes) = hdb::decode_hex(&sig.hash_hex) else {
+                        stats.parse_errors += 1;
+                        continue;
                     };
 
                     match sig_set.kind {
@@ -227,13 +223,9 @@ pub fn import_cvd_bytes(data: &[u8], db: &SignatureDatabase) -> Result<ClamavImp
 
 /// Import hash signatures from a standalone `.hdb` or `.hsb` file
 /// (not wrapped in a CVD container).
-pub fn import_hash_file(
-    path: impl AsRef<Path>,
-    db: &SignatureDatabase,
-) -> Result<ClamavImportStats> {
+pub fn import_hash_file(path: impl AsRef<Path>, db: &SignatureDatabase) -> Result<ClamavImportStats> {
     let path = path.as_ref();
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read: {}", path.display()))?;
+    let content = std::fs::read_to_string(path).with_context(|| format!("failed to read: {}", path.display()))?;
 
     let ext = path
         .extension()
@@ -243,8 +235,8 @@ pub fn import_hash_file(
 
     let sig_set = match ext.as_str() {
         "hdb" => hdb::parse_hdb(&content)?,
-        "hsb" => hdb::parse_hsb(&content)?,
-        _ => hdb::parse_hsb(&content)?, // default: auto-detect by hash length
+        // .hsb and anything else: auto-detect by hash length
+        _ => hdb::parse_hsb(&content)?,
     };
 
     let mut stats = ClamavImportStats {
@@ -262,12 +254,9 @@ pub fn import_hash_file(
     let mut md5_batch: Vec<(Vec<u8>, String)> = Vec::new();
 
     for sig in &sig_set.entries {
-        let hash_bytes = match hdb::decode_hex(&sig.hash_hex) {
-            Some(b) => b,
-            None => {
-                stats.parse_errors += 1;
-                continue;
-            }
+        let Some(hash_bytes) = hdb::decode_hex(&sig.hash_hex) else {
+            stats.parse_errors += 1;
+            continue;
         };
 
         match sig_set.kind {
@@ -288,6 +277,7 @@ pub fn import_hash_file(
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::database::SignatureDatabase;

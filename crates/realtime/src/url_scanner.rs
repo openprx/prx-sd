@@ -46,18 +46,15 @@ pub struct UrlScanner {
 impl UrlScanner {
     /// Create a new `UrlScanner` with the default suspicious TLD and shortener lists.
     pub fn new() -> Self {
-        let suspicious_tlds: HashSet<String> = [
-            ".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top", ".buzz", ".click",
-        ]
-        .iter()
-        .map(|s| (*s).to_owned())
-        .collect();
+        let suspicious_tlds: HashSet<String> = [".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top", ".buzz", ".click"]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
 
-        let url_shorteners: HashSet<String> =
-            ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly"]
-                .iter()
-                .map(|s| (*s).to_owned())
-                .collect();
+        let url_shorteners: HashSet<String> = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly"]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
 
         Self {
             suspicious_tlds,
@@ -66,7 +63,7 @@ impl UrlScanner {
     }
 
     /// Create a `UrlScanner` with custom suspicious TLD and shortener lists.
-    pub fn with_lists(suspicious_tlds: HashSet<String>, url_shorteners: HashSet<String>) -> Self {
+    pub const fn with_lists(suspicious_tlds: HashSet<String>, url_shorteners: HashSet<String>) -> Self {
         Self {
             suspicious_tlds,
             url_shorteners,
@@ -86,9 +83,7 @@ impl UrlScanner {
         // The regex is intentionally permissive to catch obfuscated URLs in binaries.
         if let Ok(re) = Regex::new(r#"https?://[^\s<>"'`\x00-\x1f\x7f]{4,256}"#) {
             for m in re.find_iter(&text) {
-                let url = m.as_str().trim_end_matches(|c: char| {
-                    matches!(c, '.' | ',' | ';' | ')' | ']' | '}' | '>' | '\'')
-                });
+                let url = m.as_str().trim_end_matches(['.', ',', ';', ')', ']', '}', '>', '\'']);
                 let url_string = url.to_owned();
                 if seen.insert(url_string.clone()) {
                     urls.push(url_string);
@@ -99,20 +94,19 @@ impl UrlScanner {
         // Match bare IPv4 addresses (not already part of a URL above).
         if let Ok(re_ip) = Regex::new(r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b") {
             for cap in re_ip.captures_iter(&text) {
-                if let Some(m) = cap.get(1) {
-                    let ip_str = m.as_str();
-                    // Validate that octets are in range.
-                    let valid = ip_str
-                        .split('.')
-                        .filter_map(|octet| octet.parse::<u16>().ok())
-                        .filter(|&v| v <= 255)
-                        .count()
-                        == 4;
-                    if valid {
-                        let ip_string = ip_str.to_owned();
-                        if seen.insert(ip_string.clone()) {
-                            urls.push(ip_string);
-                        }
+                let Some(m) = cap.get(1) else { continue };
+                let ip_str = m.as_str();
+                // Validate that octets are in range.
+                let valid = ip_str
+                    .split('.')
+                    .filter_map(|octet| octet.parse::<u16>().ok())
+                    .filter(|&v| v <= 255)
+                    .count()
+                    == 4;
+                if valid {
+                    let ip_string = ip_str.to_owned();
+                    if seen.insert(ip_string.clone()) {
+                        urls.push(ip_string);
                     }
                 }
             }
@@ -218,9 +212,7 @@ impl Default for UrlScanner {
 /// Returns `None` if the URL does not contain a recognisable host.
 fn extract_domain_from_url(url: &str) -> Option<String> {
     // Strip scheme.
-    let after_scheme = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))?;
+    let after_scheme = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
 
     // Take everything before the first `/`, `?`, `#`, or `:` (port).
     let host = after_scheme.split(['/', '?', '#', ':']).next()?;
@@ -234,18 +226,14 @@ fn extract_domain_from_url(url: &str) -> Option<String> {
 
 /// Check whether a URL uses a bare IP address instead of a domain name.
 fn is_ip_based_url(url: &str) -> bool {
-    if let Some(domain) = extract_domain_from_url(url) {
-        // If domain parses as an IPv4 address, it's IP-based.
-        domain.parse::<std::net::Ipv4Addr>().is_ok()
-    } else {
-        false
-    }
+    extract_domain_from_url(url).is_some_and(|domain| domain.parse::<std::net::Ipv4Addr>().is_ok())
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]
@@ -274,12 +262,7 @@ mod tests {
     fn deduplicate_urls() {
         let data = b"http://dup.com http://dup.com http://dup.com";
         let urls = UrlScanner::extract_urls(data);
-        assert_eq!(
-            urls.iter()
-                .filter(|u| u.as_str() == "http://dup.com")
-                .count(),
-            1
-        );
+        assert_eq!(urls.iter().filter(|u| u.as_str() == "http://dup.com").count(), 1);
     }
 
     #[test]
@@ -297,10 +280,7 @@ mod tests {
         let scanner = UrlScanner::new();
         let data = b"click http://bit.ly/abc123 for prize";
         let result = scanner.scan_urls(data, None);
-        assert!(result
-            .malicious_urls
-            .iter()
-            .any(|m| m.reason.contains("shortener")));
+        assert!(result.malicious_urls.iter().any(|m| m.reason.contains("shortener")));
     }
 
     #[test]
@@ -308,10 +288,7 @@ mod tests {
         let scanner = UrlScanner::new();
         let data = b"visit http://evil-dropper.tk/payload for updates";
         let result = scanner.scan_urls(data, None);
-        assert!(result
-            .malicious_urls
-            .iter()
-            .any(|m| m.reason.contains(".tk")));
+        assert!(result.malicious_urls.iter().any(|m| m.reason.contains(".tk")));
     }
 
     #[test]
@@ -327,10 +304,7 @@ mod tests {
         let scanner = UrlScanner::new();
         let data = b"get http://malware.evil.com/dropper for the goods";
         let result = scanner.scan_urls(data, Some(&ioc));
-        assert!(result
-            .malicious_urls
-            .iter()
-            .any(|m| m.reason.contains("IOC blocklist")));
+        assert!(result.malicious_urls.iter().any(|m| m.reason.contains("IOC blocklist")));
         assert!(result.score >= 30);
     }
 

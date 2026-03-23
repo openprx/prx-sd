@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -17,7 +18,7 @@ impl ScanEngine {
     ///
     /// Pipeline order:
     /// 1. Read file & check size limits
-    /// 2. Hash lookup (fast-path: known malware ⇒ early return)
+    /// 2. Hash lookup (fast-path: known malware => early return)
     /// 3. Magic-byte file-type detection
     /// 4. Format-specific parsing via `prx_sd_parsers`
     /// 5. Parallel YARA rule matching + heuristic scoring
@@ -32,8 +33,7 @@ impl ScanEngine {
             return Ok(ScanResult::clean(&path, 0));
         }
 
-        let metadata =
-            fs::metadata(&path).with_context(|| format!("cannot stat {}", path.display()))?;
+        let metadata = fs::metadata(&path).with_context(|| format!("cannot stat {}", path.display()))?;
 
         if metadata.len() > self.config.max_file_size {
             debug!(
@@ -53,7 +53,10 @@ impl ScanEngine {
         if result.threat_level == ThreatLevel::Clean {
             if let Some(vt) = &self.vt_client {
                 let hash_bytes = prx_sd_signatures::hash::sha256_hash(&data);
-                let sha256_hex: String = hash_bytes.iter().map(|b| format!("{b:02x}")).collect();
+                let sha256_hex = hash_bytes.iter().fold(String::with_capacity(64), |mut acc, b| {
+                    let _ = write!(acc, "{b:02x}");
+                    acc
+                });
                 match vt.lookup_sha256(&sha256_hex).await {
                     Ok(VtVerdict::Malicious {
                         threat_name,
@@ -70,7 +73,9 @@ impl ScanEngine {
                             ThreatLevel::Malicious,
                             DetectionType::Hash,
                             format!("VT:{threat_name}"),
-                            vec![format!("VirusTotal: {detections}/{total} engines detected as {threat_name}")],
+                            vec![format!(
+                                "VirusTotal: {detections}/{total} engines detected as {threat_name}"
+                            )],
                             elapsed_ms(&start),
                         );
                     }
@@ -114,7 +119,7 @@ impl ScanEngine {
         let entries: Vec<_> = WalkDir::new(dir)
             .follow_links(false)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .filter(|e| e.file_type().is_file())
             .filter(|e| !self.config.is_excluded(e.path()))
             .collect();
@@ -141,9 +146,8 @@ impl ScanEngine {
                             .iter()
                             .map(|entry| {
                                 let mut r = ScanResult::clean(entry.path(), 0);
-                                r.details.push(format!(
-                                    "scan error: failed to create thread pool: {e2}"
-                                ));
+                                r.details
+                                    .push(format!("scan error: failed to create thread pool: {e2}"));
                                 r
                             })
                             .collect();
@@ -180,8 +184,7 @@ impl ScanEngine {
     fn scan_file_sync(&self, path: &Path) -> Result<ScanResult> {
         let start = Instant::now();
 
-        let metadata =
-            fs::metadata(path).with_context(|| format!("cannot stat {}", path.display()))?;
+        let metadata = fs::metadata(path).with_context(|| format!("cannot stat {}", path.display()))?;
 
         if metadata.len() > self.config.max_file_size {
             return Ok(ScanResult::clean(path, elapsed_ms(&start)));
@@ -224,8 +227,7 @@ impl ScanEngine {
             if !matches.is_empty() {
                 let names: Vec<String> = matches.iter().map(|m| m.name.clone()).collect();
                 let threat = names.first().cloned().unwrap_or_default();
-                let details: Vec<String> =
-                    names.iter().map(|n| format!("yara rule: {n}")).collect();
+                let details: Vec<String> = names.iter().map(|n| format!("yara rule: {n}")).collect();
                 sub_results.push(ScanResult::detected(
                     path,
                     ThreatLevel::Malicious,
@@ -250,11 +252,7 @@ impl ScanEngine {
 
             let level = ThreatLevel::from_score(heur_result.score);
             if level != ThreatLevel::Clean {
-                let details: Vec<String> = heur_result
-                    .findings
-                    .iter()
-                    .map(|f| format!("heuristic: {f}"))
-                    .collect();
+                let details: Vec<String> = heur_result.findings.iter().map(|f| format!("heuristic: {f}")).collect();
                 sub_results.push(ScanResult::detected(
                     path,
                     level,
@@ -278,7 +276,7 @@ impl ScanEngine {
 }
 
 /// Map our magic-based `FileType` to the parser crate's `FileType` enum.
-fn file_type_to_parser(ft: magic::FileType) -> prx_sd_parsers::FileType {
+const fn file_type_to_parser(ft: magic::FileType) -> prx_sd_parsers::FileType {
     match ft {
         magic::FileType::PE => prx_sd_parsers::FileType::PE,
         magic::FileType::ELF => prx_sd_parsers::FileType::ELF,
@@ -295,11 +293,13 @@ fn file_type_to_parser(ft: magic::FileType) -> prx_sd_parsers::FileType {
 }
 
 /// Milliseconds elapsed since `start`.
+#[allow(clippy::cast_possible_truncation)] // Scan durations will never exceed u64::MAX ms
 fn elapsed_ms(start: &Instant) -> u64 {
     start.elapsed().as_millis() as u64
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::config::ScanConfig;
@@ -308,17 +308,17 @@ mod tests {
 
     /// Create a minimal `ScanEngine` backed by a temporary directory.
     fn setup_test_engine() -> (tempfile::TempDir, ScanEngine) {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         let config = ScanConfig::default()
             .with_signatures_dir(sig_dir)
             .with_yara_rules_dir(yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"));
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
         (dir, engine)
     }
 
@@ -326,9 +326,9 @@ mod tests {
     async fn scan_file_clean_text() {
         let (dir, engine) = setup_test_engine();
         let file = dir.path().join("clean.txt");
-        std::fs::write(&file, "Hello, this is a perfectly safe file.").unwrap();
+        std::fs::write(&file, "Hello, this is a perfectly safe file.").expect("write");
 
-        let result = engine.scan_file(&file).await.unwrap();
+        let result = engine.scan_file(&file).await.expect("scan");
         assert_eq!(result.threat_level, ThreatLevel::Clean);
         assert!(!result.is_threat());
         assert!(result.detection_type.is_none());
@@ -336,30 +336,30 @@ mod tests {
 
     #[tokio::test]
     async fn scan_file_with_known_hash_returns_malicious() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         // Insert a known hash into the signature database.
         let malware_data = b"this_is_fake_malware_payload_for_testing";
         let hash = prx_sd_signatures::hash::sha256_hash(malware_data);
-        let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir).unwrap();
+        let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir).expect("db open");
         db.import_hashes(&[(hash, "Test.Malware.FakePayload".to_string())])
-            .unwrap();
+            .expect("import");
         drop(db);
 
         let config = ScanConfig::default()
             .with_signatures_dir(&sig_dir)
             .with_yara_rules_dir(&yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"));
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
 
         let file = dir.path().join("malware.bin");
-        std::fs::write(&file, malware_data).unwrap();
+        std::fs::write(&file, malware_data).expect("write");
 
-        let result = engine.scan_file(&file).await.unwrap();
+        let result = engine.scan_file(&file).await.expect("scan");
         assert_eq!(result.threat_level, ThreatLevel::Malicious);
         assert!(result.is_threat());
         assert_eq!(result.detection_type, Some(DetectionType::Hash));
@@ -380,24 +380,24 @@ mod tests {
 
     #[test]
     fn scan_bytes_with_known_hash_returns_malicious() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         let malware_data = b"scan_bytes_malware_test_data_unique";
         let hash = prx_sd_signatures::hash::sha256_hash(malware_data);
-        let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir).unwrap();
+        let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir).expect("db open");
         db.import_hashes(&[(hash, "Test.Trojan.ByteScan".to_string())])
-            .unwrap();
+            .expect("import");
         drop(db);
 
         let config = ScanConfig::default()
             .with_signatures_dir(&sig_dir)
             .with_yara_rules_dir(&yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"));
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
 
         let result = engine.scan_bytes(malware_data, "in_memory_test");
         assert_eq!(result.threat_level, ThreatLevel::Malicious);
@@ -409,12 +409,12 @@ mod tests {
         let (dir, engine) = setup_test_engine();
 
         let scan_dir = dir.path().join("scan_target");
-        std::fs::create_dir_all(&scan_dir).unwrap();
+        std::fs::create_dir_all(&scan_dir).expect("create scan dir");
 
         // Create several clean files.
-        std::fs::write(scan_dir.join("file1.txt"), "clean content one").unwrap();
-        std::fs::write(scan_dir.join("file2.txt"), "clean content two").unwrap();
-        std::fs::write(scan_dir.join("file3.txt"), "clean content three").unwrap();
+        std::fs::write(scan_dir.join("file1.txt"), "clean content one").expect("write");
+        std::fs::write(scan_dir.join("file2.txt"), "clean content two").expect("write");
+        std::fs::write(scan_dir.join("file3.txt"), "clean content three").expect("write");
 
         let results = engine.scan_directory(&scan_dir);
         assert_eq!(results.len(), 3);
@@ -425,84 +425,82 @@ mod tests {
 
     #[tokio::test]
     async fn scan_file_excluded_path_returns_clean() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         let mut config = ScanConfig::default()
             .with_signatures_dir(&sig_dir)
             .with_yara_rules_dir(&yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"));
         config.exclude_paths = vec!["/excluded_dir".to_string()];
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
 
         // Create a file that matches the exclusion pattern.
         let excluded_dir = dir.path().join("excluded_dir");
-        std::fs::create_dir_all(&excluded_dir).unwrap();
+        std::fs::create_dir_all(&excluded_dir).expect("create excluded dir");
         let file = excluded_dir.join("test.bin");
-        std::fs::write(&file, "does not matter").unwrap();
+        std::fs::write(&file, "does not matter").expect("write");
 
         // The config excludes paths containing "/excluded_dir", but the actual
         // tempdir path will be something like /tmp/xxx/excluded_dir/test.bin,
         // which contains "excluded_dir" and should match.
-        let result = engine.scan_file(&file).await.unwrap();
+        let result = engine.scan_file(&file).await.expect("scan");
         assert_eq!(result.threat_level, ThreatLevel::Clean);
         assert!(result.details.is_empty());
     }
 
     #[tokio::test]
     async fn scan_file_oversized_returns_clean() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         let config = ScanConfig::default()
             .with_signatures_dir(&sig_dir)
             .with_yara_rules_dir(&yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"))
             .with_max_file_size(10); // 10 bytes max
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
 
         let file = dir.path().join("big.bin");
-        std::fs::write(&file, "this content is longer than ten bytes").unwrap();
+        std::fs::write(&file, "this content is longer than ten bytes").expect("write");
 
-        let result = engine.scan_file(&file).await.unwrap();
+        let result = engine.scan_file(&file).await.expect("scan");
         assert_eq!(result.threat_level, ThreatLevel::Clean);
     }
 
     #[tokio::test]
     async fn scan_file_nonexistent_returns_error() {
         let (_dir, engine) = setup_test_engine();
-        let result = engine
-            .scan_file(Path::new("/tmp/nonexistent_file_abc123xyz"))
-            .await;
+        let result = engine.scan_file(Path::new("/tmp/nonexistent_file_abc123xyz")).await;
         assert!(result.is_err());
     }
 
     #[test]
     fn scan_directory_excludes_paths() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         let mut config = ScanConfig::default()
             .with_signatures_dir(&sig_dir)
             .with_yara_rules_dir(&yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"));
         config.exclude_paths = vec!["skip_me".to_string()];
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
 
         let scan_dir = dir.path().join("scandir");
         let skip_dir = scan_dir.join("skip_me");
-        std::fs::create_dir_all(&skip_dir).unwrap();
-        std::fs::write(scan_dir.join("included.txt"), "include").unwrap();
-        std::fs::write(skip_dir.join("excluded.txt"), "exclude").unwrap();
+        std::fs::create_dir_all(&skip_dir).expect("create skip dir");
+        std::fs::write(scan_dir.join("included.txt"), "include").expect("write");
+        std::fs::write(skip_dir.join("excluded.txt"), "exclude").expect("write");
 
         let results = engine.scan_directory(&scan_dir);
         // Only the included file should be scanned.
@@ -512,23 +510,23 @@ mod tests {
 
     #[test]
     fn scan_directory_respects_max_file_size() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().expect("temp dir");
         let sig_dir = dir.path().join("signatures");
         let yara_dir = dir.path().join("yara");
-        std::fs::create_dir_all(&sig_dir).unwrap();
-        std::fs::create_dir_all(&yara_dir).unwrap();
+        std::fs::create_dir_all(&sig_dir).expect("create sig dir");
+        std::fs::create_dir_all(&yara_dir).expect("create yara dir");
 
         let config = ScanConfig::default()
             .with_signatures_dir(&sig_dir)
             .with_yara_rules_dir(&yara_dir)
             .with_quarantine_dir(dir.path().join("quarantine"))
             .with_max_file_size(5); // Very small limit
-        let engine = ScanEngine::new(config).unwrap();
+        let engine = ScanEngine::new(config).expect("engine init");
 
         let scan_dir = dir.path().join("scan_target");
-        std::fs::create_dir_all(&scan_dir).unwrap();
-        std::fs::write(scan_dir.join("small.txt"), "hi").unwrap(); // 2 bytes, under limit
-        std::fs::write(scan_dir.join("big.txt"), "this is way too long").unwrap(); // over limit
+        std::fs::create_dir_all(&scan_dir).expect("create scan dir");
+        std::fs::write(scan_dir.join("small.txt"), "hi").expect("write"); // 2 bytes, under limit
+        std::fs::write(scan_dir.join("big.txt"), "this is way too long").expect("write"); // over limit
 
         let results = engine.scan_directory(&scan_dir);
         // Both files should appear in results (oversized ones just get Clean).

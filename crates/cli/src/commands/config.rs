@@ -108,7 +108,7 @@ fn parse_value(s: &str) -> Value {
     Value::String(s.to_string())
 }
 
-pub async fn run(action: ConfigAction, data_dir: &Path) -> Result<()> {
+pub fn run(action: ConfigAction, data_dir: &Path) -> Result<()> {
     match action {
         ConfigAction::Show => {
             let config = load_config(data_dir);

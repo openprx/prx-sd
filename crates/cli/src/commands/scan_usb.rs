@@ -55,7 +55,7 @@ fn find_mount_point(device: &str) -> Option<PathBuf> {
 }
 
 /// Platform-specific path to the mount table file.
-fn mount_table_path() -> &'static str {
+const fn mount_table_path() -> &'static str {
     #[cfg(target_os = "linux")]
     {
         "/proc/mounts"
@@ -79,22 +79,15 @@ fn mount_table_path() -> &'static str {
 /// - Windows: stub (returns empty)
 fn find_usb_mounts() -> Vec<(String, PathBuf)> {
     let mount_file = mount_table_path();
-    let contents = match std::fs::read_to_string(mount_file) {
-        Ok(c) => c,
-        Err(_) => return Vec::new(),
+    let Ok(contents) = std::fs::read_to_string(mount_file) else {
+        return Vec::new();
     };
 
     let mut mounts = Vec::new();
     for line in contents.lines() {
         let mut parts = line.split_whitespace();
-        let dev = match parts.next() {
-            Some(d) => d,
-            None => continue,
-        };
-        let mount = match parts.next() {
-            Some(m) => m,
-            None => continue,
-        };
+        let Some(dev) = parts.next() else { continue };
+        let Some(mount) = parts.next() else { continue };
 
         if is_removable_device(dev, mount) {
             mounts.push((dev.to_string(), PathBuf::from(mount)));
@@ -109,9 +102,8 @@ fn is_removable_device(dev: &str, mount: &str) -> bool {
     #[cfg(target_os = "linux")]
     {
         let is_usb_device = dev.starts_with("/dev/sd");
-        let is_removable_mount = mount.starts_with("/media")
-            || mount.starts_with("/mnt")
-            || mount.starts_with("/run/media");
+        let is_removable_mount =
+            mount.starts_with("/media") || mount.starts_with("/mnt") || mount.starts_with("/run/media");
         is_usb_device && is_removable_mount
     }
     #[cfg(target_os = "macos")]
@@ -132,8 +124,7 @@ fn is_removable_device(dev: &str, mount: &str) -> bool {
 /// Quarantine a single file using the AES-256-GCM encrypted vault.
 fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()> {
     let vault_dir = data_dir.join("quarantine");
-    let quarantine =
-        prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?;
+    let quarantine = prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?;
     let id = quarantine
         .quarantine(path, threat_name)
         .with_context(|| format!("failed to quarantine {}", path.display()))?;
@@ -142,12 +133,8 @@ fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()
 }
 
 /// Scan a single mount point and return the scan results.
-async fn scan_mount(mount_path: &Path, engine: &ScanEngine) -> Vec<ScanResult> {
-    println!(
-        "\n{} scanning USB mount: {}",
-        ">>>".cyan().bold(),
-        mount_path.display()
-    );
+fn scan_mount(mount_path: &Path, engine: &ScanEngine) -> Vec<ScanResult> {
+    println!("\n{} scanning USB mount: {}", ">>>".cyan().bold(), mount_path.display());
     engine.scan_directory(mount_path)
 }
 
@@ -181,17 +168,16 @@ pub async fn run(device: Option<&str>, auto_quarantine: bool, data_dir: &Path) -
             }
         }
 
-        match mount_point {
-            Some(mp) => vec![(dev.to_string(), mp)],
-            None => {
-                eprintln!(
-                    "{} device {} is not mounted after {} retries. Skipping.",
-                    "warning:".yellow().bold(),
-                    dev,
-                    MOUNT_RETRIES,
-                );
-                return Ok(());
-            }
+        if let Some(mp) = mount_point {
+            vec![(dev.to_string(), mp)]
+        } else {
+            eprintln!(
+                "{} device {} is not mounted after {} retries. Skipping.",
+                "warning:".yellow().bold(),
+                dev,
+                MOUNT_RETRIES,
+            );
+            return Ok(());
         }
     } else {
         let usb_mounts = find_usb_mounts();
@@ -216,10 +202,11 @@ pub async fn run(device: Option<&str>, auto_quarantine: bool, data_dir: &Path) -
     let mut all_results: Vec<ScanResult> = Vec::new();
 
     for (_dev, mount) in &mounts {
-        let results = scan_mount(mount, &engine).await;
+        let results = scan_mount(mount, &engine);
         all_results.extend(results);
     }
 
+    #[allow(clippy::cast_possible_truncation)] // Scan duration won't exceed u64::MAX ms.
     let elapsed_ms = start.elapsed().as_millis() as u64;
 
     // Print individual threats.

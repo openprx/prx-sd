@@ -18,9 +18,7 @@ pub struct MacOSSandbox {
 impl MacOSSandbox {
     /// Create a new macOS sandbox with the given configuration.
     pub fn new(config: &SandboxConfig) -> Self {
-        Self {
-            config: config.clone(),
-        }
+        Self { config: config.clone() }
     }
 
     /// Execute a command in the macOS sandbox.
@@ -35,8 +33,7 @@ impl MacOSSandbox {
         let start = std::time::Instant::now();
 
         // Write the seatbelt profile to a temporary file.
-        let profile_path =
-            std::env::temp_dir().join(format!("prx-sandbox-{}.sb", std::process::id()));
+        let profile_path = std::env::temp_dir().join(format!("prx-sandbox-{}.sb", std::process::id()));
         tokio::fs::write(&profile_path, &profile).await?;
 
         // Build the sandbox-exec command.
@@ -105,10 +102,7 @@ impl MacOSSandbox {
 
         // Allow reading from allowed paths.
         for path in &self.config.allowed_paths {
-            profile.push_str(&format!(
-                "(allow file-read* (subpath \"{}\"))\n",
-                path.display()
-            ));
+            profile.push_str(&format!("(allow file-read* (subpath \"{}\"))\n", path.display()));
         }
 
         // Allow basic temp directory access.

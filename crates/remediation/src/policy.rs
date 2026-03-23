@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// Defines what to do automatically when threats are detected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct RemediationPolicy {
     /// What to do for Malicious detections.
     pub on_malicious: Vec<ActionType>,
@@ -65,24 +66,20 @@ impl Default for RemediationPolicy {
 impl RemediationPolicy {
     /// Load a remediation policy from a JSON file.
     pub fn load(path: &Path) -> Result<Self> {
-        let data = std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read policy file: {}", path.display()))?;
-        let policy: Self =
-            serde_json::from_str(&data).context("failed to parse remediation policy JSON")?;
+        let data =
+            std::fs::read_to_string(path).with_context(|| format!("failed to read policy file: {}", path.display()))?;
+        let policy: Self = serde_json::from_str(&data).context("failed to parse remediation policy JSON")?;
         Ok(policy)
     }
 
     /// Save the remediation policy to a JSON file.
     pub fn save(&self, path: &Path) -> Result<()> {
-        let json =
-            serde_json::to_string_pretty(self).context("failed to serialize remediation policy")?;
+        let json = serde_json::to_string_pretty(self).context("failed to serialize remediation policy")?;
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create parent directory: {}", parent.display())
-            })?;
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create parent directory: {}", parent.display()))?;
         }
-        std::fs::write(path, json)
-            .with_context(|| format!("failed to write policy file: {}", path.display()))?;
+        std::fs::write(path, json).with_context(|| format!("failed to write policy file: {}", path.display()))?;
         Ok(())
     }
 
@@ -121,6 +118,7 @@ impl RemediationPolicy {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -130,10 +128,7 @@ mod tests {
         assert_eq!(policy.on_malicious.len(), 4);
         assert!(matches!(policy.on_malicious[0], ActionType::KillProcess));
         assert!(matches!(policy.on_malicious[1], ActionType::Quarantine));
-        assert!(matches!(
-            policy.on_malicious[2],
-            ActionType::CleanPersistence
-        ));
+        assert!(matches!(policy.on_malicious[2], ActionType::CleanPersistence));
         assert!(matches!(policy.on_malicious[3], ActionType::AddToBlocklist));
     }
 

@@ -14,6 +14,7 @@ mod routes;
 mod signing;
 mod storage;
 
+use std::fmt::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -36,8 +37,7 @@ async fn main() -> anyhow::Result<()> {
     // Initialize tracing (respects RUST_LOG env var).
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,tower_http=debug".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,tower_http=debug".into()),
         )
         .init();
 
@@ -47,15 +47,11 @@ async fn main() -> anyhow::Result<()> {
         .parse()
         .context("LISTEN_ADDR must be a valid socket address")?;
 
-    let storage_dir =
-        PathBuf::from(std::env::var("STORAGE_DIR").unwrap_or_else(|_| "./data".to_string()));
+    let storage_dir = PathBuf::from(std::env::var("STORAGE_DIR").unwrap_or_else(|_| "./data".to_string()));
 
-    let key_file = PathBuf::from(std::env::var("KEY_FILE").unwrap_or_else(|_| {
-        storage_dir
-            .join("signing.key")
-            .to_string_lossy()
-            .to_string()
-    }));
+    let key_file = PathBuf::from(
+        std::env::var("KEY_FILE").unwrap_or_else(|_| storage_dir.join("signing.key").to_string_lossy().to_string()),
+    );
 
     let admin_token = std::env::var("ADMIN_TOKEN").map_err(|_| {
         anyhow::anyhow!(
@@ -92,14 +88,8 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
-                .allow_methods(AllowMethods::list([
-                    axum::http::Method::GET,
-                    axum::http::Method::POST,
-                ]))
-                .allow_headers(AllowHeaders::list([
-                    header::CONTENT_TYPE,
-                    header::AUTHORIZATION,
-                ])),
+                .allow_methods(AllowMethods::list([axum::http::Method::GET, axum::http::Method::POST]))
+                .allow_headers(AllowHeaders::list([header::CONTENT_TYPE, header::AUTHORIZATION])),
         )
         .with_state(state);
 
@@ -115,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
 fn hex_encode(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
     for &b in bytes {
-        s.push_str(&format!("{b:02x}"));
+        let _ = write!(s, "{b:02x}");
     }
     s
 }

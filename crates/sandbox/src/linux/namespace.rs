@@ -50,9 +50,10 @@ impl NamespaceSandbox {
     /// Uses `libc::clone` with `CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWUSER`
     /// to create a fully isolated child process. The child sets up its mount namespace,
     /// applies seccomp filters, and then exec's the target binary.
+    #[allow(clippy::items_after_statements)] // clone_callback defined near its usage for readability
     pub fn execute(&self, cmd: &Path, args: &[&str], timeout: Duration) -> Result<SandboxResult> {
         let cmd_str = cmd.to_string_lossy().to_string();
-        let args_owned: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+        let args_owned: Vec<String> = args.iter().map(ToString::to_string).collect();
         let root_dir = self.root_dir.clone();
         let network = self.network;
         let bind_mounts = self.bind_mounts.clone();
@@ -68,6 +69,13 @@ impl NamespaceSandbox {
             flags |= libc::CLONE_NEWNET;
         }
 
+        extern "C" fn clone_callback(arg: *mut libc::c_void) -> libc::c_int {
+            // SAFETY: arg is a valid pointer to our Box<dyn FnOnce() -> i32> created above.
+            // We take ownership back and call it exactly once.
+            let closure = unsafe { Box::from_raw(arg.cast::<Box<dyn FnOnce() -> i32>>()) };
+            closure()
+        }
+
         // Closure that runs in the child (new namespace).
         let child_fn = Box::new(move || -> i32 {
             if let Err(e) = Self::child_setup(&root_dir, &bind_mounts, &cmd_str, &args_owned) {
@@ -81,22 +89,15 @@ impl NamespaceSandbox {
         // We need to pass the closure through the C callback. Use a Box leak pattern.
         let child_fn_ptr = Box::into_raw(Box::new(child_fn));
 
-        extern "C" fn clone_callback(arg: *mut libc::c_void) -> libc::c_int {
-            // SAFETY: arg is a valid pointer to our Box<dyn FnOnce() -> i32> created above.
-            // We take ownership back and call it exactly once.
-            let closure = unsafe { Box::from_raw(arg as *mut Box<dyn FnOnce() -> i32>) };
-            closure()
-        }
-
         // SAFETY: We provide a valid stack, valid flags, and a valid callback.
         // The child_fn_ptr is a heap-allocated closure that is consumed exactly once
         // by clone_callback. The stack is large enough (1 MiB) and properly aligned.
         let child_pid = unsafe {
             libc::clone(
                 clone_callback,
-                stack_top as *mut libc::c_void,
+                stack_top.cast::<libc::c_void>(),
                 flags,
-                child_fn_ptr as *mut libc::c_void,
+                child_fn_ptr.cast::<libc::c_void>(),
             )
         };
 
@@ -104,8 +105,7 @@ impl NamespaceSandbox {
             // Clean up the leaked closure on error.
             // SAFETY: clone failed, so clone_callback was never called and the pointer is still valid.
             let _ = unsafe { Box::from_raw(child_fn_ptr) };
-            return Err(std::io::Error::last_os_error())
-                .context("clone() with namespace flags failed");
+            return Err(std::io::Error::last_os_error()).context("clone() with namespace flags failed");
         }
 
         let pid = nix::unistd::Pid::from_raw(child_pid);
@@ -126,6 +126,7 @@ impl NamespaceSandbox {
                     network_attempts: Vec::new(),
                     file_operations: Vec::new(),
                     process_operations: Vec::new(),
+                    #[allow(clippy::cast_possible_truncation)] // millis within u64 range for practical timeouts
                     execution_time_ms: timeout.as_millis() as u64,
                 });
             }
@@ -133,13 +134,8 @@ impl NamespaceSandbox {
             match nix::sys::wait::waitpid(pid, Some(nix::sys::wait::WaitPidFlag::WNOHANG)) {
                 Ok(nix::sys::wait::WaitStatus::Exited(_, code)) => break code,
                 Ok(nix::sys::wait::WaitStatus::Signaled(_, sig, _)) => break -(sig as i32),
-                Ok(nix::sys::wait::WaitStatus::StillAlive) => {
+                Ok(nix::sys::wait::WaitStatus::StillAlive | _) => {
                     std::thread::sleep(Duration::from_millis(10));
-                    continue;
-                }
-                Ok(_) => {
-                    std::thread::sleep(Duration::from_millis(10));
-                    continue;
                 }
                 Err(nix::errno::Errno::ECHILD) => break -1,
                 Err(e) => {
@@ -154,7 +150,7 @@ impl NamespaceSandbox {
         let _ = std::fs::remove_dir_all(&self.root_dir);
 
         Ok(SandboxResult {
-            exit_code: exit_code as i32,
+            exit_code,
             syscalls: Vec::new(),
             behaviors: Vec::new(),
             verdict: SandboxVerdict::Clean,
@@ -162,6 +158,7 @@ impl NamespaceSandbox {
             network_attempts: Vec::new(),
             file_operations: Vec::new(),
             process_operations: Vec::new(),
+            #[allow(clippy::cast_possible_truncation)] // millis within u64 range for practical timeouts
             execution_time_ms: elapsed.as_millis() as u64,
         })
     }
@@ -169,12 +166,7 @@ impl NamespaceSandbox {
     /// Setup function that runs inside the cloned child process.
     ///
     /// Sets up mount namespace (tmpfs root, bind mounts), then exec's the target.
-    fn child_setup(
-        root_dir: &Path,
-        bind_mounts: &[(PathBuf, PathBuf)],
-        cmd: &str,
-        args: &[String],
-    ) -> Result<()> {
+    fn child_setup(root_dir: &Path, bind_mounts: &[(PathBuf, PathBuf)], cmd: &str, args: &[String]) -> Result<()> {
         use std::ffi::CString;
 
         // Setup mount namespace: mount tmpfs on our root.
@@ -182,9 +174,7 @@ impl NamespaceSandbox {
 
         // Apply seccomp filter for additional protection.
         let seccomp = super::seccomp::SeccompFilter::new();
-        seccomp
-            .apply()
-            .context("failed to apply seccomp in namespace child")?;
+        seccomp.apply().context("failed to apply seccomp in namespace child")?;
 
         // Build C strings for execve.
         let c_cmd = CString::new(cmd).context("invalid command for execve")?;
@@ -205,8 +195,7 @@ impl NamespaceSandbox {
         use std::ffi::CString;
 
         // Mount tmpfs on the sandbox root.
-        let c_root =
-            CString::new(root_dir.as_os_str().as_encoded_bytes()).context("invalid root path")?;
+        let c_root = CString::new(root_dir.as_os_str().as_encoded_bytes()).context("invalid root path")?;
         let c_tmpfs = CString::new("tmpfs").context("CString creation failed")?;
         let c_none = CString::new("").context("CString creation failed")?;
 
@@ -218,7 +207,7 @@ impl NamespaceSandbox {
                 c_root.as_ptr(),
                 c_tmpfs.as_ptr(),
                 libc::MS_NOSUID | libc::MS_NODEV,
-                c_none.as_ptr() as *const libc::c_void,
+                c_none.as_ptr().cast::<libc::c_void>(),
             )
         };
         if ret != 0 {
@@ -228,16 +217,14 @@ impl NamespaceSandbox {
         // Create essential directories.
         for dir in &["proc", "dev", "tmp"] {
             let p = root_dir.join(dir);
-            std::fs::create_dir_all(&p)
-                .with_context(|| format!("failed to create {}", p.display()))?;
+            std::fs::create_dir_all(&p).with_context(|| format!("failed to create {}", p.display()))?;
         }
 
         // Process bind mounts.
         for (src, dest) in bind_mounts {
             let target = root_dir.join(dest);
-            std::fs::create_dir_all(&target).with_context(|| {
-                format!("failed to create bind mount target: {}", target.display())
-            })?;
+            std::fs::create_dir_all(&target)
+                .with_context(|| format!("failed to create bind mount target: {}", target.display()))?;
 
             let c_src = CString::new(src.as_os_str().as_encoded_bytes())
                 .with_context(|| format!("invalid bind mount source: {}", src.display()))?;
@@ -255,13 +242,8 @@ impl NamespaceSandbox {
                 )
             };
             if ret != 0 {
-                return Err(std::io::Error::last_os_error()).with_context(|| {
-                    format!(
-                        "bind mount {} -> {} failed",
-                        src.display(),
-                        target.display()
-                    )
-                });
+                return Err(std::io::Error::last_os_error())
+                    .with_context(|| format!("bind mount {} -> {} failed", src.display(), target.display()));
             }
         }
 

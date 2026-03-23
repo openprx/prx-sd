@@ -24,11 +24,19 @@ tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 prx-sd-signatures = { workspace = true }
+prx-sd-quarantine = { workspace = true }
 prx-sd-heuristic = { workspace = true }
 sha2 = { workspace = true }
 flate2 = { workspace = true }
 tar = { workspace = true }
 rand = { workspace = true }
+prx-sd-remediation = { workspace = true }
+prx-sd-sandbox = { workspace = true }
+prx-sd-updater = { workspace = true }
+prx-sd-realtime = { workspace = true }
+ed25519-dalek = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
 
 [[bench]]
 name = "scan_bench"

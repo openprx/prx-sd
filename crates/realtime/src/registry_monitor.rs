@@ -63,16 +63,11 @@ struct RegistryValueSnapshot {
 impl RegistryMonitor {
     /// Create a new `RegistryMonitor` watching the default persistence keys.
     pub fn new() -> Self {
-        Self::with_keys(
-            DEFAULT_WATCHED_KEYS
-                .iter()
-                .map(|k| (*k).to_owned())
-                .collect(),
-        )
+        Self::with_keys(DEFAULT_WATCHED_KEYS.iter().map(|k| (*k).to_owned()).collect())
     }
 
     /// Create a new `RegistryMonitor` watching the specified registry keys.
-    pub fn with_keys(watched_keys: Vec<String>) -> Self {
+    pub const fn with_keys(watched_keys: Vec<String>) -> Self {
         Self {
             watched_keys,
             #[cfg(target_os = "windows")]
@@ -89,7 +84,7 @@ impl RegistryMonitor {
     ///
     /// This must be called before `detect_changes` to establish the initial state.
     /// On non-Windows platforms this is a no-op.
-    pub fn capture_baseline(&mut self) -> Result<(), String> {
+    pub const fn capture_baseline(&mut self) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             for key in &self.watched_keys {
@@ -106,7 +101,7 @@ impl RegistryMonitor {
     /// the internal baseline is updated to the current state.
     ///
     /// On non-Windows platforms this always returns an empty list.
-    pub fn detect_changes(&mut self) -> Result<Vec<RegistryEvent>, String> {
+    pub const fn detect_changes(&mut self) -> Result<Vec<RegistryEvent>, String> {
         #[cfg(target_os = "windows")]
         {
             self.detect_changes_windows()
@@ -270,6 +265,7 @@ fn days_to_date(days_since_epoch: u64) -> (u64, u64, u64) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]

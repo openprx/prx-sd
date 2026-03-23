@@ -30,19 +30,19 @@ pub enum FileType {
 impl std::fmt::Display for FileType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = match self {
-            FileType::PE => "PE",
-            FileType::ELF => "ELF",
-            FileType::MachO => "Mach-O",
-            FileType::PDF => "PDF",
-            FileType::Zip => "ZIP",
-            FileType::SevenZip => "7z",
-            FileType::Tar => "tar",
-            FileType::Gzip => "gzip",
-            FileType::Office => "Office (OLE2)",
-            FileType::Script => "Script",
-            FileType::Unknown => "Unknown",
+            Self::PE => "PE",
+            Self::ELF => "ELF",
+            Self::MachO => "Mach-O",
+            Self::PDF => "PDF",
+            Self::Zip => "ZIP",
+            Self::SevenZip => "7z",
+            Self::Tar => "tar",
+            Self::Gzip => "gzip",
+            Self::Office => "Office (OLE2)",
+            Self::Script => "Script",
+            Self::Unknown => "Unknown",
         };
-        write!(f, "{}", label)
+        write!(f, "{label}")
     }
 }
 
@@ -50,6 +50,7 @@ impl std::fmt::Display for FileType {
 ///
 /// The function requires at most 265 bytes; shorter slices are fine but may
 /// cause some formats (e.g. tar) to go undetected.
+#[allow(clippy::indexing_slicing)] // All index accesses are guarded by prior length checks
 pub fn detect_magic(data: &[u8]) -> FileType {
     if data.len() < 2 {
         return FileType::Unknown;
@@ -61,7 +62,7 @@ pub fn detect_magic(data: &[u8]) -> FileType {
     }
 
     // --- ELF ---
-    if data.len() >= 4 && data[..4] == [0x7f, b'E', b'L', b'F'] {
+    if data.len() >= 4 && data.starts_with(&[0x7f, b'E', b'L', b'F']) {
         return FileType::ELF;
     }
 
@@ -69,18 +70,31 @@ pub fn detect_magic(data: &[u8]) -> FileType {
     if data.len() >= 4 {
         let magic32 = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
         match magic32 {
-            // MH_MAGIC, MH_CIGAM (32-bit)
-            0xFEED_FACE | 0xCEFA_EDFE |
-            // MH_MAGIC_64, MH_CIGAM_64
-            0xFEED_FACF | 0xCFFA_EDFE |
-            // FAT_MAGIC, FAT_CIGAM (universal binary)
-            0xCAFE_BABE | 0xBEBA_FECA => return FileType::MachO,
+            // MH_MAGIC, MH_CIGAM (32-bit), MH_MAGIC_64, MH_CIGAM_64, FAT_CIGAM
+            0xFEED_FACE | 0xCEFA_EDFE | 0xFEED_FACF | 0xCFFA_EDFE | 0xBEBA_FECA => {
+                return FileType::MachO;
+            }
+            // FAT_MAGIC (0xCAFEBABE) is shared by FAT Mach-O and Java .class.
+            // FAT Mach-O: bytes 4-7 = arch count (realistically 1-20).
+            // Java .class: bytes 4-5 = minor_version, bytes 6-7 = major_version
+            //              (major is typically 45-67 for Java 1.1 through 23).
+            0xCAFE_BABE => {
+                if data.len() >= 8 {
+                    let nfat = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+                    if (1..=20).contains(&nfat) {
+                        return FileType::MachO;
+                    }
+                    // Likely Java .class or unknown — fall through to Unknown
+                } else {
+                    return FileType::MachO; // not enough data, conservative guess
+                }
+            }
             _ => {}
         }
     }
 
     // --- PDF ---
-    if data.len() >= 5 && &data[..5] == b"%PDF-" {
+    if data.len() >= 5 && data.starts_with(b"%PDF-") {
         return FileType::PDF;
     }
 
@@ -93,7 +107,7 @@ pub fn detect_magic(data: &[u8]) -> FileType {
     }
 
     // --- 7-Zip ---
-    if data.len() >= 6 && data[..6] == [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C] {
+    if data.len() >= 6 && data.starts_with(&[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C]) {
         return FileType::SevenZip;
     }
 
@@ -103,13 +117,17 @@ pub fn detect_magic(data: &[u8]) -> FileType {
     }
 
     // --- OLE2 Compound Document (legacy Office: .doc, .xls, .ppt) ---
-    if data.len() >= 8 && data[..8] == [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1] {
+    if data.len() >= 8 && data.starts_with(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]) {
         return FileType::Office;
     }
 
     // --- tar (POSIX `ustar` magic at byte 257) ---
-    if data.len() >= 265 && &data[257..262] == b"ustar" {
-        return FileType::Tar;
+    if data.len() >= 265 {
+        if let Some(slice) = data.get(257..262) {
+            if slice == b"ustar" {
+                return FileType::Tar;
+            }
+        }
     }
 
     // --- Script (shebang) ---
@@ -121,6 +139,7 @@ pub fn detect_magic(data: &[u8]) -> FileType {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -192,5 +211,19 @@ mod tests {
     fn detect_macho_64() {
         let magic: [u8; 4] = 0xFEED_FACFu32.to_be_bytes();
         assert_eq!(detect_magic(&magic), FileType::MachO);
+    }
+
+    #[test]
+    fn detect_java_class_not_macho() {
+        // Java .class: 0xCAFEBABE + minor_version(0) + major_version(55 = Java 11)
+        let data: [u8; 8] = [0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x37];
+        assert_eq!(detect_magic(&data), FileType::Unknown);
+    }
+
+    #[test]
+    fn detect_fat_macho_not_java() {
+        // FAT Mach-O: 0xCAFEBABE + nfat_arch=2
+        let data: [u8; 8] = [0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x02];
+        assert_eq!(detect_magic(&data), FileType::MachO);
     }
 }

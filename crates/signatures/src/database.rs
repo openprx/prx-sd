@@ -103,7 +103,7 @@ impl SignatureDatabase {
             .sha256_db
             .get(&rtxn, hash)
             .context("failed to look up SHA-256 hash in LMDB")?
-            .map(|s| s.to_owned());
+            .map(std::borrow::ToOwned::to_owned);
         Ok(result)
     }
 
@@ -128,7 +128,7 @@ impl SignatureDatabase {
             .md5_db
             .get(&rtxn, hash)
             .context("failed to look up MD5 hash in LMDB")?
-            .map(|s| s.to_owned());
+            .map(std::borrow::ToOwned::to_owned);
         Ok(result)
     }
 
@@ -148,8 +148,7 @@ impl SignatureDatabase {
 
         // Update last_update timestamp.
         let now = chrono::Utc::now().timestamp();
-        self.meta_db
-            .put(&mut wtxn, META_KEY_LAST_UPDATE, &now.to_le_bytes())?;
+        self.meta_db.put(&mut wtxn, META_KEY_LAST_UPDATE, &now.to_le_bytes())?;
 
         wtxn.commit()?;
         tracing::info!(imported, "imported SHA-256 hash entries");
@@ -179,14 +178,10 @@ impl SignatureDatabase {
     #[instrument(skip_all)]
     pub fn get_version(&self) -> Result<u64> {
         let rtxn = self.env.read_txn()?;
-        let version = self
-            .meta_db
-            .get(&rtxn, META_KEY_VERSION)?
-            .map(|bytes| {
-                let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
-                u64::from_le_bytes(arr)
-            })
-            .unwrap_or(0);
+        let version = self.meta_db.get(&rtxn, META_KEY_VERSION)?.map_or(0, |bytes| {
+            let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
+            u64::from_le_bytes(arr)
+        });
         Ok(version)
     }
 
@@ -194,8 +189,7 @@ impl SignatureDatabase {
     #[instrument(skip_all, fields(version))]
     pub fn set_version(&self, version: u64) -> Result<()> {
         let mut wtxn = self.env.write_txn()?;
-        self.meta_db
-            .put(&mut wtxn, META_KEY_VERSION, &version.to_le_bytes())?;
+        self.meta_db.put(&mut wtxn, META_KEY_VERSION, &version.to_le_bytes())?;
         wtxn.commit()?;
         Ok(())
     }
@@ -208,14 +202,10 @@ impl SignatureDatabase {
         let hash_count = self.sha256_db.len(&rtxn)?;
         let md5_count = self.md5_db.len(&rtxn)?;
 
-        let version = self
-            .meta_db
-            .get(&rtxn, META_KEY_VERSION)?
-            .map(|bytes| {
-                let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
-                u64::from_le_bytes(arr)
-            })
-            .unwrap_or(0);
+        let version = self.meta_db.get(&rtxn, META_KEY_VERSION)?.map_or(0, |bytes| {
+            let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
+            u64::from_le_bytes(arr)
+        });
 
         let last_update = self.meta_db.get(&rtxn, META_KEY_LAST_UPDATE)?.map(|bytes| {
             let arr: [u8; 8] = bytes.try_into().unwrap_or([0u8; 8]);
@@ -245,8 +235,7 @@ impl SignatureDatabase {
         }
 
         let now = chrono::Utc::now().timestamp();
-        self.meta_db
-            .put(&mut wtxn, META_KEY_LAST_UPDATE, &now.to_le_bytes())?;
+        self.meta_db.put(&mut wtxn, META_KEY_LAST_UPDATE, &now.to_le_bytes())?;
 
         wtxn.commit()?;
         tracing::info!(imported, "imported MD5 hash entries");
@@ -309,8 +298,7 @@ mod tests {
         let (_dir, db) = open_temp_db();
 
         let hash = crate::hash::sha256_hash(b"removable");
-        db.import_hashes(&[(hash.clone(), "Test.Sig".to_string())])
-            .unwrap();
+        db.import_hashes(&[(hash.clone(), "Test.Sig".to_string())]).unwrap();
         assert!(db.sha256_lookup_raw(&hash).unwrap().is_some());
 
         let removed = db.remove_hashes(std::slice::from_ref(&hash)).unwrap();
@@ -327,8 +315,7 @@ mod tests {
         let (_dir, db) = open_temp_db();
 
         let hash = crate::hash::md5_hash(b"md5_sample");
-        db.import_md5_hashes(&[(hash.clone(), "MD5.Test-1".to_string())])
-            .unwrap();
+        db.import_md5_hashes(&[(hash, "MD5.Test-1".to_string())]).unwrap();
 
         let result = db.md5_lookup(b"md5_sample").unwrap();
         assert_eq!(result, Some("MD5.Test-1".to_string()));

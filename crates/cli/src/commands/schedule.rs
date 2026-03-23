@@ -9,8 +9,7 @@ use colored::Colorize;
 /// Rejects paths containing shell metacharacters, newlines, or null bytes.
 fn sanitize_path(path: &str) -> Result<&str> {
     let forbidden = [
-        ';', '&', '|', '`', '$', '(', ')', '{', '}', '<', '>', '!', '\n', '\r', '\0', '\'', '"',
-        '\\',
+        ';', '&', '|', '`', '$', '(', ')', '{', '}', '<', '>', '!', '\n', '\r', '\0', '\'', '"', '\\',
     ];
     for ch in forbidden {
         if path.contains(ch) {
@@ -20,10 +19,7 @@ fn sanitize_path(path: &str) -> Result<&str> {
                 '\0' => "\\0".to_string(),
                 other => other.to_string(),
             };
-            bail!(
-                "scan path contains forbidden character '{}'. Use a simple absolute path like /home.",
-                display
-            );
+            bail!("scan path contains forbidden character '{display}'. Use a simple absolute path like /home.");
         }
     }
     if path.is_empty() {
@@ -87,17 +83,12 @@ fn parse_frequency(freq: &str) -> Result<(&'static str, &'static str)> {
         "weekly" | "7d" => Ok(("weekly", "0 2 * * 0")),
         "4h" => Ok(("*-*-* 0/4:00:00", "0 */4 * * *")),
         "12h" => Ok(("*-*-* 0/12:00:00", "0 */12 * * *")),
-        _ => bail!(
-            "unsupported frequency '{}'. Use: hourly, 4h, 12h, daily, weekly",
-            freq
-        ),
+        _ => bail!("unsupported frequency '{freq}'. Use: hourly, 4h, 12h, daily, weekly"),
     }
 }
 
 fn sd_binary_path() -> String {
-    std::env::current_exe()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "sd".to_string())
+    std::env::current_exe().map_or_else(|_| "sd".to_string(), |p| p.to_string_lossy().to_string())
 }
 
 // ─── systemd timer ──────────────────────────────────────────────────────────
@@ -147,8 +138,7 @@ fn install_systemd_timer(scan_path: &str, frequency: &str, data_dir: &Path) -> R
     let service_path = unit_dir.join("prx-sd-scan.service");
     let timer_path = unit_dir.join("prx-sd-scan.timer");
 
-    std::fs::write(&service_path, service_content)
-        .context("failed to write systemd service unit")?;
+    std::fs::write(&service_path, service_content).context("failed to write systemd service unit")?;
     std::fs::write(&timer_path, timer_content).context("failed to write systemd timer unit")?;
 
     // Reload and enable.
@@ -177,6 +167,7 @@ fn install_systemd_timer(scan_path: &str, frequency: &str, data_dir: &Path) -> R
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[allow(clippy::unnecessary_wraps)]
 fn remove_systemd_timer() -> Result<()> {
     let _ = std::process::Command::new("systemctl")
         .args(["--user", "disable", "--now", "prx-sd-scan.timer"])
@@ -202,6 +193,7 @@ fn remove_systemd_timer() -> Result<()> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[allow(clippy::unnecessary_wraps)]
 fn show_systemd_status() -> Result<()> {
     let output = std::process::Command::new("systemctl")
         .args(["--user", "status", "prx-sd-scan.timer"])
@@ -215,10 +207,7 @@ fn show_systemd_status() -> Result<()> {
                 println!("{stdout}");
             }
             if !stderr.is_empty() && !o.status.success() {
-                println!(
-                    "{}",
-                    "No scheduled scan configured (systemd timer not found)".yellow()
-                );
+                println!("{}", "No scheduled scan configured (systemd timer not found)".yellow());
             }
         }
         Err(_) => {
@@ -315,21 +304,16 @@ fn remove_cron_job() -> Result<()> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[allow(clippy::unnecessary_wraps)]
 fn show_cron_status() -> Result<()> {
     let output = std::process::Command::new("crontab").arg("-l").output();
 
     match output {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout);
-            let found: Vec<&str> = stdout
-                .lines()
-                .filter(|l| l.contains("prx-sd-scheduled-scan"))
-                .collect();
+            let found: Vec<&str> = stdout.lines().filter(|l| l.contains("prx-sd-scheduled-scan")).collect();
             if found.is_empty() {
-                println!(
-                    "{}",
-                    "No scheduled scan configured (no cron job found)".yellow()
-                );
+                println!("{}", "No scheduled scan configured (no cron job found)".yellow());
             } else {
                 println!("{}", "Scheduled scan cron jobs:".cyan().bold());
                 for line in found {
@@ -441,10 +425,7 @@ fn show_launchd_status() -> Result<()> {
             println!("{}", String::from_utf8_lossy(&o.stdout));
         }
         _ => {
-            println!(
-                "{}",
-                "No scheduled scan configured (launchd job not found)".yellow()
-            );
+            println!("{}", "No scheduled scan configured (launchd job not found)".yellow());
         }
     }
     Ok(())
@@ -470,12 +451,16 @@ fn install_task_scheduler(scan_path: &str, frequency: &str, data_dir: &Path) -> 
 
     let status = std::process::Command::new("schtasks")
         .args([
-            "/Create", "/F",
-            "/TN", "PRX-SD Scheduled Scan",
-            "/SC", schtasks_freq,
+            "/Create",
+            "/F",
+            "/TN",
+            "PRX-SD Scheduled Scan",
+            "/SC",
+            schtasks_freq,
             "/TR",
             &format!("\"{sd_bin}\" --data-dir \"{data_dir_str}\" --log-level warn scan \"{scan_path}\" --recursive"),
-            "/RL", "HIGHEST",
+            "/RL",
+            "HIGHEST",
         ])
         .status()
         .context("failed to run schtasks")?;
@@ -484,10 +469,7 @@ fn install_task_scheduler(scan_path: &str, frequency: &str, data_dir: &Path) -> 
         bail!("schtasks /Create failed");
     }
 
-    println!(
-        "{} Windows scheduled task created",
-        "success:".green().bold()
-    );
+    println!("{} Windows scheduled task created", "success:".green().bold());
     println!("  Task name: PRX-SD Scheduled Scan");
     println!("  Frequency: {frequency}");
     println!("  Scan path: {scan_path}");
@@ -499,24 +481,14 @@ fn remove_task_scheduler() -> Result<()> {
     let _ = std::process::Command::new("schtasks")
         .args(["/Delete", "/F", "/TN", "PRX-SD Scheduled Scan"])
         .status();
-    println!(
-        "{} Windows scheduled task removed",
-        "success:".green().bold()
-    );
+    println!("{} Windows scheduled task removed", "success:".green().bold());
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
 fn show_task_scheduler_status() -> Result<()> {
     let output = std::process::Command::new("schtasks")
-        .args([
-            "/Query",
-            "/TN",
-            "PRX-SD Scheduled Scan",
-            "/V",
-            "/FO",
-            "LIST",
-        ])
+        .args(["/Query", "/TN", "PRX-SD Scheduled Scan", "/V", "/FO", "LIST"])
         .output();
 
     match output {
@@ -525,10 +497,7 @@ fn show_task_scheduler_status() -> Result<()> {
             println!("{}", String::from_utf8_lossy(&o.stdout));
         }
         _ => {
-            println!(
-                "{}",
-                "No scheduled scan configured (task not found)".yellow()
-            );
+            println!("{}", "No scheduled scan configured (task not found)".yellow());
         }
     }
     Ok(())
@@ -536,7 +505,7 @@ fn show_task_scheduler_status() -> Result<()> {
 
 // ─── public API ─────────────────────────────────────────────────────────────
 
-pub async fn run_add(scan_path: &str, frequency: &str, data_dir: &Path) -> Result<()> {
+pub fn run_add(scan_path: &str, frequency: &str, data_dir: &Path) -> Result<()> {
     let backend = detect_backend();
     match backend {
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -550,7 +519,7 @@ pub async fn run_add(scan_path: &str, frequency: &str, data_dir: &Path) -> Resul
     }
 }
 
-pub async fn run_remove() -> Result<()> {
+pub fn run_remove() -> Result<()> {
     let backend = detect_backend();
     match backend {
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -564,7 +533,7 @@ pub async fn run_remove() -> Result<()> {
     }
 }
 
-pub async fn run_status() -> Result<()> {
+pub fn run_status() -> Result<()> {
     let backend = detect_backend();
     match backend {
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]

@@ -35,16 +35,13 @@ impl SignatureStorage {
     /// current version from the `version` file (defaulting to 0).
     pub fn new(base_dir: PathBuf) -> Result<Self> {
         // Create directory structure.
-        std::fs::create_dir_all(base_dir.join("deltas"))
-            .context("failed to create deltas directory")?;
-        std::fs::create_dir_all(base_dir.join("full"))
-            .context("failed to create full directory")?;
+        std::fs::create_dir_all(base_dir.join("deltas")).context("failed to create deltas directory")?;
+        std::fs::create_dir_all(base_dir.join("full")).context("failed to create full directory")?;
 
         // Read current version.
         let version_file = base_dir.join("version");
         let version = if version_file.exists() {
-            let text =
-                std::fs::read_to_string(&version_file).context("failed to read version file")?;
+            let text = std::fs::read_to_string(&version_file).context("failed to read version file")?;
             text.trim()
                 .parse::<u64>()
                 .context("invalid version number in version file")?
@@ -77,8 +74,7 @@ impl SignatureStorage {
             bail!("delta {from}..{to} not found at {}", path.display());
         }
 
-        std::fs::read(&path)
-            .with_context(|| format!("failed to read delta file {}", path.display()))
+        std::fs::read(&path).with_context(|| format!("failed to read delta file {}", path.display()))
     }
 
     /// Read the latest full database snapshot.
@@ -99,7 +95,7 @@ impl SignatureStorage {
     /// Serializes and compresses the patch, signs it with the provided key,
     /// writes it to disk, and bumps the current version. Returns the new
     /// version number.
-    pub fn publish(&self, patch: DeltaPatch, signing_key: &SigningKey) -> Result<u64> {
+    pub fn publish(&self, patch: &DeltaPatch, signing_key: &SigningKey) -> Result<u64> {
         let current = self.current_version();
         let new_version = patch.version;
 
@@ -108,7 +104,7 @@ impl SignatureStorage {
         }
 
         // Encode (serialize + zstd compress) the delta.
-        let compressed = encode_delta(&patch).context("failed to encode delta patch")?;
+        let compressed = encode_delta(patch).context("failed to encode delta patch")?;
 
         // Sign the compressed payload: [64-byte sig][compressed data].
         let signed = prx_sd_updater::sign_payload(signing_key, &compressed);
@@ -120,8 +116,7 @@ impl SignatureStorage {
 
         // Update version file and atomic counter.
         let version_file = self.base_dir.join("version");
-        std::fs::write(&version_file, new_version.to_string())
-            .context("failed to update version file")?;
+        std::fs::write(&version_file, new_version.to_string()).context("failed to update version file")?;
         self.current_version.store(new_version, Ordering::Relaxed);
 
         info!(
@@ -136,8 +131,6 @@ impl SignatureStorage {
 
     /// Build the file path for a delta covering `from..to`.
     fn delta_path(&self, from: u64, to: u64) -> PathBuf {
-        self.base_dir
-            .join("deltas")
-            .join(format!("{from}..{to}.bin"))
+        self.base_dir.join("deltas").join(format!("{from}..{to}.bin"))
     }
 }

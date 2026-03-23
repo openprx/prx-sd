@@ -36,6 +36,9 @@ pub mod url_scanner;
 #[cfg(target_os = "linux")]
 pub mod behavior_monitor;
 
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+pub mod ebpf;
+
 #[cfg(target_os = "linux")]
 pub mod linux;
 
@@ -47,9 +50,7 @@ pub mod macos;
 
 // ── Re-exports ──────────────────────────────────────────────────────────────
 
-pub use adblock_filter::{
-    AdblockCategory, AdblockConfig, AdblockFilterManager, AdblockResult, AdblockStats,
-};
+pub use adblock_filter::{AdblockCategory, AdblockConfig, AdblockFilterManager, AdblockResult, AdblockStats};
 pub use dns_filter::{DnsFilter, DnsVerdict};
 pub use dns_proxy::{DnsProxy, DnsProxyConfig};
 pub use event::{FileEvent, FileEventAction};
@@ -62,9 +63,10 @@ pub use registry_monitor::{RegistryEvent, RegistryEventType, RegistryMonitor};
 pub use url_scanner::{MaliciousUrl, UrlScanResult, UrlScanner};
 
 #[cfg(target_os = "linux")]
-pub use behavior_monitor::{
-    BehaviorConfig, BehaviorMonitor, BehaviorVerdict, ProcessBehaviorScore,
-};
+pub use behavior_monitor::{BehaviorConfig, BehaviorMonitor, BehaviorVerdict, ProcessBehaviorScore};
+
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+pub use ebpf::{EbpfMetrics, EbpfPipeline, EbpfRuntime, PipelineOutput, RuntimeEvent, RuntimeEventKind};
 
 #[cfg(target_os = "linux")]
 pub use linux::FanotifyMonitor;

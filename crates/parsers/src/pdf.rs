@@ -19,6 +19,7 @@ use tracing::debug;
 
 /// Information about a PDF document relevant to security analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct PdfInfo {
     /// PDF version string (e.g. "1.7").
     pub version: String,
@@ -62,16 +63,17 @@ pub fn parse_pdf(data: &[u8]) -> Result<PdfInfo> {
     let version = extract_version(&header);
 
     let text = String::from_utf8_lossy(data);
+    let text_lower = text.to_lowercase();
 
-    let has_javascript = text.contains("/JavaScript") || text.contains("/JS ");
-    let has_embedded_files = text.contains("/EmbeddedFile");
-    let has_launch_action = text.contains("/Launch");
-    let has_uri_action = text.contains("/URI");
+    let has_javascript = text_lower.contains("/javascript") || text_lower.contains("/js ");
+    let has_embedded_files = text_lower.contains("/embeddedfile");
+    let has_launch_action = text_lower.contains("/launch");
+    let has_uri_action = text_lower.contains("/uri");
 
     let suspicious_keywords: Vec<String> = SUSPICIOUS_KEYWORDS
         .iter()
-        .filter(|kw| text.contains(*kw))
-        .map(|kw| kw.to_string())
+        .filter(|kw| text_lower.contains(&kw.to_lowercase()))
+        .map(std::string::ToString::to_string)
         .collect();
 
     debug!(
@@ -116,6 +118,7 @@ pub struct PdfSuspiciousPattern {
 
 /// Extended PDF analysis result with exploit detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct PdfAnalysis {
     pub version: Option<String>,
     pub page_count: u32,
@@ -140,6 +143,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     let version = Some(extract_version(&header));
 
     let text = String::from_utf8_lossy(data);
+    let text_lower = text.to_lowercase();
     let mut patterns: Vec<PdfSuspiciousPattern> = Vec::new();
     let mut score: u32 = 0;
 
@@ -147,7 +151,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     let page_count = count_pages(&text);
 
     // ── JavaScript detection ────────────────────────────────────────
-    let javascript_count = count_javascript(&text);
+    let javascript_count = count_javascript(&text_lower);
     let has_javascript = javascript_count > 0;
     if has_javascript {
         score += 30;
@@ -161,7 +165,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
 
     // ── Launch / SubmitForm / ImportData actions ─────────────────────
     let has_launch_action =
-        text.contains("/Launch") || text.contains("/SubmitForm") || text.contains("/ImportData");
+        text_lower.contains("/launch") || text_lower.contains("/submitform") || text_lower.contains("/importdata");
     if has_launch_action {
         score += 40;
         patterns.push(PdfSuspiciousPattern {
@@ -175,7 +179,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── OpenAction ──────────────────────────────────────────────────
-    let has_open_action = text.contains("/OpenAction");
+    let has_open_action = text_lower.contains("/openaction");
     if has_open_action {
         let severity = if has_javascript {
             // OpenAction combined with JS is very dangerous
@@ -194,7 +198,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── Automatic actions (/AA) ─────────────────────────────────────
-    let has_auto_action = text.contains("/AA");
+    let has_auto_action = text_lower.contains("/aa");
     if has_auto_action {
         score += 15;
         patterns.push(PdfSuspiciousPattern {
@@ -206,7 +210,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── Embedded files ──────────────────────────────────────────────
-    let has_embedded_file = text.contains("/EmbeddedFile") || text.contains("/Filespec");
+    let has_embedded_file = text_lower.contains("/embeddedfile") || text_lower.contains("/filespec");
     if has_embedded_file {
         score += 10;
         patterns.push(PdfSuspiciousPattern {
@@ -218,7 +222,7 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── Encryption ──────────────────────────────────────────────────
-    let has_encrypted_content = text.contains("/Encrypt");
+    let has_encrypted_content = text_lower.contains("/encrypt");
     if has_encrypted_content {
         score += 5;
         patterns.push(PdfSuspiciousPattern {
@@ -230,13 +234,13 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
     }
 
     // ── Known CVE patterns ──────────────────────────────────────────
-    check_cve_patterns(data, &text, &mut patterns, &mut score);
+    check_cve_patterns(data, &text_lower, &mut patterns, &mut score);
 
     // ── Obfuscation indicators ──────────────────────────────────────
-    check_obfuscation(data, &text, &mut patterns, &mut score);
+    check_obfuscation(&text_lower, &mut patterns, &mut score);
 
     // ── Very long streams (heap spray) ──────────────────────────────
-    check_heap_spray(&text, &mut patterns, &mut score);
+    check_heap_spray(&text_lower, &mut patterns, &mut score);
 
     let score = score.min(100);
 
@@ -274,7 +278,10 @@ pub fn analyze_pdf(data: &[u8]) -> Result<PdfAnalysis> {
 fn count_pages(text: &str) -> u32 {
     let mut count: u32 = 0;
     let mut search_from = 0;
-    while let Some(pos) = text[search_from..].find("/Type /Page") {
+    while let Some(remaining) = text.get(search_from..) {
+        let Some(pos) = remaining.find("/Type /Page") else {
+            break;
+        };
         let abs = search_from + pos;
         // Make sure this is "/Type /Page" and not "/Type /Pages"
         let after = abs + "/Type /Page".len();
@@ -286,12 +293,15 @@ fn count_pages(text: &str) -> u32 {
     count
 }
 
-/// Count JavaScript references in the PDF text.
+/// Count JavaScript references in the PDF text (expects lowercased input).
 fn count_javascript(text: &str) -> u32 {
     let mut count: u32 = 0;
-    for needle in &["/JavaScript", "/JS "] {
+    for needle in &["/javascript", "/js "] {
         let mut from = 0;
-        while let Some(pos) = text[from..].find(needle) {
+        while let Some(remaining) = text.get(from..) {
+            let Some(pos) = remaining.find(needle) else {
+                break;
+            };
             count += 1;
             from += pos + needle.len();
         }
@@ -305,30 +315,23 @@ fn find_bytes(data: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 /// Check for known CVE exploit patterns.
-fn check_cve_patterns(
-    data: &[u8],
-    text: &str,
-    patterns: &mut Vec<PdfSuspiciousPattern>,
-    score: &mut u32,
-) {
+///
+/// `text_lower` must be the lowercased text representation of the PDF data.
+/// Raw `data` is used only for byte-offset lookups on the original bytes.
+fn check_cve_patterns(data: &[u8], text_lower: &str, patterns: &mut Vec<PdfSuspiciousPattern>, score: &mut u32) {
     // CVE-2010-0188: TIFF overflow via very long /DecodeParms
     // Triggered by crafted TIFF images with oversized DecodeParms dictionaries
     if let Some(offset) = find_bytes(data, b"/DecodeParms") {
         // Check if there is an unusually large dictionary following it
-        let region_start = offset;
         let region_end = (offset + 4096).min(data.len());
-        let region = &data[region_start..region_end];
+        let region = data.get(offset..region_end).unwrap_or(&[]);
         // JBIG2Decode combined with long DecodeParms is a strong CVE-2010-0188 indicator
-        if text.contains("/JBIG2Decode")
-            && region
-                .windows(b"/JBIG2Globals".len())
-                .any(|w| w == b"/JBIG2Globals")
+        if text_lower.contains("/jbig2decode") && region.windows(b"/JBIG2Globals".len()).any(|w| w == b"/JBIG2Globals")
         {
             *score += 60;
             patterns.push(PdfSuspiciousPattern {
                 pattern_name: "CVE-2010-0188".to_string(),
-                description: "JBIG2Decode with globals — potential TIFF overflow exploit"
-                    .to_string(),
+                description: "JBIG2Decode with globals — potential TIFF overflow exploit".to_string(),
                 severity: PatternSeverity::Critical,
                 offset: Some(offset),
             });
@@ -337,7 +340,7 @@ fn check_cve_patterns(
 
     // CVE-2013-0640: Adobe Reader sandbox escape
     // Indicator: JavaScript + XFA forms combination
-    if text.contains("/XFA") && (text.contains("/JavaScript") || text.contains("/JS ")) {
+    if text_lower.contains("/xfa") && (text_lower.contains("/javascript") || text_lower.contains("/js ")) {
         *score += 60;
         patterns.push(PdfSuspiciousPattern {
             pattern_name: "CVE-2013-0640".to_string(),
@@ -368,15 +371,10 @@ fn check_cve_patterns(
     }
 }
 
-/// Check for obfuscation indicators.
-fn check_obfuscation(
-    _data: &[u8],
-    text: &str,
-    patterns: &mut Vec<PdfSuspiciousPattern>,
-    score: &mut u32,
-) {
+/// Check for obfuscation indicators (expects lowercased `text_lower`).
+fn check_obfuscation(text_lower: &str, patterns: &mut Vec<PdfSuspiciousPattern>, score: &mut u32) {
     // Hex-encoded object names (e.g. #4A#61#76#61#53#63#72#69#70#74 = JavaScript)
-    let hex_sequences = count_hex_encoded_names(text);
+    let hex_sequences = count_hex_encoded_names(text_lower);
     if hex_sequences > 2 {
         *score += 10;
         patterns.push(PdfSuspiciousPattern {
@@ -388,20 +386,19 @@ fn check_obfuscation(
     }
 
     // ASCII85Decode + FlateDecode chain (common obfuscation technique)
-    if text.contains("/ASCII85Decode") && text.contains("/FlateDecode") {
+    if text_lower.contains("/ascii85decode") && text_lower.contains("/flatedecode") {
         *score += 10;
         patterns.push(PdfSuspiciousPattern {
             pattern_name: "EncodingChain".to_string(),
-            description: "ASCII85Decode + FlateDecode filter chain (obfuscation indicator)"
-                .to_string(),
+            description: "ASCII85Decode + FlateDecode filter chain (obfuscation indicator)".to_string(),
             severity: PatternSeverity::Medium,
             offset: None,
         });
     }
 
     // Multiple levels of /ObjStm (object streams hide content)
-    if text.contains("/ObjStm") {
-        let obj_stm_count = text.matches("/ObjStm").count();
+    if text_lower.contains("/objstm") {
+        let obj_stm_count = text_lower.matches("/objstm").count();
         if obj_stm_count > 3 {
             *score += 10;
             patterns.push(PdfSuspiciousPattern {
@@ -415,20 +412,24 @@ fn check_obfuscation(
 }
 
 /// Count hex-encoded PDF names (sequences like `#XX` in name tokens).
+// Loop indices are always bounds-checked by the `while` conditions.
+#[allow(clippy::indexing_slicing)]
 fn count_hex_encoded_names(text: &str) -> u32 {
     let bytes = text.as_bytes();
     let mut count: u32 = 0;
     let mut i = 0;
 
+    // `i + 3 < bytes.len()` guarantees `bytes[i]` is safe.
     while i + 3 < bytes.len() {
         // Look for / followed by sequences containing #XX
         if bytes[i] == b'/' {
             let mut hex_in_name = 0u32;
             let mut j = i + 1;
+            // `j + 2 < bytes.len()` guarantees `bytes[j]` is safe.
             while j + 2 < bytes.len() && !bytes[j].is_ascii_whitespace() && bytes[j] != b'/' {
                 if bytes[j] == b'#'
-                    && bytes.get(j + 1).is_some_and(|b| b.is_ascii_hexdigit())
-                    && bytes.get(j + 2).is_some_and(|b| b.is_ascii_hexdigit())
+                    && bytes.get(j + 1).is_some_and(u8::is_ascii_hexdigit)
+                    && bytes.get(j + 2).is_some_and(u8::is_ascii_hexdigit)
                 {
                     hex_in_name += 1;
                     j += 3;
@@ -453,12 +454,17 @@ fn check_heap_spray(text: &str, patterns: &mut Vec<PdfSuspiciousPattern>, score:
     // Check for very large stream lengths (> 1 MB is suspicious for PDFs
     // that are not primarily image containers)
     let mut from = 0;
-    while let Some(pos) = text[from..].find("/Length ") {
-        let abs = from + pos + "/Length ".len();
+    while let Some(remaining) = text.get(from..) {
+        let Some(pos) = remaining.find("/length ") else {
+            break;
+        };
+        let abs = from + pos + "/length ".len();
         // Parse the numeric value
-        let num_str: String = text[abs..]
+        let num_str: String = text
+            .get(abs..)
+            .unwrap_or("")
             .chars()
-            .take_while(|c| c.is_ascii_digit())
+            .take_while(char::is_ascii_digit)
             .collect();
         if let Ok(length) = num_str.parse::<u64>() {
             // 10 MB+ stream is a heap spray indicator
@@ -491,18 +497,18 @@ fn check_heap_spray(text: &str, patterns: &mut Vec<PdfSuspiciousPattern>, score:
 /// Locate the `%PDF-x.y` header, which may not be at offset 0 (some PDFs have
 /// a small preamble).
 fn find_pdf_header(data: &[u8]) -> Result<String> {
-    let search_range = &data[..data.len().min(1024)];
+    let search_range = data.get(..data.len().min(1024)).unwrap_or(data);
     let needle = b"%PDF-";
 
     for i in 0..search_range.len().saturating_sub(needle.len()) {
-        if &search_range[i..i + needle.len()] == needle {
+        if search_range.get(i..i + needle.len()) == Some(needle.as_slice()) {
             let start = i;
-            let end = search_range[start..]
-                .iter()
-                .position(|&b| b == b'\n' || b == b'\r')
-                .map(|pos| start + pos)
-                .unwrap_or((start + 16).min(data.len()));
-            return Ok(String::from_utf8_lossy(&data[start..end]).to_string());
+            let end = search_range
+                .get(start..)
+                .and_then(|s| s.iter().position(|&b| b == b'\n' || b == b'\r'))
+                .map_or_else(|| (start + 16).min(data.len()), |pos| start + pos);
+            let header_bytes = data.get(start..end).unwrap_or(&[]);
+            return Ok(String::from_utf8_lossy(header_bytes).to_string());
         }
     }
 
@@ -511,16 +517,13 @@ fn find_pdf_header(data: &[u8]) -> Result<String> {
 
 /// Extract the version number from a `%PDF-x.y` header string.
 fn extract_version(header: &str) -> String {
-    header
-        .strip_prefix("%PDF-")
-        .unwrap_or("unknown")
-        .trim()
-        .to_string()
+    header.strip_prefix("%PDF-").unwrap_or("unknown").trim().to_string()
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -553,8 +556,7 @@ mod tests {
 
     #[test]
     fn detect_javascript() {
-        let data =
-            make_pdf("4 0 obj\n<< /Type /Action /S /JavaScript /JS (app.alert('hi')) >>\nendobj");
+        let data = make_pdf("4 0 obj\n<< /Type /Action /S /JavaScript /JS (app.alert('hi')) >>\nendobj");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
         assert!(analysis.has_javascript);
         assert!(analysis.javascript_count >= 1);
@@ -605,9 +607,7 @@ mod tests {
     #[test]
     fn detect_obfuscation_hex_names() {
         // #4A#61#76#61 = Java (4 hex-encoded chars => qualifies)
-        let data = make_pdf(
-            "4 0 obj\n<< /#4A#61#76#61Script (x) /#4A#61#76#61 (y) /#4A#61#76#61 (z) >>\nendobj",
-        );
+        let data = make_pdf("4 0 obj\n<< /#4A#61#76#61Script (x) /#4A#61#76#61 (y) /#4A#61#76#61 (z) >>\nendobj");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
         assert!(analysis
             .suspicious_patterns
@@ -637,5 +637,13 @@ mod tests {
     fn invalid_data_returns_error() {
         let data = b"not a pdf";
         assert!(analyze_pdf(data).is_err());
+    }
+
+    #[test]
+    fn detect_case_insensitive_javascript() {
+        let data = make_pdf("4 0 obj\n<< /Type /Action /S /javascript /js (app.alert('hi')) >>\nendobj");
+        let analysis = analyze_pdf(&data).expect("analysis should succeed");
+        assert!(analysis.has_javascript);
+        assert!(analysis.threat_score >= 30);
     }
 }

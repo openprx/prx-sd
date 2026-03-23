@@ -1,7 +1,7 @@
 //! WASM plugin system for the prx-sd antivirus engine.
 //!
 //! Allows users to write custom detection/remediation plugins in any language
-//! that compiles to WASM (Rust, Go, C, AssemblyScript, etc.).
+//! that compiles to WASM (Rust, Go, C, `AssemblyScript`, etc.).
 //!
 //! When compiled without the `wasm-runtime` feature the host and registry
 //! are still available but every scan returns an empty result set and a

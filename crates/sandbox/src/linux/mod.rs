@@ -21,8 +21,8 @@ use std::time::Duration;
 use anyhow::Result;
 
 use crate::{
-    FileOpType, FileOperation, NetworkAttempt, ProcessOpType, ProcessOperation, SandboxConfig,
-    SandboxResult, SandboxVerdict,
+    FileOpType, FileOperation, NetworkAttempt, ProcessOpType, ProcessOperation, SandboxConfig, SandboxResult,
+    SandboxVerdict,
 };
 
 /// Execute a file in the Linux sandbox with ptrace-based syscall tracing.
@@ -135,7 +135,10 @@ pub fn execute(config: &SandboxConfig, path: &Path, args: &[&str]) -> Result<San
             // Process exit.
             "exit" | "exit_group" => {
                 saw_exit = true;
-                exit_code = event.return_value as i32;
+                #[allow(clippy::cast_possible_truncation)] // exit codes are i32 by convention
+                {
+                    exit_code = event.return_value as i32;
+                }
             }
             _ => {}
         }
@@ -154,6 +157,7 @@ pub fn execute(config: &SandboxConfig, path: &Path, args: &[&str]) -> Result<San
         network_attempts,
         file_operations,
         process_operations,
+        #[allow(clippy::cast_possible_truncation)] // millis within u64 range for practical timeouts
         execution_time_ms: elapsed.as_millis() as u64,
     })
 }

@@ -4,6 +4,36 @@
 //! Exercises the full detection pipeline with multiple detection methods active
 //! simultaneously and verifies correct aggregation.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
@@ -26,8 +56,7 @@ fn setup_mixed_engine(tmp: &tempfile::TempDir) -> ScanEngine {
     // Import a SHA-256 hash.
     let db = SignatureDatabase::open(&sigs_dir).expect("open db");
     let hash = prx_sd_signatures::hash::sha256_hash(HASH_MALWARE);
-    db.import_hashes(&[(hash, "Mixed.Hash.Malware".to_string())])
-        .unwrap();
+    db.import_hashes(&[(hash, "Mixed.Hash.Malware".to_string())]).unwrap();
     drop(db);
 
     // Write a YARA rule matching "MIXED_YARA_EVIL_MARKER".
@@ -137,8 +166,7 @@ async fn file_matching_both_hash_and_yara_is_malicious() {
 
     let db = SignatureDatabase::open(&sigs_dir).expect("open db");
     let hash = prx_sd_signatures::hash::sha256_hash(dual_content);
-    db.import_hashes(&[(hash, "Dual.Hash.Match".to_string())])
-        .unwrap();
+    db.import_hashes(&[(hash, "Dual.Hash.Match".to_string())]).unwrap();
     drop(db);
 
     fs::write(

@@ -11,6 +11,7 @@ use std::path::Path;
 // ── wasm-runtime enabled ────────────────────────────────────────────────────
 
 #[cfg(feature = "wasm-runtime")]
+#[allow(clippy::wildcard_imports, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 mod inner {
     use super::*;
     use wasmtime::*;
@@ -18,12 +19,12 @@ mod inner {
     use wasmtime_wasi::WasiCtxBuilder;
 
     /// Per-instance state that host functions read/write.
-    pub(crate) struct PluginState {
-        pub(crate) wasi: WasiP1Ctx,
-        pub(crate) findings: Vec<PluginFinding>,
-        pub(crate) file_path: String,
-        pub(crate) file_type: String,
-        pub(crate) plugin_name: String,
+    struct PluginState {
+        wasi: WasiP1Ctx,
+        findings: Vec<PluginFinding>,
+        file_path: String,
+        file_type: String,
+        plugin_name: String,
     }
 
     /// Loads, compiles, and runs a single WASM plugin.
@@ -45,7 +46,7 @@ mod inner {
             let mut config = Config::new();
             config.consume_fuel(true);
             // Clamp memory: 1 page = 64 KiB
-            let max_pages = (manifest.permissions.max_memory_mb as u64 * 1024 * 1024) / 65536;
+            let max_pages = (u64::from(manifest.permissions.max_memory_mb) * 1024 * 1024) / 65536;
             config.memory_reservation(max_pages * 65536);
             let engine = Engine::new(&config).context("failed to create wasmtime engine")?;
 
@@ -66,11 +67,7 @@ mod inner {
 
         /// Instantiate the module just to call `on_load`, `plugin_name`, and
         /// `plugin_version`.
-        fn init_plugin_info(
-            engine: &Engine,
-            module: &Module,
-            manifest: &PluginManifest,
-        ) -> Result<PluginInfo> {
+        fn init_plugin_info(engine: &Engine, module: &Module, manifest: &PluginManifest) -> Result<PluginInfo> {
             let wasi = WasiCtxBuilder::new().build_p1();
             let state = PluginState {
                 wasi,
@@ -94,17 +91,15 @@ mod inner {
 
             // Call on_load.
             if let Ok(on_load) = instance.get_typed_func::<(), i32>(&mut store, "on_load") {
-                let rc = on_load
-                    .call(&mut store, ())
-                    .context("on_load call failed")?;
+                let rc = on_load.call(&mut store, ()).context("on_load call failed")?;
                 if rc != 0 {
                     anyhow::bail!("plugin on_load returned non-zero: {rc}");
                 }
             }
 
             // Read plugin_name.
-            let name = read_plugin_string(&instance, &mut store, "plugin_name")
-                .unwrap_or_else(|_| manifest.name.clone());
+            let name =
+                read_plugin_string(&instance, &mut store, "plugin_name").unwrap_or_else(|_| manifest.name.clone());
 
             // Read plugin_version.
             let version = read_plugin_string(&instance, &mut store, "plugin_version")
@@ -121,12 +116,7 @@ mod inner {
         }
 
         /// Run the plugin's `scan` export on the supplied file data.
-        pub fn scan(
-            &self,
-            file_data: &[u8],
-            file_path: &str,
-            file_type: &str,
-        ) -> Result<Vec<PluginFinding>> {
+        pub fn scan(&self, file_data: &[u8], file_path: &str, file_type: &str) -> Result<Vec<PluginFinding>> {
             let wasi = WasiCtxBuilder::new().build_p1();
 
             let state = PluginState {
@@ -140,11 +130,7 @@ mod inner {
             let mut store = Store::new(&self.engine, state);
 
             // Convert max_exec_ms into fuel. Rough heuristic: 1 000 fuel per ms.
-            let fuel = self
-                .manifest
-                .permissions
-                .max_exec_ms
-                .saturating_mul(1_000_000);
+            let fuel = self.manifest.permissions.max_exec_ms.saturating_mul(1_000_000);
             store.set_fuel(fuel)?;
 
             let mut linker: Linker<PluginState> = Linker::new(&self.engine);
@@ -163,26 +149,25 @@ mod inner {
 
             // Try to use a plugin-exported allocator; fall back to writing at a
             // fixed offset past the initial data segment.
-            let guest_ptr: u32 =
-                if let Ok(alloc) = instance.get_typed_func::<u32, u32>(&mut store, "alloc") {
-                    alloc
-                        .call(&mut store, file_data.len() as u32)
-                        .context("plugin alloc failed")?
-                } else {
-                    // Grow memory if necessary and write at the end of the
-                    // current memory region.
-                    let current_size = memory.data_size(&store);
-                    let needed = current_size + file_data.len();
-                    let pages_needed = (needed as u64)
-                        .saturating_sub(memory.data_size(&store) as u64)
-                        .div_ceil(65536);
-                    if pages_needed > 0 {
-                        memory
-                            .grow(&mut store, pages_needed)
-                            .context("failed to grow guest memory")?;
-                    }
-                    current_size as u32
-                };
+            let guest_ptr: u32 = if let Ok(alloc) = instance.get_typed_func::<u32, u32>(&mut store, "alloc") {
+                alloc
+                    .call(&mut store, file_data.len() as u32)
+                    .context("plugin alloc failed")?
+            } else {
+                // Grow memory if necessary and write at the end of the
+                // current memory region.
+                let current_size = memory.data_size(&store);
+                let needed = current_size + file_data.len();
+                let pages_needed = (needed as u64)
+                    .saturating_sub(memory.data_size(&store) as u64)
+                    .div_ceil(65536);
+                if pages_needed > 0 {
+                    memory
+                        .grow(&mut store, pages_needed)
+                        .context("failed to grow guest memory")?;
+                }
+                current_size as u32
+            };
 
             memory
                 .write(&mut store, guest_ptr as usize, file_data)
@@ -193,7 +178,7 @@ mod inner {
                 .get_typed_func::<(u32, u32), i32>(&mut store, "scan")
                 .context("plugin does not export scan(i32, i32) -> i32")?;
 
-            let score = match scan_fn.call(&mut store, (guest_ptr, file_data.len() as u32)) {
+            let threat_score = match scan_fn.call(&mut store, (guest_ptr, file_data.len() as u32)) {
                 Ok(s) => s.clamp(0, 100) as u32,
                 Err(e) => {
                     // Out-of-fuel is treated as a timeout; report it but don't
@@ -210,34 +195,30 @@ mod inner {
 
             // If the plugin returned a non-zero score but did not call
             // `report_finding`, synthesise a finding from the score alone.
-            if score > 0 && findings.is_empty() {
+            if threat_score > 0 && findings.is_empty() {
                 findings.push(PluginFinding {
                     plugin_name: self.info.name.clone(),
                     threat_name: format!("Plugin.{}", self.info.name),
-                    score,
-                    detail: format!("Plugin '{}' returned threat score {score}", self.info.name),
+                    score: threat_score,
+                    detail: format!("Plugin '{}' returned threat score {threat_score}", self.info.name),
                 });
             }
 
             Ok(findings)
         }
 
-        pub fn info(&self) -> &PluginInfo {
+        pub const fn info(&self) -> &PluginInfo {
             &self.info
         }
 
-        pub fn manifest(&self) -> &PluginManifest {
+        pub const fn manifest(&self) -> &PluginManifest {
             &self.manifest
         }
     }
 
     // ── helper: read a string from a plugin export ──────────────────────────
 
-    fn read_plugin_string(
-        instance: &Instance,
-        store: &mut Store<PluginState>,
-        func_name: &str,
-    ) -> Result<String> {
+    fn read_plugin_string(instance: &Instance, store: &mut Store<PluginState>, func_name: &str) -> Result<String> {
         let memory = instance
             .get_memory(&mut *store, "memory")
             .context("no exported memory")?;
@@ -259,7 +240,8 @@ mod inner {
 
         let data = memory.data(&*store);
         let start = buf_ptr as usize;
-        let slice = &data[start..start + len];
+        let end = start.saturating_add(len).min(data.len());
+        let slice = data.get(start..end).unwrap_or_default();
         Ok(String::from_utf8_lossy(slice).into_owned())
     }
 
@@ -276,9 +258,8 @@ mod inner {
              score: u32,
              detail_ptr: u32,
              detail_len: u32| {
-                let mem = match caller.get_export("memory") {
-                    Some(Extern::Memory(m)) => m,
-                    _ => return,
+                let Some(Extern::Memory(mem)) = caller.get_export("memory") else {
+                    return;
                 };
                 let data = mem.data(&caller);
                 let threat_name = read_guest_string(data, name_ptr, name_len);
@@ -298,9 +279,8 @@ mod inner {
             "env",
             "log_message",
             |mut caller: Caller<'_, PluginState>, level: u32, msg_ptr: u32, msg_len: u32| {
-                let mem = match caller.get_export("memory") {
-                    Some(Extern::Memory(m)) => m,
-                    _ => return,
+                let Some(Extern::Memory(mem)) = caller.get_export("memory") else {
+                    return;
                 };
                 let msg = read_guest_string(mem.data(&caller), msg_ptr, msg_len);
                 let name = &caller.data().plugin_name;
@@ -340,22 +320,17 @@ mod inner {
     fn read_guest_string(data: &[u8], ptr: u32, len: u32) -> String {
         let start = ptr as usize;
         let end = start.saturating_add(len as usize).min(data.len());
-        if start >= data.len() {
-            return String::new();
-        }
-        String::from_utf8_lossy(&data[start..end]).into_owned()
+        let slice = data.get(start..end).unwrap_or_default();
+        String::from_utf8_lossy(slice).into_owned()
     }
 
     fn write_to_guest(caller: &mut Caller<'_, PluginState>, ptr: u32, len: u32, src: &[u8]) -> u32 {
-        let mem = match caller.get_export("memory") {
-            Some(Extern::Memory(m)) => m,
-            _ => return 0,
+        let Some(Extern::Memory(mem)) = caller.get_export("memory") else {
+            return 0;
         };
         let to_write = src.len().min(len as usize);
-        if mem
-            .write(&mut *caller, ptr as usize, &src[..to_write])
-            .is_err()
-        {
+        let write_slice = src.get(..to_write).unwrap_or(src);
+        if mem.write(&mut *caller, ptr as usize, write_slice).is_err() {
             return 0;
         }
         src.len() as u32
@@ -392,12 +367,7 @@ mod inner {
             Ok(Self { manifest, info })
         }
 
-        pub fn scan(
-            &self,
-            _file_data: &[u8],
-            _file_path: &str,
-            _file_type: &str,
-        ) -> Result<Vec<PluginFinding>> {
+        pub fn scan(&self, _file_data: &[u8], _file_path: &str, _file_type: &str) -> Result<Vec<PluginFinding>> {
             tracing::warn!(
                 plugin = %self.info.name,
                 "WASM plugins disabled; scan is a no-op"
@@ -405,11 +375,11 @@ mod inner {
             Ok(Vec::new())
         }
 
-        pub fn info(&self) -> &PluginInfo {
+        pub const fn info(&self) -> &PluginInfo {
             &self.info
         }
 
-        pub fn manifest(&self) -> &PluginManifest {
+        pub const fn manifest(&self) -> &PluginManifest {
             &self.manifest
         }
     }
@@ -436,22 +406,17 @@ impl PluginHost {
     }
 
     /// Run the plugin scanner on `file_data`.
-    pub fn scan(
-        &self,
-        file_data: &[u8],
-        file_path: &str,
-        file_type: &str,
-    ) -> Result<Vec<PluginFinding>> {
+    pub fn scan(&self, file_data: &[u8], file_path: &str, file_type: &str) -> Result<Vec<PluginFinding>> {
         self.inner.scan(file_data, file_path, file_type)
     }
 
     /// Plugin metadata.
-    pub fn info(&self) -> &PluginInfo {
+    pub const fn info(&self) -> &PluginInfo {
         self.inner.info()
     }
 
     /// Raw manifest.
-    pub fn manifest(&self) -> &PluginManifest {
+    pub const fn manifest(&self) -> &PluginManifest {
         self.inner.manifest()
     }
 }

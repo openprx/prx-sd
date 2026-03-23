@@ -1,5 +1,6 @@
 //! Scan report export — generates self-contained HTML reports from scan results.
 
+use std::fmt::Write;
 use std::io::Read;
 use std::path::Path;
 
@@ -9,10 +10,7 @@ use prx_sd_core::{ScanResult, ThreatLevel};
 /// Generate a self-contained HTML scan report from scan results.
 pub fn generate_html_report(results: &[ScanResult], scan_path: &str, elapsed_ms: u64) -> String {
     let total = results.len();
-    let clean = results
-        .iter()
-        .filter(|r| r.threat_level == ThreatLevel::Clean)
-        .count();
+    let clean = results.iter().filter(|r| r.threat_level == ThreatLevel::Clean).count();
     let suspicious = results
         .iter()
         .filter(|r| r.threat_level == ThreatLevel::Suspicious)
@@ -50,21 +48,21 @@ pub fn generate_html_report(results: &[ScanResult], scan_path: &str, elapsed_ms:
         let detection = r
             .detection_type
             .as_ref()
-            .map(|d| format!("{d}"))
-            .unwrap_or_else(|| "-".to_string());
+            .map_or_else(|| "-".to_string(), |d| format!("{d}"));
         let path_display = html_escape(r.path.display().to_string().as_str());
         let threat_name_escaped = html_escape(threat_name);
 
-        threat_rows.push_str(&format!(
+        let _ = writeln!(
+            threat_rows,
             "<tr>\
                 <td title=\"{path_display}\">{path_display}</td>\
                 <td class=\"{level_class}\">{level_text}</td>\
                 <td>{threat_name_escaped}</td>\
                 <td>{detection}</td>\
                 <td>{} ms</td>\
-            </tr>\n",
+            </tr>",
             r.scan_time_ms,
-        ));
+        );
     }
 
     let no_threats_row = if threat_rows.is_empty() {
@@ -176,9 +174,7 @@ pub fn generate_html_report(results: &[ScanResult], scan_path: &str, elapsed_ms:
 
 /// Retrieve the system hostname, falling back to "unknown" on error.
 fn get_hostname() -> String {
-    std::fs::read_to_string("/etc/hostname")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "unknown".to_string())
+    std::fs::read_to_string("/etc/hostname").map_or_else(|_| "unknown".to_string(), |s| s.trim().to_string())
 }
 
 /// Minimal HTML entity escaping.
@@ -197,13 +193,12 @@ pub fn write_report(path: &Path, html: &str) -> Result<()> {
                 .with_context(|| format!("failed to create directory {}", parent.display()))?;
         }
     }
-    std::fs::write(path, html)
-        .with_context(|| format!("failed to write report to {}", path.display()))?;
+    std::fs::write(path, html).with_context(|| format!("failed to write report to {}", path.display()))?;
     Ok(())
 }
 
 /// Run the standalone `sd report` command: read JSON scan results and produce HTML.
-pub async fn run(output: &Path, input: &str) -> Result<()> {
+pub fn run(output: &Path, input: &str) -> Result<()> {
     let json_str = if input == "-" {
         let mut buf = String::new();
         std::io::stdin()
@@ -211,12 +206,10 @@ pub async fn run(output: &Path, input: &str) -> Result<()> {
             .context("failed to read from stdin")?;
         buf
     } else {
-        std::fs::read_to_string(input)
-            .with_context(|| format!("failed to read input file: {input}"))?
+        std::fs::read_to_string(input).with_context(|| format!("failed to read input file: {input}"))?
     };
 
-    let results: Vec<ScanResult> =
-        serde_json::from_str(&json_str).context("failed to parse JSON scan results")?;
+    let results: Vec<ScanResult> = serde_json::from_str(&json_str).context("failed to parse JSON scan results")?;
 
     let html = generate_html_report(&results, "(from JSON input)", 0);
     write_report(output, &html)?;

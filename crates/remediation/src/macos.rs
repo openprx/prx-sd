@@ -171,9 +171,7 @@ pub fn clean_login_items(path: &Path) -> Result<Vec<String>> {
                 "tell application \"System Events\" to get the path of login item \"{}\"",
                 safe_name
             );
-            let check_output = Command::new("osascript")
-                .args(["-e", &check_script])
-                .output();
+            let check_output = Command::new("osascript").args(["-e", &check_script]).output();
 
             if let Ok(co) = check_output {
                 let item_path = String::from_utf8_lossy(&co.stdout).trim().to_string();
@@ -182,9 +180,7 @@ pub fn clean_login_items(path: &Path) -> Result<Vec<String>> {
                         "tell application \"System Events\" to delete login item \"{}\"",
                         safe_name
                     );
-                    let _ = Command::new("osascript")
-                        .args(["-e", &delete_script])
-                        .output();
+                    let _ = Command::new("osascript").args(["-e", &delete_script]).output();
                     let desc = format!("removed login item: {}", item_name);
                     tracing::info!("{}", desc);
                     cleaned.push(desc);
@@ -225,13 +221,7 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
 
     // User profiles
     if let Ok(home) = std::env::var("HOME") {
-        let user_files = [
-            ".bashrc",
-            ".bash_profile",
-            ".profile",
-            ".zshrc",
-            ".zprofile",
-        ];
+        let user_files = [".bashrc", ".bash_profile", ".profile", ".zshrc", ".zprofile"];
         for uf in &user_files {
             let uf_path = Path::new(&home).join(uf);
             if uf_path.exists() {
@@ -268,8 +258,7 @@ pub fn isolate_network_pf() -> Result<()> {
         .context("failed to run pfctl -sr")?;
 
     if output.status.success() {
-        fs::write("/tmp/prx-sd-pf-backup.rules", &output.stdout)
-            .context("failed to save pf backup")?;
+        fs::write("/tmp/prx-sd-pf-backup.rules", &output.stdout).context("failed to save pf backup")?;
         tracing::info!("saved pf rules to /tmp/prx-sd-pf-backup.rules");
     }
 
@@ -279,8 +268,7 @@ pub fn isolate_network_pf() -> Result<()> {
         pass on lo0 all\n\
         pass out proto tcp from any to any flags S/SA keep state\n";
 
-    fs::write("/tmp/prx-sd-pf-isolation.rules", isolation_rules)
-        .context("failed to write pf isolation rules")?;
+    fs::write("/tmp/prx-sd-pf-isolation.rules", isolation_rules).context("failed to write pf isolation rules")?;
 
     // Load isolation rules
     let result = Command::new("pfctl")
@@ -371,12 +359,7 @@ fn collect_launch_agent_dirs() -> Vec<String> {
 }
 
 /// Scan a directory of plist files for references to the given pattern.
-fn scan_plist_dir(
-    dir: &str,
-    pattern: &str,
-    ptype: PersistenceType,
-    findings: &mut Vec<(PersistenceType, String)>,
-) {
+fn scan_plist_dir(dir: &str, pattern: &str, ptype: PersistenceType, findings: &mut Vec<(PersistenceType, String)>) {
     let dir_path = Path::new(dir);
     if !dir_path.exists() {
         return;
