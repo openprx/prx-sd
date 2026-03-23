@@ -32,6 +32,7 @@ pub enum IocVerdict {
 }
 
 /// IOC network filter for checking IPs and domains against blocklists.
+#[allow(clippy::struct_field_names)] // prefix `malicious_` clarifies intent for IOC data
 pub struct IocFilter {
     /// Malicious IP addresses.
     malicious_ips: HashSet<IpAddr>,
@@ -304,15 +305,10 @@ mod tests {
         let mut filter = IocFilter::new();
         filter.malicious_ips.insert("1.2.3.4".parse().unwrap());
         filter.malicious_domains.insert("evil.com".to_owned());
-        filter
-            .malicious_urls
-            .insert("http://evil.com/bad".to_owned());
+        filter.malicious_urls.insert("http://evil.com/bad".to_owned());
 
         let ip: IpAddr = "1.2.3.4".parse().unwrap();
-        assert!(matches!(
-            filter.check_ip_verdict(&ip),
-            IocVerdict::MaliciousIp { .. }
-        ));
+        assert!(matches!(filter.check_ip_verdict(&ip), IocVerdict::MaliciousIp { .. }));
         assert!(matches!(
             filter.check_domain_verdict("evil.com"),
             IocVerdict::MaliciousDomain { .. }
@@ -323,17 +319,8 @@ mod tests {
         ));
 
         let clean_ip: IpAddr = "8.8.8.8".parse().unwrap();
-        assert!(matches!(
-            filter.check_ip_verdict(&clean_ip),
-            IocVerdict::Clean
-        ));
-        assert!(matches!(
-            filter.check_domain_verdict("safe.com"),
-            IocVerdict::Clean
-        ));
-        assert!(matches!(
-            filter.check_url_verdict("http://safe.com"),
-            IocVerdict::Clean
-        ));
+        assert!(matches!(filter.check_ip_verdict(&clean_ip), IocVerdict::Clean));
+        assert!(matches!(filter.check_domain_verdict("safe.com"), IocVerdict::Clean));
+        assert!(matches!(filter.check_url_verdict("http://safe.com"), IocVerdict::Clean));
     }
 }

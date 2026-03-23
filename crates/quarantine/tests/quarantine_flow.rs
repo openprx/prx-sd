@@ -3,6 +3,8 @@
 //! Covers quarantine, restore, delete, stats, batch operations, and
 //! expiry-based cleanup.
 
+#![allow(clippy::indexing_slicing, clippy::expect_used)]
+
 use std::fs;
 
 use prx_sd_quarantine::{batch_delete, batch_restore, cleanup_expired, Quarantine, QuarantineId};
@@ -76,10 +78,7 @@ fn test_quarantine_stats() {
 
     let stats = vault.stats().expect("stats failed");
     assert_eq!(stats.count, 3, "should have 3 quarantined files");
-    assert_eq!(
-        stats.total_size, 650,
-        "total size should be 100 + 200 + 350 = 650"
-    );
+    assert_eq!(stats.total_size, 650, "total size should be 100 + 200 + 350 = 650");
 }
 
 #[test]
@@ -141,11 +140,7 @@ fn test_batch_delete() {
         assert!(r.is_ok(), "batch delete of item {i} should succeed");
     }
 
-    assert_eq!(
-        vault.list().unwrap().len(),
-        0,
-        "all entries should be deleted"
-    );
+    assert_eq!(vault.list().unwrap().len(), 0, "all entries should be deleted");
 }
 
 #[test]
@@ -218,11 +213,7 @@ fn test_restore_to_different_path() {
     vault.restore(id, &new_location).unwrap();
 
     assert!(new_location.exists(), "file should exist at new location");
-    assert_eq!(
-        fs::read(&new_location).unwrap(),
-        content,
-        "content should match"
-    );
+    assert_eq!(fs::read(&new_location).unwrap(), content, "content should match");
 }
 
 #[test]

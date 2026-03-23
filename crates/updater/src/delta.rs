@@ -66,8 +66,7 @@ pub fn decode_delta(compressed: &[u8]) -> Result<DeltaPatch> {
         .read_to_end(&mut decompressed)
         .context("failed to decompress delta patch (zstd)")?;
 
-    let patch: DeltaPatch =
-        bincode::deserialize(&decompressed).context("failed to deserialize delta patch")?;
+    let patch: DeltaPatch = bincode::deserialize(&decompressed).context("failed to deserialize delta patch")?;
 
     Ok(patch)
 }
@@ -78,13 +77,13 @@ pub fn decode_delta(compressed: &[u8]) -> Result<DeltaPatch> {
 pub fn encode_delta(patch: &DeltaPatch) -> Result<Vec<u8>> {
     let serialized = bincode::serialize(patch).context("failed to serialize delta patch")?;
 
-    let compressed =
-        zstd::encode_all(serialized.as_slice(), 3).context("failed to compress delta patch")?;
+    let compressed = zstd::encode_all(serialized.as_slice(), 3).context("failed to compress delta patch")?;
 
     Ok(compressed)
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use chrono::Utc;

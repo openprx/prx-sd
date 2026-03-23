@@ -47,6 +47,7 @@ pub fn sign_payload(key: &SigningKey, data: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use ed25519_dalek::SigningKey;
@@ -115,5 +116,73 @@ mod tests {
         let payload = sign_payload(&sk, data);
         let recovered = verify_payload(&vk, &payload).unwrap();
         assert_eq!(recovered, data);
+    }
+
+    /// A payload whose first 64 bytes are all zero (an invalid Ed25519
+    /// signature) must be rejected even when the trailing data is non-empty.
+    #[test]
+    fn verify_rejects_all_zero_signature() {
+        let (_, vk) = generate_keypair();
+
+        // Build a payload with a zeroed-out signature prefix.
+        let data = b"some valid looking data after the signature";
+        let mut payload = vec![0u8; 64];
+        payload.extend_from_slice(data);
+
+        let result = verify_payload(&vk, &payload);
+        assert!(result.is_err(), "all-zero Ed25519 signature must be rejected");
+    }
+
+    /// Signing a 1 MiB payload and verifying it must succeed, and the
+    /// recovered data must match the original byte-for-byte.
+    #[test]
+    #[allow(clippy::cast_possible_truncation)]
+    fn sign_verify_large_payload() {
+        let (sk, vk) = generate_keypair();
+
+        // 1 MiB of deterministic pseudo-random bytes (simple LCG).
+        let data: Vec<u8> = (0u64..(1024 * 1024))
+            .map(|i| {
+                i.wrapping_mul(6_364_136_223_846_793_005_u64)
+                    .wrapping_add(1_442_695_040_888_963_407_u64)
+                    .wrapping_shr(56) as u8
+            })
+            .collect();
+
+        let payload = sign_payload(&sk, &data);
+        assert_eq!(
+            payload.len(),
+            64 + data.len(),
+            "signed payload must be exactly 64 + data bytes long"
+        );
+
+        let recovered =
+            verify_payload(&vk, &payload).expect("verify_payload must succeed for a legitimately signed large payload");
+        assert_eq!(
+            recovered, data,
+            "recovered data must be identical to the original 1 MiB payload"
+        );
+    }
+
+    /// A payload that is exactly 64 bytes long contains only a signature and
+    /// zero data bytes; this must be rejected because the wire format requires
+    /// at least one data byte following the 64-byte signature.
+    #[test]
+    fn verify_exact_signature_length_no_data() {
+        let (_, vk) = generate_keypair();
+
+        // Payload is exactly SIGNATURE_LEN bytes — no data portion at all.
+        let payload = [0u8; 64];
+        let result = verify_payload(&vk, &payload);
+
+        assert!(
+            result.is_err(),
+            "a payload of exactly 64 bytes (no data) must be rejected"
+        );
+        let err_msg = format!("{}", result.err().unwrap());
+        assert!(
+            err_msg.contains("payload too short"),
+            "error must mention 'payload too short', got: {err_msg}"
+        );
     }
 }

@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -6,10 +7,10 @@ use tokio::signal;
 
 use prx_sd_core::{ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_realtime::event::FileEvent;
-use prx_sd_realtime::protected_dirs::{
-    ProtectedDirsConfig, ProtectedDirsEnforcer, ProtectionVerdict,
-};
+use prx_sd_realtime::protected_dirs::{ProtectedDirsConfig, ProtectedDirsEnforcer, ProtectionVerdict};
 use prx_sd_realtime::ransomware::{RansomwareConfig, RansomwareDetector, RansomwareVerdict};
+
+use notify::{RecursiveMode, Watcher};
 
 /// Convert a `notify::Event` into zero or more [`FileEvent`]s.
 ///
@@ -23,11 +24,11 @@ fn notify_to_file_events(event: &notify::Event) -> Vec<FileEvent> {
         let fe = match event.kind {
             notify::EventKind::Create(_) => FileEvent::Create { path: p.clone() },
             notify::EventKind::Modify(notify::event::ModifyKind::Name(_)) => {
-                if event.paths.len() == 2 {
-                    if p == &event.paths[0] {
+                if let (Some(from), Some(to)) = (event.paths.first(), event.paths.get(1)) {
+                    if p == from {
                         return vec![FileEvent::Rename {
-                            from: event.paths[0].clone(),
-                            to: event.paths[1].clone(),
+                            from: from.clone(),
+                            to: to.clone(),
                             pid: 0,
                         }];
                     }
@@ -36,9 +37,9 @@ fn notify_to_file_events(event: &notify::Event) -> Vec<FileEvent> {
                 FileEvent::Modify { path: p.clone() }
             }
             notify::EventKind::Modify(_) => FileEvent::Modify { path: p.clone() },
-            notify::EventKind::Access(notify::event::AccessKind::Close(
-                notify::event::AccessMode::Write,
-            )) => FileEvent::CloseWrite { path: p.clone() },
+            notify::EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write)) => {
+                FileEvent::CloseWrite { path: p.clone() }
+            }
             notify::EventKind::Remove(_) => FileEvent::Delete { path: p.clone() },
             _ => continue,
         };
@@ -120,10 +121,7 @@ fn send_notification(title: &str, body: &str) {
         let _ = std::process::Command::new("osascript")
             .args([
                 "-e",
-                &format!(
-                    "display notification \"{}\" with title \"{}\"",
-                    safe_body, safe_title
-                ),
+                &format!("display notification \"{}\" with title \"{}\"", safe_body, safe_title),
             ])
             .spawn();
     }
@@ -155,6 +153,14 @@ fn send_notification(title: &str, body: &str) {
 /// Returns `Ok(true)` if new signatures were downloaded, `Ok(false)` if
 /// already up to date, or an error on failure.
 async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
+    #[derive(serde::Deserialize)]
+    struct UpdateManifest {
+        version: u64,
+        sha256: String,
+        size: u64,
+        payload_url: String,
+    }
+
     let sig_dir = data_dir.join("signatures");
     std::fs::create_dir_all(&sig_dir)?;
 
@@ -174,7 +180,7 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
             .and_then(|val| {
                 val.get("update_server_url")
                     .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             })
             .unwrap_or_else(|| "https://update.prx-sd.dev/v1".to_string())
     };
@@ -184,20 +190,9 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
         .timeout(std::time::Duration::from_secs(30))
         .build()?;
 
-    #[derive(serde::Deserialize)]
-    struct UpdateManifest {
-        version: u64,
-        sha256: String,
-        size: u64,
-        payload_url: String,
-    }
-
     let manifest: UpdateManifest = match client.get(&manifest_url).send().await {
         Ok(resp) => match resp.error_for_status() {
-            Ok(resp) => resp
-                .json()
-                .await
-                .context("failed to parse update manifest")?,
+            Ok(resp) => resp.json().await.context("failed to parse update manifest")?,
             Err(e) => {
                 tracing::warn!(error = %e, "update server returned error");
                 return Ok(false);
@@ -243,10 +238,7 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
         .error_for_status()
         .context("update download failed")?;
 
-    let bytes = response
-        .bytes()
-        .await
-        .context("failed to read update payload body")?;
+    let bytes = response.bytes().await.context("failed to read update payload body")?;
 
     // Verify SHA-256.
     {
@@ -254,16 +246,12 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
         let mut hasher = Sha256::new();
         hasher.update(&bytes);
         let hash_bytes = hasher.finalize();
-        let digest = hash_bytes
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>();
+        let digest = hash_bytes.iter().fold(String::new(), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        });
         if digest != manifest.sha256 {
-            anyhow::bail!(
-                "SHA-256 mismatch: expected {}, got {}",
-                manifest.sha256,
-                digest
-            );
+            anyhow::bail!("SHA-256 mismatch: expected {}, got {}", manifest.sha256, digest);
         }
     }
 
@@ -296,7 +284,18 @@ fn quarantine_threat(path: &Path, threat_name: &str, data_dir: &Path) {
     }
 }
 
-pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u32) -> Result<()> {
+pub async fn run(
+    data_dir: &Path,
+    paths: Vec<PathBuf>,
+    update_interval_hours: u32,
+    ebpf_enabled: bool,
+    ebpf_fail_open: bool,
+    ebpf_policy: Option<PathBuf>,
+) -> Result<()> {
+    // Silence unused-variable warnings when ebpf feature is not compiled in.
+    #[cfg(not(all(target_os = "linux", feature = "ebpf")))]
+    let _ = &ebpf_policy;
+
     // 1. Write PID file.
     write_pid_file(data_dir)?;
 
@@ -312,22 +311,54 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
 
     println!("{} Scan engine initialized", ">>>".green().bold());
 
+    // 2b. Optionally start eBPF runtime.
+    #[cfg(all(target_os = "linux", feature = "ebpf"))]
+    let _ebpf_handle = if ebpf_enabled {
+        match start_ebpf_sidecar(ebpf_policy.as_deref(), data_dir) {
+            Ok(handle) => {
+                println!("{} eBPF runtime attached", ">>>".green().bold());
+                Some(handle)
+            }
+            Err(e) => {
+                if ebpf_fail_open {
+                    tracing::warn!("eBPF failed to start ({e:#}), continuing without it");
+                    println!("  {} eBPF unavailable: {e:#}", "WARNING:".yellow().bold());
+                    None
+                } else {
+                    return Err(e.context("eBPF required but failed to start (use --ebpf-fail-open to degrade)"));
+                }
+            }
+        }
+    } else {
+        None
+    };
+
+    #[cfg(not(all(target_os = "linux", feature = "ebpf")))]
+    if ebpf_enabled {
+        let msg = "eBPF requested but not compiled in (need --features ebpf on Linux)";
+        if ebpf_fail_open {
+            println!("  {} {msg}", "WARNING:".yellow().bold());
+        } else {
+            anyhow::bail!("{msg}");
+        }
+    }
+
     // 3. Start file system watcher.
     let (tx, mut rx) = tokio::sync::mpsc::channel::<notify::Event>(4096);
 
-    let mut watcher = notify::recommended_watcher(
-        move |res: std::result::Result<notify::Event, notify::Error>| match res {
-            Ok(event) => {
-                let _ = tx.blocking_send(event);
-            }
-            Err(e) => {
-                tracing::error!("watcher error: {e}");
-            }
-        },
-    )
-    .context("failed to create file system watcher")?;
+    let mut watcher =
+        notify::recommended_watcher(
+            move |res: std::result::Result<notify::Event, notify::Error>| match res {
+                Ok(event) => {
+                    let _ = tx.blocking_send(event);
+                }
+                Err(e) => {
+                    tracing::error!("watcher error: {e}");
+                }
+            },
+        )
+        .context("failed to create file system watcher")?;
 
-    use notify::{RecursiveMode, Watcher};
     for p in &paths {
         watcher
             .watch(p, RecursiveMode::Recursive)
@@ -337,7 +368,7 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
 
     // 4. Spawn signature update task.
     let update_data_dir = data_dir.to_path_buf();
-    let update_interval = std::time::Duration::from_secs(update_interval_hours as u64 * 3600);
+    let update_interval = std::time::Duration::from_secs(u64::from(update_interval_hours) * 3600);
     let (update_tx, mut update_rx) = tokio::sync::mpsc::channel::<bool>(1);
 
     tokio::spawn(async move {
@@ -375,7 +406,7 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
             .and_then(|val| {
                 val.get("quarantine")
                     .and_then(|q| q.get("auto_quarantine"))
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
             })
             .unwrap_or(false)
     };
@@ -426,7 +457,7 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
                             );
                             send_notification(
                                 "PRX-SD: RANSOMWARE DETECTED",
-                                &format!("{} (PID {}) - {}", process_name, pid, reason),
+                                &format!("{process_name} (PID {pid}) - {reason}"),
                             );
                         }
                         RansomwareVerdict::Suspicious { pid, ref process_name, ref reason, score } => {
@@ -487,7 +518,7 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
 
                                 // Send desktop notification.
                                 send_notification(
-                                    &format!("PRX-SD: {} File Detected", level_label),
+                                    &format!("PRX-SD: {level_label} File Detected"),
                                     &format!("{}: {}", file_path.display(), threat_name),
                                 );
 
@@ -522,7 +553,231 @@ pub async fn run(data_dir: &Path, paths: Vec<PathBuf>, update_interval_hours: u3
 
     // 6. Graceful shutdown.
     drop(watcher);
+
+    #[cfg(all(target_os = "linux", feature = "ebpf"))]
+    if let Some(mut handle) = _ebpf_handle {
+        handle.pipeline.stop();
+        println!("{} eBPF pipeline detached", ">>>".green().bold());
+    }
+
     remove_pid_file(&data_dir_owned);
     println!("{} Daemon stopped.", ">>>".green().bold());
     Ok(())
+}
+
+/// eBPF sidecar that runs alongside the daemon's file watcher.
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+struct EbpfHandle {
+    pipeline: prx_sd_realtime::ebpf::EbpfPipeline,
+}
+
+/// Start the eBPF pipeline in a background tokio task that logs events + alerts.
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+fn start_ebpf_sidecar(policy_path: Option<&Path>, data_dir: &Path) -> Result<EbpfHandle> {
+    use prx_sd_realtime::ebpf;
+
+    ebpf::loader::check_capabilities().context("eBPF capability check failed")?;
+
+    let (pipeline, mut rx) = if let Some(path) = policy_path {
+        let engine = ebpf::PolicyEngine::load_from_file(path)
+            .with_context(|| format!("failed to load eBPF policy: {}", path.display()))?;
+        tracing::info!(
+            rules = engine.rule_count(),
+            path = %path.display(),
+            "loaded eBPF policy"
+        );
+
+        let executor = std::sync::Arc::new(SdActionExecutor::new(data_dir)?);
+        let config = ebpf::PolicyConfig {
+            engine,
+            executor: executor as std::sync::Arc<dyn ebpf::ActionExecutor>,
+            dispatcher_config: ebpf::DispatcherConfig::default(),
+        };
+
+        ebpf::EbpfPipeline::start_with_policy(8192, config).context("failed to start eBPF pipeline with policy")?
+    } else {
+        ebpf::EbpfPipeline::start(8192).context("failed to start eBPF pipeline")?
+    };
+
+    // Spawn an async task to consume pipeline output and log it.
+    tokio::spawn(async move {
+        while let Some(output) = rx.recv().await {
+            match output {
+                ebpf::PipelineOutput::Event(event) => {
+                    tracing::info!(target: "ebpf", "{event}");
+                }
+                ebpf::PipelineOutput::Alert(alert) => {
+                    tracing::warn!(target: "ebpf_alert", "{alert}");
+                    send_notification(&format!("PRX-SD: {} Alert", alert.severity), &alert.description);
+                }
+                ebpf::PipelineOutput::Policy(policy_match) => {
+                    tracing::warn!(target: "ebpf_policy", "{policy_match}");
+                    send_notification(
+                        &format!("PRX-SD: Policy Match ({})", policy_match.severity),
+                        &policy_match.description,
+                    );
+                }
+            }
+        }
+        tracing::debug!("eBPF pipeline receiver closed");
+    });
+
+    Ok(EbpfHandle { pipeline })
+}
+
+/// Create a shared [`ActionExecutor`] for use in eBPF pipeline policy mode.
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+pub fn create_sd_executor(data_dir: &Path) -> Result<std::sync::Arc<dyn prx_sd_realtime::ebpf::ActionExecutor>> {
+    let executor = SdActionExecutor::new(data_dir)?;
+    Ok(std::sync::Arc::new(executor))
+}
+
+/// Concrete [`ActionExecutor`] for the `sd` CLI that uses the real scan
+/// engine, quarantine vault, and process management APIs.
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+struct SdActionExecutor {
+    scan_engine: prx_sd_core::ScanEngine,
+    quarantine_dir: PathBuf,
+}
+
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+impl SdActionExecutor {
+    fn new(data_dir: &Path) -> Result<Self> {
+        let config = prx_sd_core::ScanConfig::default()
+            .with_signatures_dir(data_dir.join("signatures"))
+            .with_yara_rules_dir(data_dir.join("yara"))
+            .with_quarantine_dir(data_dir.join("quarantine"));
+        let scan_engine =
+            prx_sd_core::ScanEngine::new(config).context("failed to create eBPF action executor scan engine")?;
+        Ok(Self {
+            scan_engine,
+            quarantine_dir: data_dir.join("quarantine"),
+        })
+    }
+}
+
+#[cfg(all(target_os = "linux", feature = "ebpf"))]
+#[async_trait::async_trait]
+impl prx_sd_realtime::ebpf::ActionExecutor for SdActionExecutor {
+    async fn scan_file(&self, path: &Path) -> anyhow::Result<prx_sd_realtime::ebpf::ActionResult> {
+        let result = self.scan_engine.scan_file(path).await?;
+        let success = !result.is_threat();
+        let detail = if result.is_threat() {
+            format!(
+                "THREAT: {} ({})",
+                result.threat_name.as_deref().unwrap_or("Unknown"),
+                result.threat_level,
+            )
+        } else {
+            "clean".to_string()
+        };
+
+        Ok(prx_sd_realtime::ebpf::ActionResult {
+            action: prx_sd_realtime::ebpf::PolicyAction::TriggerFileScan,
+            target: path.to_string_lossy().into_owned(),
+            success,
+            detail,
+        })
+    }
+
+    async fn scan_memory(&self, pid: u32) -> anyhow::Result<prx_sd_realtime::ebpf::ActionResult> {
+        // Memory scanning requires direct YaraEngine/SignatureDatabase access
+        // which is not yet exposed. Planned for Sprint D.
+        tracing::info!(pid, "memory scan requested (not yet implemented, logging only)");
+        Ok(prx_sd_realtime::ebpf::ActionResult {
+            action: prx_sd_realtime::ebpf::PolicyAction::TriggerMemoryScan,
+            target: pid.to_string(),
+            success: false,
+            detail: "memory scan not yet implemented (planned for Sprint D)".to_string(),
+        })
+    }
+
+    async fn kill_process(&self, pid: u32) -> anyhow::Result<prx_sd_realtime::ebpf::ActionResult> {
+        use nix::sys::signal::{self, Signal};
+        use nix::unistd::Pid;
+
+        // Safety guards: refuse to kill system-critical or own process.
+        if pid == 0 {
+            return Ok(prx_sd_realtime::ebpf::ActionResult {
+                action: prx_sd_realtime::ebpf::PolicyAction::KillProcess,
+                target: pid.to_string(),
+                success: false,
+                detail: "refusing to kill PID 0 (process group broadcast)".to_string(),
+            });
+        }
+        if pid == 1 {
+            return Ok(prx_sd_realtime::ebpf::ActionResult {
+                action: prx_sd_realtime::ebpf::PolicyAction::KillProcess,
+                target: pid.to_string(),
+                success: false,
+                detail: "refusing to kill PID 1 (init/systemd)".to_string(),
+            });
+        }
+        if pid == std::process::id() {
+            return Ok(prx_sd_realtime::ebpf::ActionResult {
+                action: prx_sd_realtime::ebpf::PolicyAction::KillProcess,
+                target: pid.to_string(),
+                success: false,
+                detail: "refusing to kill own PID".to_string(),
+            });
+        }
+        // Verify the process comm matches the event (basic TOCTOU mitigation).
+        let proc_comm_path = format!("/proc/{pid}/comm");
+        if std::fs::read_to_string(&proc_comm_path).is_err() {
+            return Ok(prx_sd_realtime::ebpf::ActionResult {
+                action: prx_sd_realtime::ebpf::PolicyAction::KillProcess,
+                target: pid.to_string(),
+                success: false,
+                detail: format!("PID {pid} no longer exists, skipping kill"),
+            });
+        }
+
+        let nix_pid = Pid::from_raw(i32::try_from(pid).map_err(|_| anyhow::anyhow!("PID {pid} out of i32 range"))?);
+        match signal::kill(nix_pid, Signal::SIGKILL) {
+            Ok(()) => {
+                tracing::warn!(pid, "killed process via policy action");
+                Ok(prx_sd_realtime::ebpf::ActionResult {
+                    action: prx_sd_realtime::ebpf::PolicyAction::KillProcess,
+                    target: pid.to_string(),
+                    success: true,
+                    detail: format!("sent SIGKILL to PID {pid}"),
+                })
+            }
+            Err(e) => Ok(prx_sd_realtime::ebpf::ActionResult {
+                action: prx_sd_realtime::ebpf::PolicyAction::KillProcess,
+                target: pid.to_string(),
+                success: false,
+                detail: format!("kill failed: {e}"),
+            }),
+        }
+    }
+
+    async fn quarantine_path(
+        &self,
+        path: &Path,
+        threat_name: &str,
+    ) -> anyhow::Result<prx_sd_realtime::ebpf::ActionResult> {
+        let quarantine = prx_sd_quarantine::Quarantine::new(self.quarantine_dir.clone())?;
+        match quarantine.quarantine(path, threat_name) {
+            Ok(id) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    id = %id,
+                    "quarantined file via policy action"
+                );
+                Ok(prx_sd_realtime::ebpf::ActionResult {
+                    action: prx_sd_realtime::ebpf::PolicyAction::QuarantinePath,
+                    target: path.to_string_lossy().into_owned(),
+                    success: true,
+                    detail: format!("quarantined as {id}"),
+                })
+            }
+            Err(e) => Ok(prx_sd_realtime::ebpf::ActionResult {
+                action: prx_sd_realtime::ebpf::PolicyAction::QuarantinePath,
+                target: path.to_string_lossy().into_owned(),
+                success: false,
+                detail: format!("quarantine failed: {e}"),
+            }),
+        }
+    }
 }

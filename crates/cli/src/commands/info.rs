@@ -7,7 +7,8 @@ use prx_sd_signatures::SignatureDatabase;
 
 use crate::output;
 
-pub async fn run(data_dir: &Path) -> Result<()> {
+#[allow(clippy::unnecessary_wraps)]
+pub fn run(data_dir: &Path) -> Result<()> {
     println!("{}", "PRX-SD Antivirus Engine".cyan().bold());
     println!();
 
@@ -24,16 +25,11 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             Ok(db) => match db.get_stats() {
                 Ok(stats) => {
                     println!("  {:<22} {}", "Signature DB version:".bold(), stats.version);
-                    println!(
-                        "  {:<22} {}",
-                        "SHA-256 hash count:".bold(),
-                        stats.hash_count
-                    );
+                    println!("  {:<22} {}", "SHA-256 hash count:".bold(), stats.hash_count);
                     println!("  {:<22} {}", "MD5 hash count:".bold(), stats.md5_count);
                     if let Some(ts) = stats.last_update {
                         let dt = chrono::DateTime::from_timestamp(ts, 0)
-                            .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-                            .unwrap_or_else(|| ts.to_string());
+                            .map_or_else(|| ts.to_string(), |d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string());
                         println!("  {:<22} {}", "Last DB update:".bold(), dt);
                     } else {
                         println!("  {:<22} {}", "Last DB update:".bold(), "never".dimmed());
@@ -66,13 +62,8 @@ pub async fn run(data_dir: &Path) -> Result<()> {
     if yara_dir.exists() {
         let rule_count = walkdir::WalkDir::new(&yara_dir)
             .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path().is_file()
-                    && e.path()
-                        .extension()
-                        .is_some_and(|ext| ext == "yar" || ext == "yara")
-            })
+            .filter_map(std::result::Result::ok)
+            .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "yar" || ext == "yara"))
             .count();
         println!("  {:<22} {} file(s)", "YARA rules:".bold(), rule_count);
     } else {
@@ -109,11 +100,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
     // Platform info.
     println!();
     println!("  {:<22} {}", "OS:".bold(), std::env::consts::OS);
-    println!(
-        "  {:<22} {}",
-        "Architecture:".bold(),
-        std::env::consts::ARCH
-    );
+    println!("  {:<22} {}", "Architecture:".bold(), std::env::consts::ARCH);
 
     Ok(())
 }

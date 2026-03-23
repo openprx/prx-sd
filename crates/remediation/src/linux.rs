@@ -2,7 +2,7 @@
 //!
 //! Provides functions for killing processes via signals, cleaning various
 //! persistence mechanisms (crontab, systemd, init scripts, shell profiles,
-//! authorized_keys, LD_PRELOAD), and network isolation via iptables.
+//! `authorized_keys`, `LD_PRELOAD`), and network isolation via iptables.
 
 use std::fs;
 use std::path::Path;
@@ -16,8 +16,9 @@ pub fn kill_process(pid: u32) -> Result<()> {
     use nix::sys::signal::{kill, Signal};
     use nix::unistd::Pid;
 
+    #[allow(clippy::cast_possible_wrap)]
     let nix_pid = Pid::from_raw(pid as i32);
-    kill(nix_pid, Signal::SIGKILL).with_context(|| format!("failed to kill process {}", pid))?;
+    kill(nix_pid, Signal::SIGKILL).with_context(|| format!("failed to kill process {pid}"))?;
     tracing::info!(pid = pid, "killed process via SIGKILL");
     Ok(())
 }
@@ -27,6 +28,7 @@ pub fn kill_process(pid: u32) -> Result<()> {
 /// Scans both the user crontab (via `crontab -l`) and system crontab files
 /// in `/etc/cron.d/`, `/etc/crontab`, and `/var/spool/cron/crontabs/`.
 /// Returns a list of removed entries.
+#[allow(clippy::excessive_nesting)]
 pub fn clean_crontab(path: &Path) -> Result<Vec<String>> {
     let path_str = path.to_string_lossy();
     let mut removed = Vec::new();
@@ -41,15 +43,10 @@ pub fn clean_crontab(path: &Path) -> Result<Vec<String>> {
             if let Ok(content) = fs::read_to_string(cron_path) {
                 let (cleaned, removed_lines) = remove_matching_lines(&content, &path_str);
                 if !removed_lines.is_empty() {
-                    fs::write(cron_path, cleaned).with_context(|| {
-                        format!("failed to write cleaned crontab: {}", cron_path.display())
-                    })?;
+                    fs::write(cron_path, cleaned)
+                        .with_context(|| format!("failed to write cleaned crontab: {}", cron_path.display()))?;
                     for line in &removed_lines {
-                        tracing::info!(
-                            file = cron_file,
-                            line = line.as_str(),
-                            "removed crontab entry"
-                        );
+                        tracing::info!(file = cron_file, line = line.as_str(), "removed crontab entry");
                     }
                     removed.extend(removed_lines);
                 }
@@ -64,9 +61,8 @@ pub fn clean_crontab(path: &Path) -> Result<Vec<String>> {
         }
         if let Ok(entries) = fs::read_dir(dir_path) {
             for entry in entries {
-                let entry = match entry {
-                    Ok(e) => e,
-                    Err(_) => continue,
+                let Ok(entry) = entry else {
+                    continue;
                 };
                 let file_path = entry.path();
                 if !file_path.is_file() {
@@ -75,9 +71,8 @@ pub fn clean_crontab(path: &Path) -> Result<Vec<String>> {
                 if let Ok(content) = fs::read_to_string(&file_path) {
                     let (cleaned, removed_lines) = remove_matching_lines(&content, &path_str);
                     if !removed_lines.is_empty() {
-                        fs::write(&file_path, cleaned).with_context(|| {
-                            format!("failed to write cleaned cron file: {}", file_path.display())
-                        })?;
+                        fs::write(&file_path, cleaned)
+                            .with_context(|| format!("failed to write cleaned cron file: {}", file_path.display()))?;
                         for line in &removed_lines {
                             tracing::info!(
                                 file = %file_path.display(),
@@ -101,6 +96,7 @@ pub fn clean_crontab(path: &Path) -> Result<Vec<String>> {
 /// and `.timer` unit files that reference the malicious path.
 /// Disables and masks the unit, then removes it.
 /// Returns a list of cleaned unit names.
+#[allow(clippy::excessive_nesting)]
 pub fn clean_systemd_services(path: &Path) -> Result<Vec<String>> {
     let path_str = path.to_string_lossy();
     let mut cleaned = Vec::new();
@@ -114,18 +110,22 @@ pub fn clean_systemd_services(path: &Path) -> Result<Vec<String>> {
         }
         if let Ok(entries) = fs::read_dir(dir_path) {
             for entry in entries {
-                let entry = match entry {
-                    Ok(e) => e,
-                    Err(_) => continue,
+                let Ok(entry) = entry else {
+                    continue;
                 };
                 let file_path = entry.path();
                 let file_name = file_path
                     .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
+                    .map_or_else(String::new, |n| n.to_string_lossy().to_string());
 
                 // Only check .service and .timer files
-                if !file_name.ends_with(".service") && !file_name.ends_with(".timer") {
+                let is_service = std::path::Path::new(&file_name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("service"));
+                let is_timer = std::path::Path::new(&file_name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("timer"));
+                if !is_service && !is_timer {
                     continue;
                 }
 
@@ -147,10 +147,7 @@ pub fn clean_systemd_services(path: &Path) -> Result<Vec<String>> {
                                 "failed to remove systemd unit"
                             );
                         } else {
-                            tracing::info!(
-                                unit = file_name.as_str(),
-                                "removed malicious systemd unit"
-                            );
+                            tracing::info!(unit = file_name.as_str(), "removed malicious systemd unit");
                             cleaned.push(file_name);
                         }
                     }
@@ -161,9 +158,7 @@ pub fn clean_systemd_services(path: &Path) -> Result<Vec<String>> {
 
     // Reload systemd if we removed anything
     if !cleaned.is_empty() {
-        let _ = std::process::Command::new("systemctl")
-            .arg("daemon-reload")
-            .output();
+        let _ = std::process::Command::new("systemctl").arg("daemon-reload").output();
     }
 
     Ok(cleaned)
@@ -172,6 +167,7 @@ pub fn clean_systemd_services(path: &Path) -> Result<Vec<String>> {
 /// Remove malicious entries from init scripts (/etc/rc.local and /etc/init.d/).
 ///
 /// Returns a list of descriptions of what was cleaned.
+#[allow(clippy::excessive_nesting)]
 pub fn clean_init_scripts(path: &Path) -> Result<Vec<String>> {
     let path_str = path.to_string_lossy();
     let mut cleaned = Vec::new();
@@ -182,8 +178,7 @@ pub fn clean_init_scripts(path: &Path) -> Result<Vec<String>> {
         if let Ok(content) = fs::read_to_string(rc_local) {
             let (new_content, removed_lines) = remove_matching_lines(&content, &path_str);
             if !removed_lines.is_empty() {
-                fs::write(rc_local, new_content)
-                    .context("failed to write cleaned /etc/rc.local")?;
+                fs::write(rc_local, new_content).context("failed to write cleaned /etc/rc.local")?;
                 for line in &removed_lines {
                     tracing::info!(line = line.as_str(), "removed from /etc/rc.local");
                 }
@@ -197,9 +192,8 @@ pub fn clean_init_scripts(path: &Path) -> Result<Vec<String>> {
     if init_d.exists() {
         if let Ok(entries) = fs::read_dir(init_d) {
             for entry in entries {
-                let entry = match entry {
-                    Ok(e) => e,
-                    Err(_) => continue,
+                let Ok(entry) = entry else {
+                    continue;
                 };
                 let file_path = entry.path();
                 if !file_path.is_file() {
@@ -210,8 +204,7 @@ pub fn clean_init_scripts(path: &Path) -> Result<Vec<String>> {
                         // Disable the init script
                         let file_name = file_path
                             .file_name()
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_default();
+                            .map_or_else(String::new, |n| n.to_string_lossy().to_string());
                         let _ = std::process::Command::new("update-rc.d")
                             .args([&file_name, "disable"])
                             .output();
@@ -222,8 +215,8 @@ pub fn clean_init_scripts(path: &Path) -> Result<Vec<String>> {
                                 "failed to remove init script"
                             );
                         } else {
-                            let desc = format!("removed init script: {}", file_name);
-                            tracing::info!("{}", desc);
+                            let desc = format!("removed init script: {file_name}");
+                            tracing::info!("{desc}");
                             cleaned.push(desc);
                         }
                     }
@@ -237,9 +230,10 @@ pub fn clean_init_scripts(path: &Path) -> Result<Vec<String>> {
 
 /// Remove malicious entries from shell profile files.
 ///
-/// Scans ~/.bashrc, ~/.profile, ~/.bash_profile, /etc/profile,
+/// Scans `~/.bashrc`, `~/.profile`, `~/.bash_profile`, `/etc/profile`,
 /// and /etc/profile.d/*.sh for lines referencing the malicious path.
 /// Returns a list of removed entries.
+#[allow(clippy::excessive_nesting)]
 pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
     let path_str = path.to_string_lossy();
     let mut cleaned = Vec::new();
@@ -256,11 +250,7 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
                     fs::write(pf_path, new_content)
                         .with_context(|| format!("failed to write: {}", pf_path.display()))?;
                     for line in &removed_lines {
-                        tracing::info!(
-                            file = *pf,
-                            line = line.as_str(),
-                            "removed from shell profile"
-                        );
+                        tracing::info!(file = *pf, line = line.as_str(), "removed from shell profile");
                     }
                     cleaned.extend(removed_lines);
                 }
@@ -273,9 +263,8 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
     if profile_d.exists() {
         if let Ok(entries) = fs::read_dir(profile_d) {
             for entry in entries {
-                let entry = match entry {
-                    Ok(e) => e,
-                    Err(_) => continue,
+                let Ok(entry) = entry else {
+                    continue;
                 };
                 let file_path = entry.path();
                 if !file_path.is_file() {
@@ -291,7 +280,7 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
                             );
                         } else {
                             let desc = format!("removed profile.d script: {}", file_path.display());
-                            tracing::info!("{}", desc);
+                            tracing::info!("{desc}");
                             cleaned.push(desc);
                         }
                     }
@@ -304,10 +293,9 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
     if let Ok(passwd) = fs::read_to_string("/etc/passwd") {
         for line in passwd.lines() {
             let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() < 6 {
+            let Some(home) = parts.get(5) else {
                 continue;
-            }
-            let home = parts[5];
+            };
             if home.is_empty() || !Path::new(home).exists() {
                 continue;
             }
@@ -317,8 +305,7 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
                 let uf_path = Path::new(home).join(uf);
                 if uf_path.exists() {
                     if let Ok(content) = fs::read_to_string(&uf_path) {
-                        let (new_content, removed_lines) =
-                            remove_matching_lines(&content, &path_str);
+                        let (new_content, removed_lines) = remove_matching_lines(&content, &path_str);
                         if !removed_lines.is_empty() {
                             if let Err(e) = fs::write(&uf_path, new_content) {
                                 tracing::warn!(
@@ -346,21 +333,21 @@ pub fn clean_shell_profiles(path: &Path) -> Result<Vec<String>> {
     Ok(cleaned)
 }
 
-/// Remove entries from ~/.ssh/authorized_keys that match a suspicious pattern.
+/// Remove entries from `~/.ssh/authorized_keys` that match a suspicious pattern.
 ///
-/// This searches all users' authorized_keys files for lines containing the
+/// This searches all users' `authorized_keys` files for lines containing the
 /// given pattern and removes them.
 /// Returns a list of removed key descriptions.
+#[allow(clippy::excessive_nesting)]
 pub fn clean_authorized_keys(suspicious_pattern: &str) -> Result<Vec<String>> {
     let mut cleaned = Vec::new();
 
     if let Ok(passwd) = fs::read_to_string("/etc/passwd") {
         for line in passwd.lines() {
             let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() < 6 {
+            let Some(home) = parts.get(5) else {
                 continue;
-            }
-            let home = parts[5];
+            };
             let ak_path = Path::new(home).join(".ssh/authorized_keys");
 
             if !ak_path.exists() {
@@ -368,8 +355,7 @@ pub fn clean_authorized_keys(suspicious_pattern: &str) -> Result<Vec<String>> {
             }
 
             if let Ok(content) = fs::read_to_string(&ak_path) {
-                let (new_content, removed_lines) =
-                    remove_matching_lines(&content, suspicious_pattern);
+                let (new_content, removed_lines) = remove_matching_lines(&content, suspicious_pattern);
                 if !removed_lines.is_empty() {
                     if let Err(e) = fs::write(&ak_path, new_content) {
                         tracing::warn!(
@@ -395,7 +381,7 @@ pub fn clean_authorized_keys(suspicious_pattern: &str) -> Result<Vec<String>> {
     Ok(cleaned)
 }
 
-/// Remove LD_PRELOAD entries from /etc/ld.so.preload that reference the path.
+/// Remove `LD_PRELOAD` entries from `/etc/ld.so.preload` that reference the path.
 ///
 /// Returns a list of removed entries.
 pub fn clean_ld_preload(path: &Path) -> Result<Vec<String>> {
@@ -410,8 +396,7 @@ pub fn clean_ld_preload(path: &Path) -> Result<Vec<String>> {
     let (new_content, removed_lines) = remove_matching_lines(&content, &path_str);
 
     if !removed_lines.is_empty() {
-        fs::write(preload_path, new_content)
-            .context("failed to write cleaned /etc/ld.so.preload")?;
+        fs::write(preload_path, new_content).context("failed to write cleaned /etc/ld.so.preload")?;
         for line in &removed_lines {
             tracing::info!(line = line.as_str(), "removed from /etc/ld.so.preload");
         }
@@ -431,8 +416,7 @@ pub fn isolate_network_iptables() -> Result<()> {
         .context("failed to run iptables-save")?;
 
     if output.status.success() {
-        fs::write("/tmp/prx-sd-iptables-backup.rules", &output.stdout)
-            .context("failed to save iptables backup")?;
+        fs::write("/tmp/prx-sd-iptables-backup.rules", &output.stdout).context("failed to save iptables backup")?;
         tracing::info!("saved iptables rules to /tmp/prx-sd-iptables-backup.rules");
     }
 
@@ -506,11 +490,9 @@ pub fn restore_network_iptables() -> Result<()> {
                 .context("failed to write to iptables-restore stdin")?;
         }
 
-        let status = child
-            .wait()
-            .context("failed to wait for iptables-restore")?;
+        let status = child.wait().context("failed to wait for iptables-restore")?;
         if !status.success() {
-            anyhow::bail!("iptables-restore exited with status: {}", status);
+            anyhow::bail!("iptables-restore exited with status: {status}");
         }
 
         fs::remove_file(backup_path).ok();
@@ -536,6 +518,7 @@ pub fn restore_network_iptables() -> Result<()> {
 /// Scan all Linux persistence mechanisms for references to the given path.
 ///
 /// Returns a list of `(PersistenceType, detail)` tuples for each match found.
+#[allow(clippy::excessive_nesting)]
 pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
     let path_str = path.to_string_lossy();
     let mut findings = Vec::new();
@@ -547,7 +530,7 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
         if loc_path.is_file() {
             if let Ok(content) = fs::read_to_string(loc_path) {
                 if content.contains(path_str.as_ref()) {
-                    findings.push((PersistenceType::Crontab, format!("found in {}", loc)));
+                    findings.push((PersistenceType::Crontab, format!("found in {loc}")));
                 }
             }
         } else if loc_path.is_dir() {
@@ -555,10 +538,7 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
                 for entry in entries.flatten() {
                     if let Ok(content) = fs::read_to_string(entry.path()) {
                         if content.contains(path_str.as_ref()) {
-                            findings.push((
-                                PersistenceType::CronJob,
-                                format!("found in {}", entry.path().display()),
-                            ));
+                            findings.push((PersistenceType::CronJob, format!("found in {}", entry.path().display())));
                         }
                     }
                 }
@@ -573,13 +553,10 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
         if let Ok(entries) = fs::read_dir(dir_path) {
             for entry in entries.flatten() {
                 let ep = entry.path();
-                let name = ep
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
                 if let Ok(content) = fs::read_to_string(&ep) {
                     if content.contains(path_str.as_ref()) {
-                        let ptype = if name.ends_with(".timer") {
+                        let is_timer = ep.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("timer"));
+                        let ptype = if is_timer {
                             PersistenceType::SystemdTimer
                         } else {
                             PersistenceType::SystemdService
@@ -597,7 +574,7 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
         let sf_path = Path::new(sf);
         if let Ok(content) = fs::read_to_string(sf_path) {
             if content.contains(path_str.as_ref()) {
-                findings.push((PersistenceType::ShellRc, format!("found in {}", sf)));
+                findings.push((PersistenceType::ShellRc, format!("found in {sf}")));
             }
         }
     }
@@ -606,10 +583,7 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
     let rc_local = Path::new("/etc/rc.local");
     if let Ok(content) = fs::read_to_string(rc_local) {
         if content.contains(path_str.as_ref()) {
-            findings.push((
-                PersistenceType::InitScript,
-                "found in /etc/rc.local".to_string(),
-            ));
+            findings.push((PersistenceType::InitScript, "found in /etc/rc.local".to_string()));
         }
     }
 
@@ -617,10 +591,7 @@ pub fn scan_all_persistence(path: &Path) -> Vec<(PersistenceType, String)> {
     let ld_preload = Path::new("/etc/ld.so.preload");
     if let Ok(content) = fs::read_to_string(ld_preload) {
         if content.contains(path_str.as_ref()) {
-            findings.push((
-                PersistenceType::LdPreload,
-                "found in /etc/ld.so.preload".to_string(),
-            ));
+            findings.push((PersistenceType::LdPreload, "found in /etc/ld.so.preload".to_string()));
         }
     }
 

@@ -86,10 +86,7 @@ pub async fn get_version(State(state): State<AppState>) -> Json<VersionInfo> {
     let current = state.storage.current_version();
     // min_delta is 0 for now; in production this would be set based on
     // how many delta files are retained.
-    Json(VersionInfo {
-        current,
-        min_delta: 0,
-    })
+    Json(VersionInfo { current, min_delta: 0 })
 }
 
 /// `GET /delta/:range` - Return a signed delta patch.
@@ -100,11 +97,8 @@ pub async fn get_delta(
     State(state): State<AppState>,
     Path(range): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let (from, to) = parse_range(&range).ok_or_else(|| {
-        AppError::bad_request(format!(
-            "invalid range format '{range}': expected 'FROM..TO'"
-        ))
-    })?;
+    let (from, to) = parse_range(&range)
+        .ok_or_else(|| AppError::bad_request(format!("invalid range format '{range}': expected 'FROM..TO'")))?;
 
     if from >= to {
         return Err(AppError::bad_request(format!(
@@ -193,13 +187,10 @@ pub async fn publish(
     let new_version = patch.version;
 
     // Publish (sign, write to disk, bump version).
-    state
-        .storage
-        .publish(patch, &state.signing_key)
-        .map_err(|e| {
-            error!(error = %e, "failed to publish delta patch");
-            AppError::internal(format!("publish failed: {e}"))
-        })?;
+    state.storage.publish(&patch, &state.signing_key).map_err(|e| {
+        error!(error = %e, "failed to publish delta patch");
+        AppError::internal(format!("publish failed: {e}"))
+    })?;
 
     info!(new_version, "delta patch published successfully");
 

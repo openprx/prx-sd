@@ -16,10 +16,7 @@ pub mod pe;
 pub use archive::{ArchiveEntry, ArchiveFormat, ArchiveInfo};
 pub use elf::ElfInfo;
 pub use macho::MachOInfo;
-pub use office::{
-    analyze_office, MacroSuspiciousCall, MacroThreatCategory, OfficeAnalysis, OfficeFormat,
-    OfficeInfo,
-};
+pub use office::{analyze_office, MacroSuspiciousCall, MacroThreatCategory, OfficeAnalysis, OfficeFormat, OfficeInfo};
 pub use pdf::{analyze_pdf, PdfAnalysis, PdfInfo, PdfSuspiciousPattern};
 pub use pe::{ImportInfo, PeInfo, SectionInfo};
 
@@ -63,49 +60,49 @@ pub enum ParsedFile {
 
 impl ParsedFile {
     /// Return the PE info if this is a PE file, or `None` otherwise.
-    pub fn as_pe(&self) -> Option<&PeInfo> {
+    pub const fn as_pe(&self) -> Option<&PeInfo> {
         match self {
-            ParsedFile::PE(info) => Some(info),
+            Self::PE(info) => Some(info),
             _ => None,
         }
     }
 
     /// Return the ELF info if this is an ELF file, or `None` otherwise.
-    pub fn as_elf(&self) -> Option<&ElfInfo> {
+    pub const fn as_elf(&self) -> Option<&ElfInfo> {
         match self {
-            ParsedFile::ELF(info) => Some(info),
+            Self::ELF(info) => Some(info),
             _ => None,
         }
     }
 
     /// Return the Mach-O info if this is a Mach-O file, or `None` otherwise.
-    pub fn as_macho(&self) -> Option<&MachOInfo> {
+    pub const fn as_macho(&self) -> Option<&MachOInfo> {
         match self {
-            ParsedFile::MachO(info) => Some(info),
+            Self::MachO(info) => Some(info),
             _ => None,
         }
     }
 
     /// Return the PDF info if this is a PDF file, or `None` otherwise.
-    pub fn as_pdf(&self) -> Option<&PdfInfo> {
+    pub const fn as_pdf(&self) -> Option<&PdfInfo> {
         match self {
-            ParsedFile::PDF(info) => Some(info),
+            Self::PDF(info) => Some(info),
             _ => None,
         }
     }
 
     /// Return the archive info if this is an archive file, or `None` otherwise.
-    pub fn as_archive(&self) -> Option<&ArchiveInfo> {
+    pub const fn as_archive(&self) -> Option<&ArchiveInfo> {
         match self {
-            ParsedFile::Archive(info) => Some(info),
+            Self::Archive(info) => Some(info),
             _ => None,
         }
     }
 
     /// Return the Office info if this is an Office file, or `None` otherwise.
-    pub fn as_office(&self) -> Option<&OfficeInfo> {
+    pub const fn as_office(&self) -> Option<&OfficeInfo> {
         match self {
-            ParsedFile::Office(info) => Some(info),
+            Self::Office(info) => Some(info),
             _ => None,
         }
     }
@@ -118,24 +115,12 @@ pub fn parse(data: &[u8], file_type: FileType) -> Result<ParsedFile> {
         FileType::ELF => elf::parse_elf(data).map(ParsedFile::ELF),
         FileType::MachO => macho::parse_macho(data).map(ParsedFile::MachO),
         FileType::PDF => pdf::parse_pdf(data).map(ParsedFile::PDF),
-        FileType::Zip => {
-            archive::inspect_archive(data, ArchiveFormat::Zip).map(ParsedFile::Archive)
-        }
-        FileType::Gzip => {
-            archive::inspect_archive(data, ArchiveFormat::Gzip).map(ParsedFile::Archive)
-        }
-        FileType::Tar => {
-            archive::inspect_archive(data, ArchiveFormat::Tar).map(ParsedFile::Archive)
-        }
-        FileType::TarGz => {
-            archive::inspect_archive(data, ArchiveFormat::TarGz).map(ParsedFile::Archive)
-        }
-        FileType::SevenZip => {
-            archive::inspect_archive(data, ArchiveFormat::SevenZip).map(ParsedFile::Archive)
-        }
-        FileType::OfficeOoxml | FileType::OfficeLegacy => {
-            office::parse_office(data).map(ParsedFile::Office)
-        }
+        FileType::Zip => archive::inspect_archive(data, ArchiveFormat::Zip).map(ParsedFile::Archive),
+        FileType::Gzip => archive::inspect_archive(data, ArchiveFormat::Gzip).map(ParsedFile::Archive),
+        FileType::Tar => archive::inspect_archive(data, ArchiveFormat::Tar).map(ParsedFile::Archive),
+        FileType::TarGz => archive::inspect_archive(data, ArchiveFormat::TarGz).map(ParsedFile::Archive),
+        FileType::SevenZip => archive::inspect_archive(data, ArchiveFormat::SevenZip).map(ParsedFile::Archive),
+        FileType::OfficeOoxml | FileType::OfficeLegacy => office::parse_office(data).map(ParsedFile::Office),
         FileType::Script | FileType::Unknown => Ok(ParsedFile::Unparsed {
             file_type,
             size: data.len(),
@@ -160,6 +145,8 @@ pub fn detect_file_type(data: &[u8]) -> FileType {
     }
 
     // Mach-O: various magic values (32/64-bit, big/little endian)
+    // data.len() >= 4 is guaranteed by the guard above, so indices 0..3 are safe.
+    #[allow(clippy::indexing_slicing)]
     let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
     match magic {
         0xFEED_FACE | 0xFEED_FACF | 0xCEFA_EDFE | 0xCFFA_EDFE => {
@@ -168,8 +155,8 @@ pub fn detect_file_type(data: &[u8]) -> FileType {
         // Fat binary: 0xCAFEBABE (big-endian) or 0xBEBAFECA (little-endian)
         // Distinguish from Java class files by checking arch count.
         0xCAFE_BABE | 0xBEBA_FECA => {
-            if data.len() >= 8 {
-                let count = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+            if let (Some(&b4), Some(&b5), Some(&b6), Some(&b7)) = (data.get(4), data.get(5), data.get(6), data.get(7)) {
+                let count = u32::from_be_bytes([b4, b5, b6, b7]);
                 if count > 0 && count < 30 {
                     return FileType::MachO;
                 }
@@ -180,7 +167,7 @@ pub fn detect_file_type(data: &[u8]) -> FileType {
 
     // PDF: %PDF- (possibly with preamble up to 1024 bytes)
     if data.len() >= 5 {
-        let search = &data[..data.len().min(1024)];
+        let search = data.get(..data.len().min(1024)).unwrap_or(data);
         if search.windows(5).any(|w| w == b"%PDF-") {
             return FileType::PDF;
         }
@@ -205,12 +192,12 @@ pub fn detect_file_type(data: &[u8]) -> FileType {
     }
 
     // Tar (ustar magic at offset 257)
-    if data.len() > 262 && &data[257..262] == b"ustar" {
+    if data.get(257..262).is_some_and(|slice| slice == b"ustar") {
         return FileType::Tar;
     }
 
     // 7z
-    if data.len() >= 6 && &data[0..6] == b"7z\xBC\xAF\x27\x1C" {
+    if data.get(..6).is_some_and(|slice| slice == b"7z\xBC\xAF\x27\x1C") {
         return FileType::SevenZip;
     }
 
@@ -256,13 +243,19 @@ pub fn shannon_entropy(data: &[u8]) -> f64 {
 
     let mut freq = [0u64; 256];
     for &byte in data {
-        freq[byte as usize] += 1;
+        // `byte as usize` is always in 0..=255, which is within bounds of `freq[256]`.
+        #[allow(clippy::indexing_slicing)]
+        {
+            freq[byte as usize] += 1;
+        }
     }
 
+    #[allow(clippy::cast_precision_loss)]
     let len = data.len() as f64;
     freq.iter()
         .filter(|&&f| f > 0)
         .map(|&f| {
+            #[allow(clippy::cast_precision_loss)]
             let p = f as f64 / len;
             -p * p.log2()
         })
@@ -270,6 +263,12 @@ pub fn shannon_entropy(data: &[u8]) -> f64 {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::unreadable_literal,
+    clippy::float_cmp,
+    clippy::uninlined_format_args
+)]
 mod tests {
     use super::*;
 

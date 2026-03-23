@@ -16,6 +16,7 @@ pub mod realtime;
 pub mod report;
 #[cfg(target_os = "linux")]
 pub mod rootkit;
+pub mod runtime;
 pub mod scan;
 pub mod scan_usb;
 pub mod schedule;

@@ -1,4 +1,4 @@
-//! Parser for ClamAV `.ldb` logical signature files.
+//! Parser for `ClamAV` `.ldb` logical signature files.
 //!
 //! LDB signatures combine multiple subsignatures with a logical (boolean)
 //! expression. Each line has the format:
@@ -7,8 +7,8 @@
 //! SignatureName;TargetType;LogicalExpression;SubSig0;SubSig1;...
 //! ```
 //!
-//! - **LogicalExpression**: e.g., `0&1`, `0|1&2`, `0&1|2`.
-//! - **SubSigN**: hex patterns or other subsignature specifiers.
+//! - **`LogicalExpression`**: e.g., `0&1`, `0|1&2`, `0&1|2`.
+//! - **`SubSigN`**: hex patterns or other subsignature specifiers.
 
 use anyhow::{bail, Context, Result};
 
@@ -47,19 +47,24 @@ pub fn parse_ldb(content: &str) -> Result<Vec<LdbSignature>> {
             );
         }
 
-        let name = parts[0].to_string();
+        let name = parts.first().context("LDB: missing name field")?.to_string();
 
-        let target_type = parts[1].parse::<u32>().with_context(|| {
-            format!(
-                "LDB line {}: invalid target type '{}'",
-                line_num + 1,
-                parts[1]
-            )
-        })?;
+        let target_str = *parts.get(1).context("LDB: missing target type field")?;
+        let target_type = target_str
+            .parse::<u32>()
+            .with_context(|| format!("LDB line {}: invalid target type '{target_str}'", line_num + 1,))?;
 
-        let logical_expression = parts[2].to_string();
+        let logical_expression = parts
+            .get(2)
+            .context("LDB: missing logical expression field")?
+            .to_string();
 
-        let subsignatures: Vec<String> = parts[3..].iter().map(|s| s.to_string()).collect();
+        let subsignatures: Vec<String> = parts
+            .get(3..)
+            .unwrap_or_default()
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         if subsignatures.is_empty() {
             bail!("LDB line {}: no subsignatures provided", line_num + 1);
@@ -77,6 +82,7 @@ pub fn parse_ldb(content: &str) -> Result<Vec<LdbSignature>> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

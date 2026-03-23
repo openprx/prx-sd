@@ -34,14 +34,14 @@ mod onnx_backend {
     use super::*;
     use tract_onnx::prelude::*;
 
-    pub(super) type OnnxModel =
-        SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
+    pub(super) type OnnxModel = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
     pub(super) fn load_model(path: &Path, feature_dim: usize) -> Result<OnnxModel> {
         let model = tract_onnx::onnx()
             .model_for_path(path)?
             .with_input_fact(
                 0,
+                #[allow(clippy::cast_possible_wrap)]
                 InferenceFact::dt_shape(f32::datum_type(), tvec![1, feature_dim as i64]),
             )?
             .into_optimized()?
@@ -57,15 +57,9 @@ mod onnx_backend {
         // Handle both [1,1] and [1,2] output shapes.
         let prob = if output.len() >= 2 {
             // Assume softmax [benign, malicious]
-            output
-                .as_slice()
-                .and_then(|s| s.get(1).copied())
-                .unwrap_or(0.0)
+            output.as_slice().and_then(|s| s.get(1).copied()).unwrap_or(0.0)
         } else {
-            output
-                .as_slice()
-                .and_then(|s| s.first().copied())
-                .unwrap_or(0.0)
+            output.as_slice().and_then(|s| s.first().copied()).unwrap_or(0.0)
         };
         Ok(prob.clamp(0.0, 1.0))
     }
@@ -183,12 +177,7 @@ impl MlModel {
             }
         }
 
-        if self.pe_fallback || cfg!(not(feature = "onnx")) {
-            fallback_pe_score(features)
-        } else {
-            // Should not reach here, but be safe
-            fallback_pe_score(features)
-        }
+        fallback_pe_score(features)
     }
 
     /// Run ELF malware prediction.
@@ -215,7 +204,7 @@ impl MlModel {
     }
 
     /// Whether either model is using ONNX (not fallback).
-    pub fn has_onnx_models(&self) -> bool {
+    pub const fn has_onnx_models(&self) -> bool {
         !self.pe_fallback || !self.elf_fallback
     }
 }
@@ -229,7 +218,16 @@ impl MlModel {
 /// - Suspicious API counts
 /// - Writable code sections
 /// - Packer indicators (UPX sections, zero-size sections)
+#[allow(clippy::indexing_slicing)] // All indices are compile-time constants verified by const assert below
 fn fallback_pe_score(f: &[f32; PE_FEATURE_DIM]) -> MlPrediction {
+    // Compile-time guard: the highest index we access is 58, so the feature
+    // dimension must be at least 59.  If PE_FEATURE_DIM is ever reduced below
+    // that, this line will cause a build error instead of a runtime panic.
+    const _: () = assert!(
+        PE_FEATURE_DIM >= 59,
+        "PE_FEATURE_DIM too small for fallback model indices"
+    );
+
     let mut score: f32 = 0.0;
 
     // Overall entropy contribution (f[8] is /8.0, so >0.875 means >7.0)
@@ -268,21 +266,21 @@ fn fallback_pe_score(f: &[f32; PE_FEATURE_DIM]) -> MlPrediction {
     }
 
     // No debug info in a complex binary is mildly suspicious
-    if f[58] == 0.0 && f[6] > 10.0 {
+    #[allow(clippy::float_cmp)]
+    let no_debug_complex = f[58] == 0.0 && f[6] > 10.0;
+    if no_debug_complex {
         score += 0.05;
     }
 
     // Zero timestamp (f[3])
-    if f[3] == 0.0 {
+    #[allow(clippy::float_cmp)]
+    let zero_ts = f[3] == 0.0;
+    if zero_ts {
         score += 0.05;
     }
 
     let prob = score.clamp(0.0, 1.0);
-    let confidence = if !(0.2..=0.7).contains(&prob) {
-        0.6
-    } else {
-        0.4
-    };
+    let confidence = if (0.2..=0.7).contains(&prob) { 0.4 } else { 0.6 };
 
     MlPrediction {
         malicious_probability: prob,
@@ -292,7 +290,15 @@ fn fallback_pe_score(f: &[f32; PE_FEATURE_DIM]) -> MlPrediction {
 }
 
 /// Simple weighted feature sum for ELF files.
+#[allow(clippy::indexing_slicing)] // All indices are compile-time constants verified by const assert below
 fn fallback_elf_score(f: &[f32; ELF_FEATURE_DIM]) -> MlPrediction {
+    // Compile-time guard: the highest index we access is 43, so the feature
+    // dimension must be at least 44.
+    const _: () = assert!(
+        ELF_FEATURE_DIM >= 44,
+        "ELF_FEATURE_DIM too small for fallback model indices"
+    );
+
     let mut score: f32 = 0.0;
 
     // Overall entropy (f[7])
@@ -331,16 +337,14 @@ fn fallback_elf_score(f: &[f32; ELF_FEATURE_DIM]) -> MlPrediction {
     score += f[43] * 0.08;
 
     // No interpreter + no dynamic libs = static, possibly packed
-    if f[6] == 0.0 && f[5] == 0.0 && f[7] > 0.8 {
+    #[allow(clippy::float_cmp)]
+    let static_packed = f[6] == 0.0 && f[5] == 0.0 && f[7] > 0.8;
+    if static_packed {
         score += 0.12;
     }
 
     let prob = score.clamp(0.0, 1.0);
-    let confidence = if !(0.2..=0.7).contains(&prob) {
-        0.6
-    } else {
-        0.4
-    };
+    let confidence = if (0.2..=0.7).contains(&prob) { 0.4 } else { 0.6 };
 
     MlPrediction {
         malicious_probability: prob,
@@ -350,6 +354,7 @@ fn fallback_elf_score(f: &[f32; ELF_FEATURE_DIM]) -> MlPrediction {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::float_cmp, clippy::expect_used)]
 mod tests {
     use super::*;
 

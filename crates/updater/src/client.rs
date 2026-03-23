@@ -35,9 +35,8 @@ impl UpdateClient {
     /// # Arguments
     /// * `server_url` - Base URL of the update server (no trailing slash).
     /// * `public_key_bytes` - 32-byte Ed25519 public key for signature verification.
-    pub fn new(server_url: String, public_key_bytes: &[u8; 32]) -> Result<Self> {
-        let verify_key = VerifyingKey::from_bytes(public_key_bytes)
-            .context("invalid Ed25519 public key bytes")?;
+    pub fn new(server_url: &str, public_key_bytes: &[u8; 32]) -> Result<Self> {
+        let verify_key = VerifyingKey::from_bytes(public_key_bytes).context("invalid Ed25519 public key bytes")?;
 
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
@@ -70,15 +69,12 @@ impl UpdateClient {
     /// Perform a full update cycle: check for updates and apply them.
     ///
     /// Returns `true` if the database was updated, `false` if already current.
-    pub async fn update(&self, db: &mut prx_sd_signatures::SignatureDatabase) -> Result<bool> {
+    pub async fn update(&self, db: &prx_sd_signatures::SignatureDatabase) -> Result<bool> {
         let current_version = db.get_version()?;
         let latest = self.fetch_latest_version().await?;
 
         if latest <= current_version {
-            info!(
-                current_version,
-                latest, "signature database is already up-to-date"
-            );
+            info!(current_version, latest, "signature database is already up-to-date");
             return Ok(false);
         }
 
@@ -88,12 +84,9 @@ impl UpdateClient {
         );
 
         let delta_data = self.fetch_delta(current_version, latest).await?;
-        self.apply_delta(db, &delta_data, latest).await?;
+        self.apply_delta(db, &delta_data, latest)?;
 
-        info!(
-            new_version = latest,
-            "signature database updated successfully"
-        );
+        info!(new_version = latest, "signature database updated successfully");
         Ok(true)
     }
 
@@ -113,10 +106,7 @@ impl UpdateClient {
             bail!("update server returned HTTP {status} for GET /version");
         }
 
-        let info: VersionInfo = resp
-            .json()
-            .await
-            .context("failed to parse version response")?;
+        let info: VersionInfo = resp.json().await.context("failed to parse version response")?;
 
         Ok(info.current)
     }
@@ -137,28 +127,19 @@ impl UpdateClient {
             bail!("update server returned HTTP {status} for GET /delta/{from}..{to}");
         }
 
-        let bytes = resp
-            .bytes()
-            .await
-            .context("failed to read delta response body")?;
+        let bytes = resp.bytes().await.context("failed to read delta response body")?;
 
         Ok(bytes.to_vec())
     }
 
     /// Verify, decompress, and apply a delta patch to the signature database.
-    async fn apply_delta(
-        &self,
-        db: &mut prx_sd_signatures::SignatureDatabase,
-        delta_data: &[u8],
-        new_ver: u64,
-    ) -> Result<()> {
+    fn apply_delta(&self, db: &prx_sd_signatures::SignatureDatabase, delta_data: &[u8], new_ver: u64) -> Result<()> {
         // Verify the Ed25519 signature and extract the compressed payload.
-        let compressed = verify_payload(&self.verify_key, delta_data)
-            .context("delta payload signature verification failed")?;
+        let compressed =
+            verify_payload(&self.verify_key, delta_data).context("delta payload signature verification failed")?;
 
         // Decompress and deserialize the delta patch.
-        let patch: DeltaPatch =
-            decode_delta(&compressed).context("failed to decode delta patch")?;
+        let patch: DeltaPatch = decode_delta(&compressed).context("failed to decode delta patch")?;
 
         // Sanity check: the patch version should match what we expect.
         if patch.version != new_ver {
@@ -178,8 +159,7 @@ impl UpdateClient {
         }
 
         if !patch.add_hashes.is_empty() {
-            let entries: Vec<(Vec<u8>, String)> = patch.add_hashes.clone();
-            let added = db.import_hashes(&entries)?;
+            let added = db.import_hashes(&patch.add_hashes)?;
             info!(added, "imported new hash entries");
         }
 

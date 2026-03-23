@@ -32,8 +32,7 @@ pub fn print_scan_result(result: &ScanResult, colored: bool) {
     let detection = result
         .detection_type
         .as_ref()
-        .map(|d| d.to_string())
-        .unwrap_or_else(|| "-".to_string());
+        .map_or_else(|| "-".to_string(), std::string::ToString::to_string);
 
     println!(
         "  [{level_str}] {} | {threat_info} ({detection}) [{} ms]",
@@ -49,10 +48,7 @@ pub fn print_scan_result(result: &ScanResult, colored: bool) {
 /// Print a summary line for a batch of scan results.
 pub fn print_scan_summary(results: &[ScanResult], elapsed_ms: u64) {
     let total = results.len();
-    let clean = results
-        .iter()
-        .filter(|r| r.threat_level == ThreatLevel::Clean)
-        .count();
+    let clean = results.iter().filter(|r| r.threat_level == ThreatLevel::Clean).count();
     let suspicious = results
         .iter()
         .filter(|r| r.threat_level == ThreatLevel::Suspicious)
@@ -66,10 +62,7 @@ pub fn print_scan_summary(results: &[ScanResult], elapsed_ms: u64) {
     println!("  Total scanned: {total}");
     println!("  Clean:         {}", format!("{clean}").green());
     if suspicious > 0 {
-        println!(
-            "  Suspicious:    {}",
-            format!("{suspicious}").yellow().bold()
-        );
+        println!("  Suspicious:    {}", format!("{suspicious}").yellow().bold());
     } else {
         println!("  Suspicious:    {suspicious}");
     }
@@ -94,8 +87,8 @@ pub fn print_table(headers: &[&str], rows: &[Vec<String>]) {
     let mut widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
     for row in rows {
         for (i, cell) in row.iter().enumerate() {
-            if i < widths.len() {
-                widths[i] = widths[i].max(cell.len());
+            if let Some(w) = widths.get_mut(i) {
+                *w = (*w).max(cell.len());
             }
         }
     }
@@ -104,17 +97,16 @@ pub fn print_table(headers: &[&str], rows: &[Vec<String>]) {
     let header_line: String = headers
         .iter()
         .enumerate()
-        .map(|(i, h)| format!("{:<width$}", h, width = widths[i]))
+        .map(|(i, h)| {
+            let w = widths.get(i).copied().unwrap_or(0);
+            format!("{h:<w$}")
+        })
         .collect::<Vec<_>>()
         .join("  ");
     println!("{}", header_line.bold());
 
     // Separator.
-    let sep: String = widths
-        .iter()
-        .map(|&w| "-".repeat(w))
-        .collect::<Vec<_>>()
-        .join("  ");
+    let sep: String = widths.iter().map(|&w| "-".repeat(w)).collect::<Vec<_>>().join("  ");
     println!("{sep}");
 
     // Rows.
@@ -124,7 +116,7 @@ pub fn print_table(headers: &[&str], rows: &[Vec<String>]) {
             .enumerate()
             .map(|(i, cell)| {
                 let w = widths.get(i).copied().unwrap_or(0);
-                format!("{:<width$}", cell, width = w)
+                format!("{cell:<w$}")
             })
             .collect::<Vec<_>>()
             .join("  ");
@@ -133,6 +125,7 @@ pub fn print_table(headers: &[&str], rows: &[Vec<String>]) {
 }
 
 /// Format a byte count into a human-readable string (B, KB, MB, GB, TB).
+#[allow(clippy::cast_precision_loss)] // Precision loss is acceptable for display formatting.
 pub fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = 1024 * KB;
@@ -153,6 +146,7 @@ pub fn format_bytes(bytes: u64) -> String {
 }
 
 /// Format a duration in milliseconds into a human-readable string.
+#[allow(clippy::cast_precision_loss)] // Precision loss is acceptable for display formatting.
 pub fn format_duration(ms: u64) -> String {
     if ms < 1_000 {
         format!("{ms} ms")

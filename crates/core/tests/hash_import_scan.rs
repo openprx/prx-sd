@@ -3,6 +3,36 @@
 //!
 //! Covers both SHA-256 and MD5 import paths.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
@@ -54,10 +84,7 @@ async fn import_sha256_hash_then_scan_detects() {
     let result = engine.scan_file(&evil_path).await.expect("scan file");
     assert_eq!(result.threat_level, ThreatLevel::Malicious);
     assert_eq!(result.detection_type, Some(DetectionType::Hash));
-    assert_eq!(
-        result.threat_name.as_deref(),
-        Some("Test.Trojan.SHA256Import"),
-    );
+    assert_eq!(result.threat_name.as_deref(), Some("Test.Trojan.SHA256Import"),);
 
     // Clean file should not match.
     let clean_path = tmp.path().join("clean.txt");
@@ -100,11 +127,7 @@ async fn import_multiple_hashes_scan_detects_all() {
         .iter()
         .filter(|r| r.threat_level == ThreatLevel::Malicious)
         .collect();
-    assert_eq!(
-        malicious.len(),
-        2,
-        "both malware samples should be detected"
-    );
+    assert_eq!(malicious.len(), 2, "both malware samples should be detected");
 }
 
 #[tokio::test]

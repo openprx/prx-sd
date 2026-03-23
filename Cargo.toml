@@ -18,7 +18,7 @@ exclude = ["gui/src-tauri"]
 
 [workspace.package]
 authors = ["g1e2x87"]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Open-source antivirus engine with hash, YARA, and heuristic detection"
@@ -35,6 +35,7 @@ rayon = "1"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
 bincode = "1"
 
 # Error handling
@@ -77,6 +78,9 @@ yara-x = "1.14"
 
 # Regex
 regex = "1"
+
+# Synchronization (prefer over std::sync::Mutex per project rules)
+parking_lot = "0.12"
 
 # Adblock / domain filtering (Brave engine)
 adblock = "0.12"

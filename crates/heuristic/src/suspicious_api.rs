@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Broad categories of suspicious API behaviour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ApiCategory {
-    /// Code injection into another process (e.g. VirtualAllocEx + WriteProcessMemory).
+    /// Code injection into another process (e.g. `VirtualAllocEx` + `WriteProcessMemory`).
     ProcessInjection,
     /// Techniques to detect or evade debuggers.
     AntiDebug,
@@ -29,13 +29,13 @@ pub enum ApiCategory {
 impl std::fmt::Display for ApiCategory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ApiCategory::ProcessInjection => write!(f, "ProcessInjection"),
-            ApiCategory::AntiDebug => write!(f, "AntiDebug"),
-            ApiCategory::Persistence => write!(f, "Persistence"),
-            ApiCategory::NetworkExfil => write!(f, "NetworkExfil"),
-            ApiCategory::Crypto => write!(f, "Crypto"),
-            ApiCategory::Privilege => write!(f, "Privilege"),
-            ApiCategory::FileSystem => write!(f, "FileSystem"),
+            Self::ProcessInjection => write!(f, "ProcessInjection"),
+            Self::AntiDebug => write!(f, "AntiDebug"),
+            Self::Persistence => write!(f, "Persistence"),
+            Self::NetworkExfil => write!(f, "NetworkExfil"),
+            Self::Crypto => write!(f, "Crypto"),
+            Self::Privilege => write!(f, "Privilege"),
+            Self::FileSystem => write!(f, "FileSystem"),
         }
     }
 }
@@ -411,20 +411,25 @@ pub fn check_suspicious_imports(imports: &[ImportInfo]) -> Vec<(ApiCategory, Str
 ///
 /// Handles common variations:
 /// - Exact match (case-insensitive)
-/// - Match ignoring trailing A/W suffix (e.g. "RegSetValueEx" matches
-///   both "RegSetValueExA" and "RegSetValueExW" entries)
+/// - Match ignoring trailing A/W suffix (e.g. "`RegSetValueEx`" matches
+///   both "`RegSetValueExA`" and "`RegSetValueExW`" entries)
 fn func_matches(imported: &str, suspicious: &str) -> bool {
     if imported.eq_ignore_ascii_case(suspicious) {
         return true;
     }
 
-    // If the suspicious entry has no A/W suffix, also match imports that do
+    // Bidirectional A/W suffix stripping — both the imported name and the
+    // suspicious-API catalog entry may carry platform-specific suffixes.
     let imported_base = imported
         .strip_suffix('A')
         .or_else(|| imported.strip_suffix('W'))
         .unwrap_or(imported);
+    let suspicious_base = suspicious
+        .strip_suffix('A')
+        .or_else(|| suspicious.strip_suffix('W'))
+        .unwrap_or(suspicious);
 
-    imported_base.eq_ignore_ascii_case(suspicious)
+    imported_base.eq_ignore_ascii_case(suspicious_base)
 }
 
 #[cfg(test)]
@@ -488,5 +493,17 @@ mod tests {
         assert!(LINUX_SUSPICIOUS_CALLS.contains(&"ptrace"));
         assert!(LINUX_SUSPICIOUS_CALLS.contains(&"memfd_create"));
         assert!(LINUX_SUSPICIOUS_CALLS.contains(&"execveat"));
+    }
+
+    #[test]
+    fn suffix_match_bidirectional() {
+        // imported has no suffix, suspicious has A suffix
+        assert!(func_matches("RegSetValueEx", "RegSetValueExA"));
+        // imported has W suffix, suspicious has A suffix
+        assert!(func_matches("RegSetValueExW", "RegSetValueExA"));
+        // both have same suffix
+        assert!(func_matches("RegSetValueExA", "RegSetValueExA"));
+        // imported has suffix, suspicious has none
+        assert!(func_matches("VirtualAllocExW", "VirtualAllocEx"));
     }
 }

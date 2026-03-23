@@ -152,7 +152,15 @@ impl RansomwareDetector {
     fn on_file_event_at(&mut self, event: &FileEvent, now: Instant) -> RansomwareVerdict {
         let pid = match event.pid() {
             Some(p) if p > 0 => p,
-            _ => return RansomwareVerdict::Clean,
+            _ => {
+                // For file modification events without PID attribution
+                // (e.g., from notify-based monitors), track under a sentinel
+                // PID so modifications are still counted for path-based detection.
+                match event {
+                    FileEvent::Modify { .. } | FileEvent::CloseWrite { .. } => u32::MAX,
+                    _ => return RansomwareVerdict::Clean,
+                }
+            }
         };
 
         let window = Duration::from_secs(self.config.window_secs);
@@ -189,18 +197,19 @@ impl RansomwareDetector {
 
     /// Evaluate current counters for a given PID and return a verdict.
     pub fn check_process(&self, pid: u32) -> RansomwareVerdict {
-        let activity = match self.process_activity.get(&pid) {
-            Some(a) => a,
-            None => return RansomwareVerdict::Clean,
+        let Some(activity) = self.process_activity.get(&pid) else {
+            return RansomwareVerdict::Clean;
         };
 
+        // VecDeque lengths are bounded by event rates, well within u32 range.
+        #[allow(clippy::cast_possible_truncation)]
         let mod_count = activity.modifications.len() as u32;
+        #[allow(clippy::cast_possible_truncation)]
         let ren_count = activity.renames.len() as u32;
         let ext_count = activity.suspicious_extensions;
 
         // Definitive: both thresholds exceeded OR many ransomware extensions.
-        if (mod_count >= self.config.modification_threshold
-            && ren_count >= self.config.rename_threshold)
+        if (mod_count >= self.config.modification_threshold && ren_count >= self.config.rename_threshold)
             || ext_count >= self.config.rename_threshold
         {
             return RansomwareVerdict::RansomwareDetected {
@@ -242,14 +251,11 @@ impl RansomwareDetector {
     }
 
     fn has_ransomware_extension_in(extensions: &[String], path: &Path) -> bool {
-        let name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n,
-            None => return false,
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            return false;
         };
         let lower = name.to_ascii_lowercase();
-        extensions
-            .iter()
-            .any(|ext| lower.ends_with(&ext.to_ascii_lowercase()))
+        extensions.iter().any(|ext| lower.ends_with(&ext.to_ascii_lowercase()))
     }
 }
 
@@ -396,15 +402,41 @@ mod tests {
     }
 
     #[test]
-    fn events_without_pid_are_ignored() {
+    fn events_without_pid_track_modifications() {
+        let config = RansomwareConfig {
+            modification_threshold: 3,
+            ..RansomwareConfig::default()
+        };
+        let mut det = RansomwareDetector::new(config);
+        let now = Instant::now();
+
+        // Modify events without PID should still be tracked.
+        for i in 0..3 {
+            det.on_file_event_at(
+                &FileEvent::Modify {
+                    path: PathBuf::from(format!("/tmp/file{i}")),
+                },
+                now,
+            );
+        }
+        // The sentinel PID bucket should have 3 modifications.
+        let v = det.check_process(u32::MAX);
+        assert!(
+            matches!(v, RansomwareVerdict::Suspicious { .. }),
+            "expected Suspicious from tracked modifications, got {v:?}"
+        );
+    }
+
+    #[test]
+    fn events_without_pid_create_delete_are_ignored() {
         let mut det = RansomwareDetector::new(RansomwareConfig::default());
-        let v = det.on_file_event(&FileEvent::Modify {
-            path: PathBuf::from("/tmp/x"),
+        let v = det.on_file_event(&FileEvent::Create {
+            path: PathBuf::from("/tmp/y"),
         });
         assert_eq!(v, RansomwareVerdict::Clean);
 
-        let v = det.on_file_event(&FileEvent::Create {
-            path: PathBuf::from("/tmp/y"),
+        let v = det.on_file_event(&FileEvent::Delete {
+            path: PathBuf::from("/tmp/z"),
         });
         assert_eq!(v, RansomwareVerdict::Clean);
     }

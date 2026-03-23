@@ -4,6 +4,36 @@
 //! `scan_file` and `scan_bytes`, correctly flagging matching content as
 //! Malicious while leaving non-matching content Clean.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
@@ -80,11 +110,7 @@ async fn yara_rule_detects_matching_content() {
         "detection should be via YaraRule"
     );
     assert!(
-        result
-            .threat_name
-            .as_deref()
-            .unwrap_or("")
-            .contains("TestEvil"),
+        result.threat_name.as_deref().unwrap_or("").contains("TestEvil"),
         "threat name should reference the YARA rule, got {:?}",
         result.threat_name
     );
@@ -94,17 +120,10 @@ async fn yara_rule_detects_matching_content() {
 fn yara_rule_detects_via_scan_bytes() {
     let (_tmp, engine) = setup_engine_with_yara_rule();
 
-    let result = engine.scan_bytes(
-        b"some preamble EVIL_TEST_MARKER_XYZ trailing data",
-        "in-memory",
-    );
+    let result = engine.scan_bytes(b"some preamble EVIL_TEST_MARKER_XYZ trailing data", "in-memory");
     assert_eq!(result.threat_level, ThreatLevel::Malicious);
     assert_eq!(result.detection_type, Some(DetectionType::YaraRule));
-    assert!(result
-        .threat_name
-        .as_deref()
-        .unwrap_or("")
-        .contains("TestEvil"),);
+    assert!(result.threat_name.as_deref().unwrap_or("").contains("TestEvil"),);
 }
 
 #[test]
@@ -113,9 +132,7 @@ fn clean_bytes_not_matched_by_yara() {
 
     let result = engine.scan_bytes(b"completely benign content", "clean-buf");
     assert_eq!(result.threat_level, ThreatLevel::Clean);
-    assert!(
-        result.detection_type.is_none() || result.detection_type != Some(DetectionType::YaraRule)
-    );
+    assert!(result.detection_type.is_none() || result.detection_type != Some(DetectionType::YaraRule));
 }
 
 #[test]
@@ -127,11 +144,7 @@ fn yara_directory_scan_mixed_files() {
 
     fs::write(scan_dir.join("clean_1.txt"), "hello world").unwrap();
     fs::write(scan_dir.join("clean_2.txt"), "nothing here").unwrap();
-    fs::write(
-        scan_dir.join("evil.bin"),
-        "payload EVIL_TEST_MARKER_XYZ end",
-    )
-    .unwrap();
+    fs::write(scan_dir.join("evil.bin"), "payload EVIL_TEST_MARKER_XYZ end").unwrap();
 
     let results = engine.scan_directory(&scan_dir);
     assert_eq!(results.len(), 3, "should scan all 3 files");
@@ -140,10 +153,6 @@ fn yara_directory_scan_mixed_files() {
         .iter()
         .filter(|r| r.threat_level == ThreatLevel::Malicious)
         .collect();
-    assert_eq!(
-        malicious.len(),
-        1,
-        "exactly one file should be flagged as Malicious"
-    );
+    assert_eq!(malicious.len(), 1, "exactly one file should be flagged as Malicious");
     assert!(malicious[0].path.to_string_lossy().contains("evil.bin"),);
 }

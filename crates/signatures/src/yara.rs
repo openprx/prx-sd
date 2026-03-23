@@ -41,10 +41,7 @@ impl YaraEngine {
     #[instrument(skip_all, fields(rules_dir = %rules_dir.display()))]
     pub fn load_rules(rules_dir: &Path) -> Result<Self> {
         if !rules_dir.is_dir() {
-            anyhow::bail!(
-                "YARA rules directory does not exist: {}",
-                rules_dir.display()
-            );
+            anyhow::bail!("YARA rules directory does not exist: {}", rules_dir.display());
         }
 
         let mut compiler = yara_x::Compiler::new();
@@ -54,7 +51,7 @@ impl YaraEngine {
         for entry in WalkDir::new(rules_dir)
             .follow_links(false)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
         {
             let path = entry.path();
             // Use entry.file_type() (lstat) rather than path.is_file() (stat)
@@ -67,7 +64,7 @@ impl YaraEngine {
                 continue;
             }
 
-            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or_default();
             if ext != "yar" && ext != "yara" && ext != "rule" {
                 continue;
             }
@@ -82,10 +79,7 @@ impl YaraEngine {
             };
 
             // Use filename stem as namespace to avoid rule name collisions.
-            let namespace = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("default");
+            let namespace = path.file_stem().and_then(|s| s.to_str()).unwrap_or("default");
 
             compiler.new_namespace(namespace);
 
@@ -125,9 +119,8 @@ impl YaraEngine {
     /// Returns a list of `YaraMatch` for each rule that matched.
     #[instrument(skip_all, fields(data_len = data.len(), rules = self.rule_count))]
     pub fn scan(&self, data: &[u8]) -> Vec<YaraMatch> {
-        let rules = match &self.compiled_rules {
-            Some(r) => r,
-            None => return Vec::new(),
+        let Some(rules) = &self.compiled_rules else {
+            return Vec::new();
         };
 
         let mut scanner = yara_x::Scanner::new(rules);
@@ -150,12 +143,13 @@ impl YaraEngine {
     }
 
     /// Return the number of successfully compiled YARA rule files.
-    pub fn rule_count(&self) -> usize {
+    pub const fn rule_count(&self) -> usize {
         self.rule_count
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

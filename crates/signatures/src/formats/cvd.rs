@@ -1,4 +1,4 @@
-//! Parser for ClamAV `.cvd` (ClamAV Virus Database) files.
+//! Parser for `ClamAV` `.cvd` (`ClamAV` Virus Database) files.
 //!
 //! A CVD file has a 512-byte ASCII header followed by a tar.gz archive
 //! containing the actual signature data. The header fields are colon-separated:
@@ -15,7 +15,7 @@ const CVD_HEADER_SIZE: usize = 512;
 /// Parsed CVD file header.
 #[derive(Debug, Clone)]
 pub struct CvdHeader {
-    /// Database name (e.g., "ClamAV-VDB").
+    /// Database name (e.g., "`ClamAV`-VDB").
     pub name: String,
     /// Build time as a human-readable string.
     pub build_time: String,
@@ -36,20 +36,20 @@ pub struct CvdFile {
     pub data: Vec<u8>,
 }
 
-/// Parse a ClamAV `.cvd` file from raw bytes.
+/// Parse a `ClamAV` `.cvd` file from raw bytes.
 ///
 /// The first 512 bytes are a colon-separated ASCII header. Everything after
 /// that is a tar.gz archive containing the signature files.
 pub fn parse_cvd(data: &[u8]) -> Result<CvdFile> {
     if data.len() < CVD_HEADER_SIZE {
         bail!(
-            "CVD data too short: {} bytes (expected at least {})",
+            "CVD data too short: {} bytes (expected at least {CVD_HEADER_SIZE})",
             data.len(),
-            CVD_HEADER_SIZE
         );
     }
 
-    let header_bytes = &data[..CVD_HEADER_SIZE];
+    // Safe: length checked above ensures data has at least CVD_HEADER_SIZE bytes.
+    let header_bytes = data.get(..CVD_HEADER_SIZE).context("CVD header slice out of bounds")?;
     let header_str = std::str::from_utf8(header_bytes)
         .context("CVD header is not valid UTF-8")?
         .trim_end_matches('\0')
@@ -65,19 +65,22 @@ pub fn parse_cvd(data: &[u8]) -> Result<CvdFile> {
         );
     }
 
-    let name = fields[0].to_string();
-    let build_time = fields[1].to_string();
+    // Safe: we verified fields.len() >= 6 above.
+    let name = fields.first().context("missing CVD name field")?.to_string();
+    let build_time = fields.get(1).context("missing CVD build_time field")?.to_string();
 
-    let version = fields[2]
+    let version_str = fields.get(2).context("missing CVD version field")?;
+    let version = version_str
         .parse::<u32>()
-        .with_context(|| format!("invalid CVD version field: '{}'", fields[2]))?;
+        .with_context(|| format!("invalid CVD version field: '{version_str}'"))?;
 
-    let num_signatures = fields[3]
+    let sigs_str = fields.get(3).context("missing CVD num_signatures field")?;
+    let num_signatures = sigs_str
         .parse::<u32>()
-        .with_context(|| format!("invalid CVD num_signatures field: '{}'", fields[3]))?;
+        .with_context(|| format!("invalid CVD num_signatures field: '{sigs_str}'"))?;
 
     // fields[4] is func_level, which we skip.
-    let md5 = fields[5].to_string();
+    let md5 = fields.get(5).context("missing CVD md5 field")?.to_string();
 
     let header = CvdHeader {
         name,
@@ -87,15 +90,16 @@ pub fn parse_cvd(data: &[u8]) -> Result<CvdFile> {
         md5,
     };
 
-    let payload = data[CVD_HEADER_SIZE..].to_vec();
+    let payload = data
+        .get(CVD_HEADER_SIZE..)
+        .context("CVD payload slice out of bounds")?
+        .to_vec();
 
-    Ok(CvdFile {
-        header,
-        data: payload,
-    })
+    Ok(CvdFile { header, data: payload })
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::unreadable_literal)]
 mod tests {
     use super::*;
 

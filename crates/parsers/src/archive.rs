@@ -48,11 +48,7 @@ pub fn inspect_archive(data: &[u8], format: ArchiveFormat) -> Result<ArchiveInfo
 
 /// Recursively extract files from an archive up to `max_depth` levels of
 /// nesting. Returns a list of `(path, contents)` pairs.
-pub fn extract_archive(
-    data: &[u8],
-    format: ArchiveFormat,
-    max_depth: u32,
-) -> Result<Vec<(String, Vec<u8>)>> {
+pub fn extract_archive(data: &[u8], format: ArchiveFormat, max_depth: u32) -> Result<Vec<(String, Vec<u8>)>> {
     if max_depth == 0 {
         debug!("max recursion depth reached, skipping nested extraction");
         return Ok(Vec::new());
@@ -85,11 +81,11 @@ pub fn detect_archive_format(data: &[u8]) -> Option<ArchiveFormat> {
         return Some(ArchiveFormat::TarGz);
     }
     // Tar: "ustar" at offset 257
-    if data.len() > 262 && &data[257..262] == b"ustar" {
+    if data.get(257..262).is_some_and(|slice| slice == b"ustar") {
         return Some(ArchiveFormat::Tar);
     }
     // 7z: 7z\xBC\xAF\x27\x1C
-    if data.len() >= 6 && &data[0..6] == b"7z\xBC\xAF\x27\x1C" {
+    if data.get(..6).is_some_and(|slice| slice == b"7z\xBC\xAF\x27\x1C") {
         return Some(ArchiveFormat::SevenZip);
     }
     None
@@ -104,9 +100,7 @@ fn inspect_zip(data: &[u8]) -> Result<ArchiveInfo> {
     let mut total_uncompressed_size: u64 = 0;
 
     for i in 0..archive.len() {
-        let file = archive
-            .by_index_raw(i)
-            .context("failed to read zip entry")?;
+        let file = archive.by_index_raw(i).context("failed to read zip entry")?;
         let is_encrypted = file.encrypted();
         let size = file.size();
         total_uncompressed_size = total_uncompressed_size.saturating_add(size);
@@ -150,9 +144,10 @@ fn extract_zip(data: &[u8], max_depth: u32) -> Result<Vec<(String, Vec<u8>)>> {
             break;
         }
 
+        #[allow(clippy::cast_possible_truncation)]
         let mut buf = Vec::with_capacity(size as usize);
         file.read_to_end(&mut buf)
-            .with_context(|| format!("failed to decompress zip entry: {}", name))?;
+            .with_context(|| format!("failed to decompress zip entry: {name}"))?;
 
         // Attempt recursive extraction of nested archives
         if let Some(nested_fmt) = detect_archive_format(&buf) {
@@ -160,7 +155,7 @@ fn extract_zip(data: &[u8], max_depth: u32) -> Result<Vec<(String, Vec<u8>)>> {
             match extract_archive(&buf, nested_fmt, max_depth - 1) {
                 Ok(nested) => {
                     for (nested_path, nested_data) in nested {
-                        results.push((format!("{}/{}", name, nested_path), nested_data));
+                        results.push((format!("{name}/{nested_path}"), nested_data));
                     }
                     continue;
                 }
@@ -233,17 +228,18 @@ fn extract_tar_from_reader<R: Read>(reader: R, max_depth: u32) -> Result<Vec<(St
             break;
         }
 
+        #[allow(clippy::cast_possible_truncation)]
         let mut buf = Vec::with_capacity(size as usize);
         entry
             .read_to_end(&mut buf)
-            .with_context(|| format!("failed to read tar entry: {}", path))?;
+            .with_context(|| format!("failed to read tar entry: {path}"))?;
 
         if let Some(nested_fmt) = detect_archive_format(&buf) {
             debug!(%path, ?nested_fmt, "recursively extracting nested archive");
             match extract_archive(&buf, nested_fmt, max_depth - 1) {
                 Ok(nested) => {
                     for (nested_path, nested_data) in nested {
-                        results.push((format!("{}/{}", path, nested_path), nested_data));
+                        results.push((format!("{path}/{nested_path}"), nested_data));
                     }
                     continue;
                 }
@@ -343,7 +339,7 @@ fn inspect_7z(data: &[u8]) -> Result<ArchiveInfo> {
     // We cannot parse 7z without a dedicated crate. Return minimal info.
     warn!("7z inspection is a stub; only magic-byte validation is performed");
 
-    if data.len() < 6 || &data[0..6] != b"7z\xBC\xAF\x27\x1C" {
+    if data.get(..6).is_none_or(|slice| slice != b"7z\xBC\xAF\x27\x1C") {
         bail!("data does not have a valid 7z signature");
     }
 
@@ -355,6 +351,7 @@ fn inspect_7z(data: &[u8]) -> Result<ArchiveInfo> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -364,8 +361,7 @@ mod tests {
         let buf = Vec::new();
         let cursor = Cursor::new(buf);
         let mut writer = zip::ZipWriter::new(cursor);
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
         writer.start_file("hello.txt", options).expect("start file");
         writer.write_all(b"Hello, world!").expect("write data");
         let cursor = writer.finish().expect("finish zip");
@@ -499,8 +495,7 @@ mod tests {
     #[test]
     fn extract_at_zero_depth_returns_empty() {
         let data = make_minimal_zip();
-        let files =
-            extract_archive(&data, ArchiveFormat::Zip, 0).expect("should return empty at depth 0");
+        let files = extract_archive(&data, ArchiveFormat::Zip, 0).expect("should return empty at depth 0");
         assert!(files.is_empty());
     }
 
@@ -509,10 +504,7 @@ mod tests {
         let mut data = vec![0u8; 64];
         data[0..6].copy_from_slice(b"7z\xBC\xAF\x27\x1C");
         let result = extract_archive(&data, ArchiveFormat::SevenZip, 3);
-        assert!(
-            result.is_err(),
-            "7z extraction should fail (not implemented)"
-        );
+        assert!(result.is_err(), "7z extraction should fail (not implemented)");
     }
 
     #[test]

@@ -29,11 +29,8 @@ impl RemediationEngine {
     /// * `policy` - The remediation policy governing automatic actions.
     /// * `quarantine` - Shared reference to the quarantine vault.
     /// * `audit_dir` - Directory for writing audit log files.
-    pub fn new(
-        policy: RemediationPolicy,
-        quarantine: Arc<Quarantine>,
-        audit_dir: PathBuf,
-    ) -> Result<Self> {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(policy: RemediationPolicy, quarantine: Arc<Quarantine>, audit_dir: PathBuf) -> Result<Self> {
         let audit = AuditLogger::new(audit_dir.clone())?;
         let blocklist_path = audit_dir.join("blocklist.txt");
         Ok(Self {
@@ -50,6 +47,7 @@ impl RemediationEngine {
     /// It checks whitelists, determines the appropriate actions based on
     /// threat level, executes each action in order, and logs everything
     /// to the audit trail.
+    #[allow(clippy::unused_async)]
     pub async fn handle_threat(
         &self,
         file_path: &Path,
@@ -98,10 +96,8 @@ impl RemediationEngine {
                     if self.policy.clean_persistence {
                         let persistence_results = self.clean_persistence(file_path);
                         results.extend(persistence_results);
-                        continue;
-                    } else {
-                        continue;
                     }
+                    continue;
                 }
                 ActionType::Delete => self.delete_file(file_path),
                 ActionType::Block => RemediationResult::success(RemediationAction::Blocked),
@@ -150,7 +146,7 @@ impl RemediationEngine {
                         pid: 0,
                         name: String::new(),
                     },
-                    format!("failed to find processes: {}", e),
+                    format!("failed to find processes: {e}"),
                 );
             }
         };
@@ -186,7 +182,7 @@ impl RemediationEngine {
                             pid: proc_info.pid,
                             name: proc_info.name.clone(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     );
                 }
             }
@@ -212,7 +208,7 @@ impl RemediationEngine {
                 RemediationAction::Quarantined {
                     quarantine_id: String::new(),
                 },
-                format!("quarantine failed: {}", e),
+                format!("quarantine failed: {e}"),
             ),
         }
     }
@@ -236,12 +232,10 @@ impl RemediationEngine {
             match crate::linux::clean_crontab(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::Crontab,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::Crontab,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -250,7 +244,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::Crontab,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -259,12 +253,10 @@ impl RemediationEngine {
             match crate::linux::clean_systemd_services(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::SystemdService,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::SystemdService,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -273,7 +265,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::SystemdService,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -282,12 +274,10 @@ impl RemediationEngine {
             match crate::linux::clean_init_scripts(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::InitScript,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::InitScript,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -296,7 +286,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::InitScript,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -305,12 +295,10 @@ impl RemediationEngine {
             match crate::linux::clean_shell_profiles(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::BashProfile,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::BashProfile,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -319,7 +307,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::BashProfile,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -328,12 +316,10 @@ impl RemediationEngine {
             match crate::linux::clean_ld_preload(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::LdPreload,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::LdPreload,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -342,7 +328,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::LdPreload,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -363,12 +349,10 @@ impl RemediationEngine {
             match crate::macos::clean_launch_agents(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::LaunchAgent,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::LaunchAgent,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -377,7 +361,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::LaunchAgent,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -386,12 +370,10 @@ impl RemediationEngine {
             match crate::macos::clean_launch_daemons(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::LaunchDaemon,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::LaunchDaemon,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -400,7 +382,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::LaunchDaemon,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -409,12 +391,10 @@ impl RemediationEngine {
             match crate::macos::clean_login_items(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::LoginItem,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::LoginItem,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -423,7 +403,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::LoginItem,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -432,12 +412,10 @@ impl RemediationEngine {
             match crate::macos::clean_shell_profiles(path) {
                 Ok(removed) => {
                     for entry in removed {
-                        results.push(RemediationResult::success(
-                            RemediationAction::PersistenceCleaned {
-                                persistence_type: PersistenceType::ShellRc,
-                                detail: entry,
-                            },
-                        ));
+                        results.push(RemediationResult::success(RemediationAction::PersistenceCleaned {
+                            persistence_type: PersistenceType::ShellRc,
+                            detail: entry,
+                        }));
                     }
                 }
                 Err(e) => {
@@ -446,7 +424,7 @@ impl RemediationEngine {
                             persistence_type: PersistenceType::ShellRc,
                             detail: String::new(),
                         },
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -472,18 +450,14 @@ impl RemediationEngine {
         {
             match crate::linux::isolate_network_iptables() {
                 Ok(()) => RemediationResult::success(RemediationAction::NetworkIsolated),
-                Err(e) => {
-                    RemediationResult::failure(RemediationAction::NetworkIsolated, format!("{}", e))
-                }
+                Err(e) => RemediationResult::failure(RemediationAction::NetworkIsolated, format!("{e}")),
             }
         }
         #[cfg(target_os = "macos")]
         {
             match crate::macos::isolate_network_pf() {
                 Ok(()) => RemediationResult::success(RemediationAction::NetworkIsolated),
-                Err(e) => {
-                    RemediationResult::failure(RemediationAction::NetworkIsolated, format!("{}", e))
-                }
+                Err(e) => RemediationResult::failure(RemediationAction::NetworkIsolated, format!("{e}")),
             }
         }
         #[cfg(target_os = "windows")]
@@ -508,20 +482,18 @@ impl RemediationEngine {
         {
             match crate::linux::restore_network_iptables() {
                 Ok(()) => RemediationResult::success(RemediationAction::ReportOnly),
-                Err(e) => RemediationResult::failure(
-                    RemediationAction::ReportOnly,
-                    format!("network restore failed: {}", e),
-                ),
+                Err(e) => {
+                    RemediationResult::failure(RemediationAction::ReportOnly, format!("network restore failed: {e}"))
+                }
             }
         }
         #[cfg(target_os = "macos")]
         {
             match crate::macos::restore_network_pf() {
                 Ok(()) => RemediationResult::success(RemediationAction::ReportOnly),
-                Err(e) => RemediationResult::failure(
-                    RemediationAction::ReportOnly,
-                    format!("network restore failed: {}", e),
-                ),
+                Err(e) => {
+                    RemediationResult::failure(RemediationAction::ReportOnly, format!("network restore failed: {e}"))
+                }
             }
         }
         #[cfg(target_os = "windows")]
@@ -541,41 +513,41 @@ impl RemediationEngine {
     }
 
     /// Add the file's SHA-256 hash to the local blocklist.
+    #[allow(clippy::option_if_let_else)]
     pub fn add_to_blocklist(&self, path: &Path) -> RemediationResult {
-        match compute_sha256(path) {
-            Some(hash) => {
-                let entry = format!("{}  {}\n", hash, path.display());
-                match std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&self.blocklist_path)
-                {
-                    Ok(mut file) => {
-                        use std::io::Write;
-                        match file.write_all(entry.as_bytes()) {
-                            Ok(()) => {
-                                tracing::info!(
-                                    hash = hash.as_str(),
-                                    path = %path.display(),
-                                    "added to blocklist"
-                                );
-                                RemediationResult::success(RemediationAction::AddedToBlocklist)
-                            }
-                            Err(e) => RemediationResult::failure(
-                                RemediationAction::AddedToBlocklist,
-                                format!("failed to write blocklist: {}", e),
-                            ),
-                        }
-                    }
-                    Err(e) => RemediationResult::failure(
-                        RemediationAction::AddedToBlocklist,
-                        format!("failed to open blocklist: {}", e),
-                    ),
-                }
-            }
-            None => RemediationResult::failure(
+        use std::io::Write;
+        let Some(hash) = compute_sha256(path) else {
+            return RemediationResult::failure(
                 RemediationAction::AddedToBlocklist,
                 format!("failed to compute hash of {}", path.display()),
+            );
+        };
+        let entry = format!("{}  {}\n", hash, path.display());
+        let mut file = match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.blocklist_path)
+        {
+            Ok(f) => f,
+            Err(e) => {
+                return RemediationResult::failure(
+                    RemediationAction::AddedToBlocklist,
+                    format!("failed to open blocklist: {e}"),
+                );
+            }
+        };
+        match file.write_all(entry.as_bytes()) {
+            Ok(()) => {
+                tracing::info!(
+                    hash = hash.as_str(),
+                    path = %path.display(),
+                    "added to blocklist"
+                );
+                RemediationResult::success(RemediationAction::AddedToBlocklist)
+            }
+            Err(e) => RemediationResult::failure(
+                RemediationAction::AddedToBlocklist,
+                format!("failed to write blocklist: {e}"),
             ),
         }
     }
@@ -597,16 +569,14 @@ impl RemediationEngine {
     }
 
     /// Permanently delete a file.
+    #[allow(clippy::unused_self)]
     fn delete_file(&self, path: &Path) -> RemediationResult {
         match std::fs::remove_file(path) {
             Ok(()) => {
                 tracing::info!(path = %path.display(), "file permanently deleted");
                 RemediationResult::success(RemediationAction::Deleted)
             }
-            Err(e) => RemediationResult::failure(
-                RemediationAction::Deleted,
-                format!("failed to delete: {}", e),
-            ),
+            Err(e) => RemediationResult::failure(RemediationAction::Deleted, format!("failed to delete: {e}")),
         }
     }
 }
@@ -643,9 +613,7 @@ fn kill_process_platform(pid: u32) -> Result<()> {
 
 /// Get the current hostname.
 fn get_hostname() -> String {
-    std::fs::read_to_string("/etc/hostname")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "unknown".to_string())
+    std::fs::read_to_string("/etc/hostname").map_or_else(|_| "unknown".to_string(), |s| s.trim().to_string())
 }
 
 /// Get the current platform string.
@@ -662,6 +630,7 @@ fn get_platform() -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::policy::RemediationPolicy;
@@ -695,12 +664,7 @@ mod tests {
         let engine = RemediationEngine::new(policy, quarantine, audit_dir).expect("create engine");
 
         let results = engine
-            .handle_threat(
-                Path::new("/safe/dir/file.txt"),
-                "TestThreat",
-                "malicious",
-                "hash",
-            )
+            .handle_threat(Path::new("/safe/dir/file.txt"), "TestThreat", "malicious", "hash")
             .await;
 
         assert_eq!(results.len(), 1);
@@ -737,10 +701,7 @@ mod tests {
 
         assert!(results.len() >= 2);
         assert!(matches!(results[0].action, RemediationAction::ReportOnly));
-        assert!(matches!(
-            results[1].action,
-            RemediationAction::AddedToBlocklist
-        ));
+        assert!(matches!(results[1].action, RemediationAction::AddedToBlocklist));
     }
 
     #[tokio::test]
@@ -757,12 +718,7 @@ mod tests {
         let engine = RemediationEngine::new(policy, quarantine, audit_dir).expect("create engine");
 
         let results = engine
-            .handle_threat(
-                &suspicious_file,
-                "SuspiciousThreat",
-                "suspicious",
-                "heuristic",
-            )
+            .handle_threat(&suspicious_file, "SuspiciousThreat", "suspicious", "heuristic")
             .await;
 
         assert_eq!(results.len(), 1);
@@ -784,8 +740,7 @@ mod tests {
         assert!(matches!(result.action, RemediationAction::AddedToBlocklist));
 
         // Verify blocklist file was written
-        let blocklist_content =
-            std::fs::read_to_string(&engine.blocklist_path).expect("read blocklist");
+        let blocklist_content = std::fs::read_to_string(&engine.blocklist_path).expect("read blocklist");
         assert!(blocklist_content.contains("test_malware.bin"));
         // SHA-256 hash should be a 64-char hex string
         let hash_part = blocklist_content.split_whitespace().next().expect("hash");

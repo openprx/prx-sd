@@ -3,6 +3,36 @@
 //! Benchmarks cover hash lookups, in-memory scanning at various payload sizes,
 //! Shannon entropy computation, and magic-byte file-type detection.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use prx_sd_core::{detect_magic, ScanConfig, ScanEngine};
@@ -68,12 +98,7 @@ fn bench_scan_bytes(c: &mut Criterion) {
     let tmp = tempfile::tempdir().unwrap();
     let engine = engine_with_hashes(&tmp, 100);
 
-    let sizes: &[(usize, &str)] = &[
-        (1_024, "1KB"),
-        (10_240, "10KB"),
-        (102_400, "100KB"),
-        (1_048_576, "1MB"),
-    ];
+    let sizes: &[(usize, &str)] = &[(1_024, "1KB"), (10_240, "10KB"), (102_400, "100KB"), (1_048_576, "1MB")];
 
     let mut group = c.benchmark_group("scan_bytes");
 

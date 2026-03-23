@@ -84,7 +84,7 @@ pub enum ThreatCategory {
     DataExfiltration,
     /// Credential theft: accessing password files, SSH keys, etc.
     CredentialTheft,
-    /// Persistence: writing to cron, systemd, LaunchAgents, etc.
+    /// Persistence: writing to cron, systemd, `LaunchAgents`, etc.
     Persistence,
     /// Privilege escalation: setuid, capability changes.
     PrivilegeEscalation,
@@ -271,7 +271,7 @@ pub struct Sandbox {
 
 impl Sandbox {
     /// Create a new sandbox with the given configuration.
-    pub fn new(config: SandboxConfig) -> Self {
+    pub const fn new(config: SandboxConfig) -> Self {
         Self { config }
     }
 
@@ -299,10 +299,10 @@ impl Sandbox {
             // Linux: use ptrace-based tracing (runs synchronously in a blocking task).
             let config = self.config.clone();
             let path = path.to_path_buf();
-            let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+            let args: Vec<String> = args.iter().map(ToString::to_string).collect();
 
             let result = tokio::task::spawn_blocking(move || {
-                let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
                 linux::execute(&config, &path, &arg_refs)
             })
             .await
@@ -335,6 +335,7 @@ impl Sandbox {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::uninlined_format_args)]
 mod tests {
     use super::*;
 
@@ -479,23 +480,11 @@ mod tests {
     #[test]
     fn test_threat_category_display() {
         assert_eq!(ThreatCategory::ReverseShell.to_string(), "reverse_shell");
-        assert_eq!(
-            ThreatCategory::DataExfiltration.to_string(),
-            "data_exfiltration"
-        );
-        assert_eq!(
-            ThreatCategory::CredentialTheft.to_string(),
-            "credential_theft"
-        );
+        assert_eq!(ThreatCategory::DataExfiltration.to_string(), "data_exfiltration");
+        assert_eq!(ThreatCategory::CredentialTheft.to_string(), "credential_theft");
         assert_eq!(ThreatCategory::Persistence.to_string(), "persistence");
-        assert_eq!(
-            ThreatCategory::PrivilegeEscalation.to_string(),
-            "privilege_escalation"
-        );
-        assert_eq!(
-            ThreatCategory::LateralMovement.to_string(),
-            "lateral_movement"
-        );
+        assert_eq!(ThreatCategory::PrivilegeEscalation.to_string(), "privilege_escalation");
+        assert_eq!(ThreatCategory::LateralMovement.to_string(), "lateral_movement");
         assert_eq!(ThreatCategory::CryptoMining.to_string(), "crypto_mining");
         assert_eq!(ThreatCategory::Ransomware.to_string(), "ransomware");
         assert_eq!(ThreatCategory::AntiAnalysis.to_string(), "anti_analysis");

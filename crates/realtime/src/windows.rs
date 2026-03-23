@@ -57,10 +57,7 @@ impl WindowsMonitor {
         let mut results = Vec::new();
 
         // Handle rename events: notify may provide two paths (from, to)
-        if matches!(
-            event.kind,
-            EventKind::Modify(notify::event::ModifyKind::Name(_))
-        ) {
+        if matches!(event.kind, EventKind::Modify(notify::event::ModifyKind::Name(_))) {
             if event.paths.len() >= 2 {
                 results.push(FileEvent::Rename {
                     from: event.paths[0].clone(),
@@ -76,12 +73,10 @@ impl WindowsMonitor {
                 EventKind::Create(_) => Some(FileEvent::Create { path }),
                 EventKind::Modify(_) => Some(FileEvent::Modify { path }),
                 EventKind::Remove(_) => Some(FileEvent::Delete { path }),
-                EventKind::Access(notify::event::AccessKind::Open(_)) => {
-                    Some(FileEvent::Open { path, pid: 0 })
+                EventKind::Access(notify::event::AccessKind::Open(_)) => Some(FileEvent::Open { path, pid: 0 }),
+                EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write)) => {
+                    Some(FileEvent::CloseWrite { path })
                 }
-                EventKind::Access(notify::event::AccessKind::Close(
-                    notify::event::AccessMode::Write,
-                )) => Some(FileEvent::CloseWrite { path }),
                 _ => None,
             };
 
@@ -104,27 +99,26 @@ impl FileSystemMonitor for WindowsMonitor {
         let tx = self.tx.clone();
         let running = self.running.clone();
 
-        let mut watcher =
-            notify::recommended_watcher(move |res: std::result::Result<Event, notify::Error>| {
-                if !running.load(Ordering::Relaxed) {
-                    return;
-                }
+        let mut watcher = notify::recommended_watcher(move |res: std::result::Result<Event, notify::Error>| {
+            if !running.load(Ordering::Relaxed) {
+                return;
+            }
 
-                match res {
-                    Ok(event) => {
-                        let file_events = Self::convert_event(event);
-                        for fe in file_events {
-                            // Use try_send to avoid blocking the watcher thread.
-                            // Events are dropped if the channel is full.
-                            let _ = tx.try_send(fe);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Windows ReadDirectoryChangesW watcher error: {e}");
+            match res {
+                Ok(event) => {
+                    let file_events = Self::convert_event(event);
+                    for fe in file_events {
+                        // Use try_send to avoid blocking the watcher thread.
+                        // Events are dropped if the channel is full.
+                        let _ = tx.try_send(fe);
                     }
                 }
-            })
-            .context("failed to create Windows ReadDirectoryChangesW watcher")?;
+                Err(e) => {
+                    tracing::error!("Windows ReadDirectoryChangesW watcher error: {e}");
+                }
+            }
+        })
+        .context("failed to create Windows ReadDirectoryChangesW watcher")?;
 
         for path in paths {
             watcher

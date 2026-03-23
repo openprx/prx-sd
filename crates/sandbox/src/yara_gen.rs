@@ -177,8 +177,10 @@ fn extract_wide_strings(data: &[u8], min_len: usize) -> Vec<String> {
     let mut i = 0;
 
     while i + 1 < data.len() {
-        let lo = data[i];
-        let hi = data[i + 1];
+        // Both indices are guaranteed in-bounds: i < data.len()-1 and i+1 < data.len().
+        let (Some(&lo), Some(&hi)) = (data.get(i), data.get(i + 1)) else {
+            break;
+        };
         if hi == 0 && (0x20..0x7F).contains(&lo) {
             current.push(lo as char);
             i += 2;
@@ -200,9 +202,7 @@ fn extract_wide_strings(data: &[u8], min_len: usize) -> Vec<String> {
 /// Return `true` if `s` contains any suspicious keyword (case-insensitive).
 fn is_suspicious_string(s: &str) -> bool {
     let lower = s.to_lowercase();
-    SUSPICIOUS_KEYWORDS
-        .iter()
-        .any(|kw| lower.contains(&kw.to_lowercase()))
+    SUSPICIOUS_KEYWORDS.iter().any(|kw| lower.contains(&kw.to_lowercase()))
 }
 
 /// Heuristic check for IPv4-like strings.
@@ -241,25 +241,25 @@ fn extract_unique_patterns(data: &[u8]) -> Vec<Vec<u8>> {
 
     // 1. Entry-point region (first 64 bytes, capped to data length).
     let header_len = data.len().min(64);
-    if header_len >= MIN_PATTERN_LEN && !is_trivial_block(&data[..header_len]) {
-        let take = header_len.min(MAX_PATTERN_LEN);
-        patterns.push(data[..take].to_vec());
+    if let Some(header_block) = data.get(..header_len) {
+        if header_len >= MIN_PATTERN_LEN && !is_trivial_block(header_block) {
+            let take = header_len.min(MAX_PATTERN_LEN);
+            if let Some(take_block) = data.get(..take) {
+                patterns.push(take_block.to_vec());
+            }
+        }
     }
 
     // 2. Scan for non-trivial blocks at regular intervals.
-    let step = if data.len() > 4096 {
-        data.len() / 16
-    } else {
-        256
-    };
+    let step = if data.len() > 4096 { data.len() / 16 } else { 256 };
 
     let mut offset = 64;
     while offset + MIN_PATTERN_LEN <= data.len() && patterns.len() < MAX_BYTE_PATTERNS {
         let end = (offset + MAX_PATTERN_LEN).min(data.len());
-        let candidate = &data[offset..end];
-
-        if !is_trivial_block(candidate) && !patterns.iter().any(|p| p == candidate) {
-            patterns.push(candidate.to_vec());
+        if let Some(candidate) = data.get(offset..end) {
+            if !is_trivial_block(candidate) && !patterns.iter().any(|p| p.as_slice() == candidate) {
+                patterns.push(candidate.to_vec());
+            }
         }
         offset += step;
     }
@@ -270,10 +270,9 @@ fn extract_unique_patterns(data: &[u8]) -> Vec<Vec<u8>> {
 
 /// A block is "trivial" if all bytes are the same (e.g. all zeros).
 fn is_trivial_block(block: &[u8]) -> bool {
-    if block.is_empty() {
+    let Some(&first) = block.first() else {
         return true;
-    }
-    let first = block[0];
+    };
     block.iter().all(|&b| b == first)
 }
 
@@ -294,6 +293,7 @@ fn sanitize_rule_name(threat_name: &str) -> String {
 }
 
 /// Build the full YARA rule source text.
+#[allow(clippy::similar_names)] // `data` (binary content) and `today` are semantically distinct
 fn build_rule_source(
     rule_name: &str,
     threat_name: &str,
@@ -304,20 +304,17 @@ fn build_rule_source(
     data: &[u8],
 ) -> String {
     let mut src = String::new();
-    let date = chrono::Utc::now().format("%Y-%m-%d");
+    let today = chrono::Utc::now().format("%Y-%m-%d");
 
     // Rule header.
     let _ = writeln!(src, "rule {rule_name} {{");
 
     // Meta section.
     let _ = writeln!(src, "    meta:");
-    let _ = writeln!(
-        src,
-        "        description = \"Auto-generated from sandbox analysis\""
-    );
+    let _ = writeln!(src, "        description = \"Auto-generated from sandbox analysis\"");
     let _ = writeln!(src, "        threat_name = \"{threat_name}\"");
     let _ = writeln!(src, "        source_file = \"{file_name}\"");
-    let _ = writeln!(src, "        date = \"{date}\"");
+    let _ = writeln!(src, "        date = \"{today}\"");
     let _ = writeln!(src, "        confidence = {confidence}");
     let _ = writeln!(src, "        generator = \"prx-sd\"");
 
@@ -350,8 +347,8 @@ fn build_condition(string_count: usize, pattern_count: usize, data: &[u8]) -> St
     let mut parts: Vec<String> = Vec::new();
 
     // File-type magic check.
-    if data.len() >= 2 {
-        let magic = u16::from_le_bytes([data[0], data[1]]);
+    if let Some(magic_bytes) = data.get(..2).and_then(|s| <[u8; 2]>::try_from(s).ok()) {
+        let magic = u16::from_le_bytes(magic_bytes);
         match magic {
             0x5A4D => parts.push("uint16(0) == 0x5A4D".into()), // PE / MZ
             0x457F => parts.push("uint16(0) == 0x457F".into()), // ELF
@@ -402,29 +399,27 @@ fn escape_yara_string(s: &str) -> String {
 
 /// Convert a byte slice to a space-separated hex string (e.g. "4D 5A 90 00").
 fn bytes_to_hex_string(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .map(|b| format!("{b:02X}"))
-        .collect::<Vec<_>>()
-        .join(" ")
+    bytes.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")
 }
 
 /// Compute a confidence score based on the number and quality of indicators.
-fn compute_confidence(
-    strings: &[String],
-    byte_patterns: &[Vec<u8>],
-    behaviors: &[BehaviorFinding],
-) -> u32 {
+fn compute_confidence(strings: &[String], byte_patterns: &[Vec<u8>], behaviors: &[BehaviorFinding]) -> u32 {
     let mut score: u32 = 30; // base
 
-    // More suspicious strings → higher confidence.
-    score = score.saturating_add((strings.len() as u32).min(20) * 2);
+    // More suspicious strings -> higher confidence.
+    #[allow(clippy::cast_possible_truncation)] // len() <= 20, fits in u32
+    let str_count = strings.len().min(20) as u32;
+    score = score.saturating_add(str_count * 2);
 
     // Byte patterns contribute moderately.
-    score = score.saturating_add((byte_patterns.len() as u32).min(5) * 3);
+    #[allow(clippy::cast_possible_truncation)] // len() <= 5, fits in u32
+    let pat_count = byte_patterns.len().min(5) as u32;
+    score = score.saturating_add(pat_count * 3);
 
     // Behavior findings boost confidence.
-    score = score.saturating_add((behaviors.len() as u32).min(5) * 5);
+    #[allow(clippy::cast_possible_truncation)] // len() <= 5, fits in u32
+    let beh_count = behaviors.len().min(5) as u32;
+    score = score.saturating_add(beh_count * 5);
 
     score.min(100)
 }
@@ -483,6 +478,7 @@ fn behavior_ioc_strings(category: &ThreatCategory) -> Vec<&'static str> {
 /// Attempt to generate a behavior-specific YARA rule.
 ///
 /// Returns `None` if no behavior findings map to categories with known IOCs.
+#[allow(clippy::similar_names)] // `data` (binary content) and `today` are semantically distinct
 fn generate_behavior_rule(
     threat_name: &str,
     file_name: &str,
@@ -517,7 +513,7 @@ fn generate_behavior_rule(
     let confidence = compute_confidence(&ioc_strings, &[], behaviors);
 
     let mut src = String::new();
-    let date = chrono::Utc::now().format("%Y-%m-%d");
+    let today = chrono::Utc::now().format("%Y-%m-%d");
 
     let _ = writeln!(src, "rule {base_name} {{");
     let _ = writeln!(src, "    meta:");
@@ -527,14 +523,10 @@ fn generate_behavior_rule(
     );
     let _ = writeln!(src, "        threat_name = \"{threat_name}\"");
     let _ = writeln!(src, "        source_file = \"{file_name}\"");
-    let _ = writeln!(src, "        date = \"{date}\"");
+    let _ = writeln!(src, "        date = \"{today}\"");
     let _ = writeln!(src, "        confidence = {confidence}");
     let _ = writeln!(src, "        generator = \"prx-sd\"");
-    let _ = writeln!(
-        src,
-        "        categories = \"{}\"",
-        categories_used.join(", ")
-    );
+    let _ = writeln!(src, "        categories = \"{}\"", categories_used.join(", "));
     let _ = writeln!(src, "    strings:");
 
     for (i, s) in ioc_strings.iter().enumerate() {
@@ -547,8 +539,8 @@ fn generate_behavior_rule(
 
     // Add file-type check if we can detect it.
     let mut cond_parts: Vec<String> = Vec::new();
-    if data.len() >= 2 {
-        let magic = u16::from_le_bytes([data[0], data[1]]);
+    if let Some(magic_bytes) = data.get(..2).and_then(|s| <[u8; 2]>::try_from(s).ok()) {
+        let magic = u16::from_le_bytes(magic_bytes);
         match magic {
             0x5A4D => cond_parts.push("uint16(0) == 0x5A4D".into()),
             0x457F => cond_parts.push("uint16(0) == 0x457F".into()),
@@ -562,10 +554,7 @@ fn generate_behavior_rule(
     Some(GeneratedRule {
         name: base_name,
         source: src,
-        generation_reason: format!(
-            "Behavior-based rule from categories: {}",
-            categories_used.join(", "),
-        ),
+        generation_reason: format!("Behavior-based rule from categories: {}", categories_used.join(", "),),
         confidence,
     })
 }
@@ -573,6 +562,7 @@ fn generate_behavior_rule(
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::ThreatCategory;
@@ -606,10 +596,7 @@ mod tests {
     #[test]
     fn test_extract_wide_strings() {
         // "http://" encoded as UTF-16LE.
-        let wide: Vec<u8> = "http://evil.com"
-            .chars()
-            .flat_map(|c| vec![c as u8, 0x00])
-            .collect();
+        let wide: Vec<u8> = "http://evil.com".chars().flat_map(|c| vec![c as u8, 0x00]).collect();
         let strings = extract_wide_strings(&wide, 6);
         assert!(strings.iter().any(|s| s.contains("http://evil.com")));
     }
@@ -740,10 +727,7 @@ mod tests {
 
     #[test]
     fn test_bytes_to_hex_string() {
-        assert_eq!(
-            bytes_to_hex_string(&[0x4D, 0x5A, 0x90, 0x00]),
-            "4D 5A 90 00"
-        );
+        assert_eq!(bytes_to_hex_string(&[0x4D, 0x5A, 0x90, 0x00]), "4D 5A 90 00");
         assert_eq!(bytes_to_hex_string(&[0xFF]), "FF");
         assert_eq!(bytes_to_hex_string(&[]), "");
     }

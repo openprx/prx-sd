@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 
 /// Return the compile-time version of this binary.
-fn current_version() -> &'static str {
+const fn current_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
@@ -54,15 +54,11 @@ fn strip_v_prefix(tag: &str) -> &str {
 /// than `local`. Falls back to lexicographic comparison if parsing fails.
 fn is_newer(local: &str, remote: &str) -> bool {
     let parse = |s: &str| -> Option<(u64, u64, u64)> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 3 {
-            return None;
-        }
-        Some((
-            parts[0].parse().ok()?,
-            parts[1].parse().ok()?,
-            parts[2].parse().ok()?,
-        ))
+        let mut iter = s.splitn(3, '.');
+        let major = iter.next()?.parse().ok()?;
+        let minor = iter.next()?.parse().ok()?;
+        let patch = iter.next()?.parse().ok()?;
+        Some((major, minor, patch))
     };
 
     match (parse(local), parse(remote)) {
@@ -74,11 +70,7 @@ fn is_newer(local: &str, remote: &str) -> bool {
 /// Entry point for the `self-update` command.
 pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
     let current = current_version();
-    println!(
-        "{} current version: v{}",
-        "self-update:".cyan().bold(),
-        current
-    );
+    println!("{} current version: v{}", "self-update:".cyan().bold(), current);
     println!("  Checking for updates...");
 
     let client = reqwest::Client::builder()
@@ -116,21 +108,17 @@ pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
 
     // Find the matching asset for this platform.
     let wanted = platform_asset_name(remote_version);
-    let asset = release
-        .assets
-        .iter()
-        .find(|a| a.name == wanted)
-        .with_context(|| {
-            format!(
-                "no release asset matching '{wanted}' found (available: {})",
-                release
-                    .assets
-                    .iter()
-                    .map(|a| a.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        })?;
+    let asset = release.assets.iter().find(|a| a.name == wanted).with_context(|| {
+        format!(
+            "no release asset matching '{wanted}' found (available: {})",
+            release
+                .assets
+                .iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    })?;
 
     println!("  Downloading {}...", asset.name);
 
@@ -146,8 +134,7 @@ pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
         .context("failed to read release asset bytes")?;
 
     // Determine the path to the currently running binary.
-    let current_exe =
-        std::env::current_exe().context("failed to determine current executable path")?;
+    let current_exe = std::env::current_exe().context("failed to determine current executable path")?;
 
     let backup_path = current_exe.with_extension("old");
     let new_path = current_exe.with_extension("new");
@@ -161,8 +148,7 @@ pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
     {
         use std::os::unix::fs::PermissionsExt;
         let perms = std::fs::Permissions::from_mode(0o755);
-        std::fs::set_permissions(&new_path, perms)
-            .context("failed to set executable permissions on new binary")?;
+        std::fs::set_permissions(&new_path, perms).context("failed to set executable permissions on new binary")?;
     }
 
     // Rename dance: current -> backup, new -> current.
@@ -178,21 +164,13 @@ pub async fn run(check_only: bool, _data_dir: &Path) -> Result<()> {
     if let Err(e) = std::fs::rename(&new_path, &current_exe) {
         // Attempt to restore the backup so the user isn't left without a binary.
         let _ = std::fs::rename(&backup_path, &current_exe);
-        return Err(e).with_context(|| {
-            format!(
-                "failed to move new binary into place at {}",
-                current_exe.display()
-            )
-        });
+        return Err(e).with_context(|| format!("failed to move new binary into place at {}", current_exe.display()));
     }
 
     // Clean up the backup (non-fatal).
     let _ = std::fs::remove_file(&backup_path);
 
-    println!(
-        "  {} updated to v{remote_version}",
-        "Success:".green().bold()
-    );
+    println!("  {} updated to v{remote_version}", "Success:".green().bold());
 
     Ok(())
 }

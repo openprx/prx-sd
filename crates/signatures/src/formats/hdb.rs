@@ -1,4 +1,4 @@
-//! Parser for ClamAV `.hdb` (MD5 hash) and `.hsb` (SHA-256/SHA-1 hash) signature files.
+//! Parser for `ClamAV` `.hdb` (MD5 hash) and `.hsb` (SHA-256/SHA-1 hash) signature files.
 //!
 //! HDB format (one per line):
 //! ```text
@@ -75,9 +75,18 @@ fn parse_hash_file(content: &str, expected_kind: Option<HashKind>) -> Result<Has
             continue;
         }
 
-        let hash_hex = parts[0].trim();
-        let size_str = parts[1].trim();
-        let name = parts[2].trim();
+        let Some(hash_hex) = parts.first().map(|s| s.trim()) else {
+            skipped += 1;
+            continue;
+        };
+        let Some(size_str) = parts.get(1).map(|s| s.trim()) else {
+            skipped += 1;
+            continue;
+        };
+        let Some(name) = parts.get(2).map(|s| s.trim()) else {
+            skipped += 1;
+            continue;
+        };
 
         // Validate hex characters.
         if !hash_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -100,14 +109,11 @@ fn parse_hash_file(content: &str, expected_kind: Option<HashKind>) -> Result<Has
 
         let file_size = if size_str == "*" {
             None
+        } else if let Ok(n) = size_str.parse::<u64>() {
+            Some(n)
         } else {
-            match size_str.parse::<u64>() {
-                Ok(n) => Some(n),
-                Err(_) => {
-                    skipped += 1;
-                    continue;
-                }
-            }
+            skipped += 1;
+            continue;
         };
 
         entries.push(HashSignature {
@@ -117,14 +123,13 @@ fn parse_hash_file(content: &str, expected_kind: Option<HashKind>) -> Result<Has
         });
     }
 
-    let resolved_kind = match kind {
-        Some(k) => k,
-        None => {
-            if entries.is_empty() {
-                bail!("no valid hash entries found");
-            }
-            HashKind::Md5 // fallback
+    let resolved_kind = if let Some(k) = kind {
+        k
+    } else {
+        if entries.is_empty() {
+            bail!("no valid hash entries found");
         }
+        HashKind::Md5 // fallback
     };
 
     Ok(HashSignatureSet {
@@ -141,13 +146,15 @@ pub fn decode_hex(hex: &str) -> Option<Vec<u8>> {
     }
     let mut bytes = Vec::with_capacity(hex.len() / 2);
     for i in (0..hex.len()).step_by(2) {
-        let byte = u8::from_str_radix(&hex[i..i + 2], 16).ok()?;
+        let pair = hex.get(i..i + 2)?;
+        let byte = u8::from_str_radix(pair, 16).ok()?;
         bytes.push(byte);
     }
     Some(bytes)
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

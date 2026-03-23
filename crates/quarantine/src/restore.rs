@@ -37,7 +37,7 @@ pub fn batch_delete(quarantine: &Quarantine, ids: &[QuarantineId]) -> Vec<Result
 pub fn cleanup_expired(quarantine: &Quarantine, max_age_days: u32) -> Result<usize> {
     let entries = quarantine.list()?;
     let now = Utc::now();
-    let max_age = chrono::Duration::days(max_age_days as i64);
+    let max_age = chrono::Duration::days(i64::from(max_age_days));
     let mut deleted = 0;
 
     for (id, meta) in &entries {

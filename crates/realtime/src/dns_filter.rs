@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 /// Platform-specific default path to the hosts file.
-fn default_hosts_path() -> &'static str {
+const fn default_hosts_path() -> &'static str {
     #[cfg(target_os = "windows")]
     {
         r"C:\Windows\System32\drivers\etc\hosts"
@@ -135,8 +135,8 @@ impl DnsFilter {
 
     /// Internal implementation that accepts an explicit path (for testing).
     fn install_hosts_blocking_at(&mut self, hosts_path: &Path) -> Result<()> {
-        let content = std::fs::read_to_string(hosts_path)
-            .with_context(|| format!("failed to read {}", hosts_path.display()))?;
+        let content =
+            std::fs::read_to_string(hosts_path).with_context(|| format!("failed to read {}", hosts_path.display()))?;
 
         let mut lines: Vec<String> = content
             .lines()
@@ -158,8 +158,7 @@ impl DnsFilter {
             output.push('\n');
         }
 
-        std::fs::write(hosts_path, &output)
-            .with_context(|| format!("failed to write {}", hosts_path.display()))?;
+        std::fs::write(hosts_path, &output).with_context(|| format!("failed to write {}", hosts_path.display()))?;
 
         self.hosts_active = true;
         Ok(())
@@ -174,21 +173,17 @@ impl DnsFilter {
 
     /// Internal implementation with explicit path (for testing).
     fn remove_hosts_blocking_at(&mut self, hosts_path: &Path) -> Result<()> {
-        let content = std::fs::read_to_string(hosts_path)
-            .with_context(|| format!("failed to read {}", hosts_path.display()))?;
+        let content =
+            std::fs::read_to_string(hosts_path).with_context(|| format!("failed to read {}", hosts_path.display()))?;
 
-        let lines: Vec<&str> = content
-            .lines()
-            .filter(|line| !line.contains(HOSTS_MARKER))
-            .collect();
+        let lines: Vec<&str> = content.lines().filter(|line| !line.contains(HOSTS_MARKER)).collect();
 
         let mut output = lines.join("\n");
         if !output.ends_with('\n') {
             output.push('\n');
         }
 
-        std::fs::write(hosts_path, &output)
-            .with_context(|| format!("failed to write {}", hosts_path.display()))?;
+        std::fs::write(hosts_path, &output).with_context(|| format!("failed to write {}", hosts_path.display()))?;
 
         self.hosts_active = false;
         Ok(())
@@ -200,7 +195,7 @@ impl DnsFilter {
     }
 
     /// Return whether hosts-file blocking is currently active.
-    pub fn is_hosts_active(&self) -> bool {
+    pub const fn is_hosts_active(&self) -> bool {
         self.hosts_active
     }
 }
@@ -267,14 +262,8 @@ mod tests {
         filter.add_domain("EVIL.COM.");
 
         // Should match regardless of case or trailing dot.
-        assert!(matches!(
-            filter.check("evil.com"),
-            DnsVerdict::Blocked { .. }
-        ));
-        assert!(matches!(
-            filter.check("Evil.Com."),
-            DnsVerdict::Blocked { .. }
-        ));
+        assert!(matches!(filter.check("evil.com"), DnsVerdict::Blocked { .. }));
+        assert!(matches!(filter.check("Evil.Com."), DnsVerdict::Blocked { .. }));
     }
 
     #[test]
@@ -282,10 +271,7 @@ mod tests {
         let mut filter = DnsFilter::new();
         filter.add_domain("malware.net");
         assert_eq!(filter.domain_count(), 1);
-        assert!(matches!(
-            filter.check("malware.net"),
-            DnsVerdict::Blocked { .. }
-        ));
+        assert!(matches!(filter.check("malware.net"), DnsVerdict::Blocked { .. }));
 
         filter.remove_domain("malware.net");
         assert_eq!(filter.domain_count(), 0);
@@ -316,18 +302,9 @@ mod tests {
 
         let filter = DnsFilter::load_blocklist(&blocklist_path).expect("load");
         assert_eq!(filter.domain_count(), 3);
-        assert!(matches!(
-            filter.check("bad-domain.com"),
-            DnsVerdict::Blocked { .. }
-        ));
-        assert!(matches!(
-            filter.check("another-bad.org"),
-            DnsVerdict::Blocked { .. }
-        ));
-        assert!(matches!(
-            filter.check("spaced.net"),
-            DnsVerdict::Blocked { .. }
-        ));
+        assert!(matches!(filter.check("bad-domain.com"), DnsVerdict::Blocked { .. }));
+        assert!(matches!(filter.check("another-bad.org"), DnsVerdict::Blocked { .. }));
+        assert!(matches!(filter.check("spaced.net"), DnsVerdict::Blocked { .. }));
         assert_eq!(filter.check("safe.com"), DnsVerdict::Allow);
     }
 
@@ -350,9 +327,7 @@ mod tests {
         filter.add_domain("malware.net");
 
         // Install blocking.
-        filter
-            .install_hosts_blocking_at(&hosts_path)
-            .expect("install");
+        filter.install_hosts_blocking_at(&hosts_path).expect("install");
         assert!(filter.is_hosts_active());
 
         let content = std::fs::read_to_string(&hosts_path).expect("read");
@@ -361,9 +336,7 @@ mod tests {
         assert!(content.contains("0.0.0.0 malware.net # prx-sd-dns-filter"));
 
         // Remove blocking.
-        filter
-            .remove_hosts_blocking_at(&hosts_path)
-            .expect("remove");
+        filter.remove_hosts_blocking_at(&hosts_path).expect("remove");
         assert!(!filter.is_hosts_active());
 
         let content = std::fs::read_to_string(&hosts_path).expect("read");
@@ -382,12 +355,8 @@ mod tests {
         filter.add_domain("evil.com");
 
         // Install twice.
-        filter
-            .install_hosts_blocking_at(&hosts_path)
-            .expect("install 1");
-        filter
-            .install_hosts_blocking_at(&hosts_path)
-            .expect("install 2");
+        filter.install_hosts_blocking_at(&hosts_path).expect("install 1");
+        filter.install_hosts_blocking_at(&hosts_path).expect("install 2");
 
         let content = std::fs::read_to_string(&hosts_path).expect("read");
         // Should only have one entry for evil.com, not two.

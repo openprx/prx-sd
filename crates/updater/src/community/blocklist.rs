@@ -105,10 +105,7 @@ impl CommunityBlocklistSync {
             bail!("blocklist version check failed: HTTP {status}");
         }
 
-        let ver: BlocklistVersion = resp
-            .json()
-            .await
-            .context("failed to parse blocklist version")?;
+        let ver: BlocklistVersion = resp.json().await.context("failed to parse blocklist version")?;
 
         let local = *self.current_version.read().await;
         if ver.version <= local {
@@ -138,20 +135,12 @@ impl CommunityBlocklistSync {
         // Enforce response size limit (8 MiB) before parsing.
         let bytes = resp.bytes().await.context("failed to read blocklist response")?;
         if bytes.len() > 8 * 1024 * 1024 {
-            bail!(
-                "blocklist response too large ({} bytes), max 8 MiB",
-                bytes.len()
-            );
+            bail!("blocklist response too large ({} bytes), max 8 MiB", bytes.len());
         }
-        let payload: BlocklistPayload =
-            serde_json::from_slice(&bytes).context("failed to parse blocklist payload")?;
+        let payload: BlocklistPayload = serde_json::from_slice(&bytes).context("failed to parse blocklist payload")?;
 
         let count = payload.hashes.len();
-        let new_set: HashSet<String> = payload
-            .hashes
-            .into_iter()
-            .map(|h| h.to_ascii_lowercase())
-            .collect();
+        let new_set: HashSet<String> = payload.hashes.into_iter().map(|h| h.to_ascii_lowercase()).collect();
 
         // 3. Swap in the new set.
         {
@@ -163,10 +152,7 @@ impl CommunityBlocklistSync {
             *v = payload.version;
         }
 
-        info!(
-            version = payload.version,
-            count, "community blocklist synced"
-        );
+        info!(version = payload.version, count, "community blocklist synced");
         Ok(true)
     }
 
@@ -188,7 +174,7 @@ impl CommunityBlocklistSync {
                         warn!(error = %e, "periodic community blocklist sync failed");
                     }
                 }
-                _ = cancel_notified(&cancel) => {
+                () = cancel_notified(&cancel) => {
                     break;
                 }
             }

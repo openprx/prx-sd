@@ -53,22 +53,18 @@ pub fn parse_pe(data: &[u8]) -> Result<PeInfo> {
         .sections
         .iter()
         .map(|s| {
-            let name = String::from_utf8_lossy(
-                &s.name[..s.name.iter().position(|&b| b == 0).unwrap_or(s.name.len())],
-            )
-            .to_string();
+            let name_end = s.name.iter().position(|&b| b == 0).unwrap_or(s.name.len());
+            let name = String::from_utf8_lossy(s.name.get(..name_end).unwrap_or(&s.name)).to_string();
 
             let raw_offset = s.pointer_to_raw_data as usize;
             let raw_size = s.size_of_raw_data as usize;
-            let section_data = data
-                .get(raw_offset..raw_offset.saturating_add(raw_size))
-                .unwrap_or(&[]);
+            let section_data = data.get(raw_offset..raw_offset.saturating_add(raw_size)).unwrap_or(&[]);
             let entropy = shannon_entropy(section_data);
 
             SectionInfo {
                 name,
-                virtual_size: s.virtual_size as u64,
-                raw_size: s.size_of_raw_data as u64,
+                virtual_size: u64::from(s.virtual_size),
+                raw_size: u64::from(s.size_of_raw_data),
                 entropy,
                 characteristics: s.characteristics,
             }
@@ -82,9 +78,7 @@ pub fn parse_pe(data: &[u8]) -> Result<PeInfo> {
         .fold(
             std::collections::HashMap::<String, Vec<String>>::new(),
             |mut acc, imp| {
-                acc.entry(imp.dll.to_string())
-                    .or_default()
-                    .push(imp.name.to_string());
+                acc.entry(imp.dll.to_string()).or_default().push(imp.name.to_string());
                 acc
             },
         )
@@ -96,7 +90,7 @@ pub fn parse_pe(data: &[u8]) -> Result<PeInfo> {
     let exports: Vec<String> = pe
         .exports
         .iter()
-        .filter_map(|e| e.name.map(|n| n.to_string()))
+        .filter_map(|e| e.name.map(std::string::ToString::to_string))
         .collect();
 
     let imphash = compute_imphash(&imports);
@@ -144,7 +138,8 @@ pub fn compute_imphash(imports: &[ImportInfo]) -> String {
             .unwrap_or(&dll_lower);
 
         for func in &imp.functions {
-            pairs.push(format!("{}.{}", dll_stem, func.to_lowercase()));
+            let func_lower = func.to_lowercase();
+            pairs.push(format!("{dll_stem}.{func_lower}"));
         }
     }
 
@@ -178,42 +173,60 @@ fn extract_debug_info(pe: &goblin::pe::PE, data: &[u8]) -> Option<String> {
     for section in &pe.sections {
         let offset = section.pointer_to_raw_data as usize;
         let size = section.size_of_raw_data as usize;
-        if let Some(section_data) = data.get(offset..offset.saturating_add(size)) {
-            // Search for RSDS signature within this section
-            for i in 0..section_data.len().saturating_sub(24) {
-                if &section_data[i..i + 4] == b"RSDS" {
-                    // PDB path starts at RSDS + 24, null-terminated
-                    if let Some(path_bytes) = section_data.get(i + 24..) {
-                        let end = path_bytes
-                            .iter()
-                            .position(|&b| b == 0)
-                            .unwrap_or(path_bytes.len().min(260));
-                        let path = String::from_utf8_lossy(&path_bytes[..end]).to_string();
-                        if !path.is_empty() && path.len() < 260 {
-                            return Some(path);
-                        }
-                    }
-                }
-            }
+        let Some(section_data) = data.get(offset..offset.saturating_add(size)) else {
+            continue;
+        };
+        // Search for RSDS signature within this section
+        if let Some(path) = find_rsds_pdb_path(section_data) {
+            return Some(path);
         }
     }
 
     None
 }
 
+/// Scan a section's raw bytes for an RSDS `CodeView` signature and extract the
+/// PDB path that follows it.
+fn find_rsds_pdb_path(section_data: &[u8]) -> Option<String> {
+    for i in 0..section_data.len().saturating_sub(24) {
+        if section_data.get(i..i + 4) != Some(b"RSDS".as_slice()) {
+            continue;
+        }
+        // PDB path starts at RSDS + 24, null-terminated
+        let path_bytes = section_data.get(i + 24..)?;
+        let end = path_bytes
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or_else(|| path_bytes.len().min(260));
+        let pdb_path = String::from_utf8_lossy(path_bytes.get(..end).unwrap_or(&[])).to_string();
+        if !pdb_path.is_empty() && pdb_path.len() < 260 {
+            return Some(pdb_path);
+        }
+    }
+    None
+}
+
 // We need hex encoding for imphash. A minimal inline implementation to avoid
 // adding another dependency (though in practice you'd use the `hex` crate).
 mod hex {
+    use std::fmt::Write;
+
     pub fn encode(bytes: impl AsRef<[u8]>) -> String {
-        bytes
-            .as_ref()
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect()
+        bytes.as_ref().iter().fold(String::new(), |mut output, b| {
+            let _ = write!(output, "{b:02x}");
+            output
+        })
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::unreadable_literal,
+    clippy::cast_possible_truncation,
+    clippy::branches_sharing_code,
+    clippy::doc_markdown
+)]
 mod tests {
     use super::*;
 
@@ -368,12 +381,7 @@ mod tests {
             let coff = pe_offset as usize + 4;
             let opt_size = u16::from_le_bytes([data[coff + 16], data[coff + 17]]) as usize;
             let sec = coff + 20 + opt_size;
-            u32::from_le_bytes([
-                data[sec + 20],
-                data[sec + 21],
-                data[sec + 22],
-                data[sec + 23],
-            ]) as usize
+            u32::from_le_bytes([data[sec + 20], data[sec + 21], data[sec + 22], data[sec + 23]]) as usize
         };
         for i in 0..512 {
             data[section_raw_offset + i] = 0;
@@ -513,9 +521,6 @@ mod tests {
     fn parse_pe_no_debug_info() {
         let data = make_minimal_pe(true, false);
         let info = parse_pe(&data).expect("should parse PE");
-        assert!(
-            info.debug_info.is_none(),
-            "minimal PE should have no debug info"
-        );
+        assert!(info.debug_info.is_none(), "minimal PE should have no debug info");
     }
 }

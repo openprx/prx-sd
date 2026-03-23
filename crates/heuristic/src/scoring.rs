@@ -41,7 +41,8 @@ impl Default for ScoringWeights {
 
 impl ScoringWeights {
     /// Return the weight for a single [`Finding`].
-    fn weight_for(&self, finding: &Finding) -> u32 {
+    #[allow(clippy::match_same_arms)] // Intentional: each finding type has its own weight for independent tuning
+    const fn weight_for(&self, finding: &Finding) -> u32 {
         match finding {
             Finding::HighEntropy(_) => self.high_entropy,
             Finding::PackedSection { .. } => self.packed_section,
@@ -88,10 +89,7 @@ pub fn aggregate_score(findings: &[Finding]) -> (u32, ThreatLevel) {
 }
 
 /// Like [`aggregate_score`] but with caller-supplied weights.
-pub fn aggregate_score_with_weights(
-    findings: &[Finding],
-    weights: &ScoringWeights,
-) -> (u32, ThreatLevel) {
+pub fn aggregate_score_with_weights(findings: &[Finding], weights: &ScoringWeights) -> (u32, ThreatLevel) {
     let raw: u32 = findings.iter().map(|f| weights.weight_for(f)).sum();
 
     // Bonus for multiple suspicious API findings: 3+ co-occurring suspicious

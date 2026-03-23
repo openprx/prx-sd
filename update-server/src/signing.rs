@@ -15,7 +15,7 @@ use prx_sd_updater::sign_payload;
 /// written to disk, and the pair is returned. If it exists, the seed is
 /// read and the keypair is reconstructed.
 pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)> {
-    use std::io::Write;
+    use std::io::Write as IoWrite;
 
     // Try to read existing key first (avoids TOCTOU with exists() check).
     match std::fs::read(path) {
@@ -27,9 +27,9 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
                 );
             }
 
-            let seed: [u8; 32] = seed_bytes.try_into().map_err(|_| {
-                anyhow::anyhow!("signing key seed conversion failed despite length check")
-            })?;
+            let seed: [u8; 32] = seed_bytes
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("signing key seed conversion failed despite length check"))?;
 
             let signing_key = SigningKey::from_bytes(&seed);
             let verifying_key = signing_key.verifying_key();
@@ -49,12 +49,8 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
 
             // Ensure parent directory exists.
             if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).with_context(|| {
-                    format!(
-                        "failed to create directory for signing key: {}",
-                        parent.display()
-                    )
-                })?;
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create directory for signing key: {}", parent.display()))?;
             }
 
             // Use create_new (O_CREAT | O_EXCL) for atomic creation.
@@ -72,21 +68,16 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
                 }
                 #[cfg(not(unix))]
                 {
-                    std::fs::OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(path)
+                    std::fs::OpenOptions::new().write(true).create_new(true).open(path)
                 }
             };
 
             match open_result {
                 Ok(mut file) => {
-                    file.write_all(&signing_key.to_bytes()).with_context(|| {
-                        format!("failed to write signing key to {}", path.display())
-                    })?;
-                    file.sync_all().with_context(|| {
-                        format!("failed to sync signing key to {}", path.display())
-                    })?;
+                    file.write_all(&signing_key.to_bytes())
+                        .with_context(|| format!("failed to write signing key to {}", path.display()))?;
+                    file.sync_all()
+                        .with_context(|| format!("failed to sync signing key to {}", path.display()))?;
 
                     info!(
                         path = %path.display(),
@@ -98,9 +89,8 @@ pub fn load_or_create_keypair(path: &Path) -> Result<(SigningKey, VerifyingKey)>
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                     // Another process created the key concurrently -- load it.
-                    let seed_bytes = std::fs::read(path).with_context(|| {
-                        format!("failed to read signing key from {}", path.display())
-                    })?;
+                    let seed_bytes = std::fs::read(path)
+                        .with_context(|| format!("failed to read signing key from {}", path.display()))?;
 
                     if seed_bytes.len() != 32 {
                         anyhow::bail!(
@@ -153,10 +143,12 @@ pub fn sign_and_compress(data: &[u8], key: &SigningKey) -> Result<Vec<u8>> {
 ///
 /// Used for logging public keys; kept private to this module.
 mod hex {
+    use std::fmt::Write;
+
     pub fn encode(bytes: &[u8]) -> String {
         let mut s = String::with_capacity(bytes.len() * 2);
         for &b in bytes {
-            s.push_str(&format!("{b:02x}"));
+            let _ = write!(s, "{b:02x}");
         }
         s
     }

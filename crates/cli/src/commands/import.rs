@@ -11,14 +11,16 @@ fn decode_hex(s: &str) -> Result<Vec<u8>> {
     }
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| anyhow!("{}", e)))
+        .map(|i| {
+            let pair = s.get(i..i + 2).ok_or_else(|| anyhow!("index out of bounds"))?;
+            u8::from_str_radix(pair, 16).map_err(|e| anyhow!("{e}"))
+        })
         .collect()
 }
 
-pub async fn run(blocklist_path: &Path, data_dir: &Path) -> Result<()> {
+pub fn run(blocklist_path: &Path, data_dir: &Path) -> Result<()> {
     let sig_dir = data_dir.join("signatures");
-    let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir)
-        .context("failed to open signature database")?;
+    let db = prx_sd_signatures::SignatureDatabase::open(&sig_dir).context("failed to open signature database")?;
 
     let content = std::fs::read_to_string(blocklist_path)
         .with_context(|| format!("failed to read {}", blocklist_path.display()))?;
@@ -32,19 +34,18 @@ pub async fn run(blocklist_path: &Path, data_dir: &Path) -> Result<()> {
         }
 
         // Format: hex_hash malware_name
-        let parts: Vec<&str> = line.splitn(2, ' ').collect();
-        if parts.len() != 2 {
-            eprintln!("{} skipping malformed line: {}", "warning:".yellow(), line);
+        let Some((hex_hash, name_str)) = line.split_once(' ') else {
+            eprintln!("{} skipping malformed line: {line}", "warning:".yellow());
             continue;
-        }
+        };
 
-        let hex_hash = parts[0].trim();
-        let name = parts[1].trim().to_string();
+        let hex_hash = hex_hash.trim();
+        let name = name_str.trim().to_string();
 
         match decode_hex(hex_hash) {
             Ok(hash_bytes) => entries.push((hash_bytes, name)),
             Err(e) => {
-                eprintln!("{} invalid hex '{}': {}", "warning:".yellow(), hex_hash, e);
+                eprintln!("{} invalid hex '{hex_hash}': {e}", "warning:".yellow());
             }
         }
     }
@@ -56,9 +57,8 @@ pub async fn run(blocklist_path: &Path, data_dir: &Path) -> Result<()> {
 
     let count = db.import_hashes(&entries)?;
     println!(
-        "{} Imported {} hash entries from {}",
+        "{} Imported {count} hash entries from {}",
         "success:".green().bold(),
-        count,
         blocklist_path.display()
     );
 

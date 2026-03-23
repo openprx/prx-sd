@@ -27,11 +27,11 @@ pub struct EnhancedSandboxConfig {
     pub enable_network_isolation: bool,
     /// Use a private mount namespace with tmpfs root.
     pub enable_filesystem_isolation: bool,
-    /// Maximum resident-set-size in megabytes (enforced via RLIMIT_AS).
+    /// Maximum resident-set-size in megabytes (enforced via `RLIMIT_AS`).
     pub memory_limit_mb: u64,
-    /// Maximum CPU time in seconds (enforced via RLIMIT_CPU).
+    /// Maximum CPU time in seconds (enforced via `RLIMIT_CPU`).
     pub cpu_time_limit_secs: u64,
-    /// Maximum number of child processes (RLIMIT_NPROC).
+    /// Maximum number of child processes (`RLIMIT_NPROC`).
     pub max_processes: u32,
     /// Syscall names that should be permitted; all others are killed.
     /// An empty list means "use the default allowlist".
@@ -68,7 +68,7 @@ pub struct EnhancedSandbox {
 
 impl EnhancedSandbox {
     /// Create a new enhanced sandbox from the given configuration.
-    pub fn new(config: EnhancedSandboxConfig) -> Self {
+    pub const fn new(config: EnhancedSandboxConfig) -> Self {
         Self { config }
     }
 
@@ -109,7 +109,10 @@ impl EnhancedSandbox {
 
         // If we also want ptrace-level detail, run the tracer in parallel.
         // For now, augment the result with rlimit / config metadata.
-        result.execution_time_ms = start.elapsed().as_millis() as u64;
+        #[allow(clippy::cast_possible_truncation)] // millis within u64 range for practical timeouts
+        {
+            result.execution_time_ms = start.elapsed().as_millis() as u64;
+        }
 
         // Run behavior analysis on whatever syscalls were collected.
         let analyzer = crate::behavior::BehaviorAnalyzer::new();
@@ -120,12 +123,7 @@ impl EnhancedSandbox {
 
     /// Fallback for non-Linux: always returns an error.
     #[cfg(not(target_os = "linux"))]
-    pub fn execute(
-        &self,
-        _path: &Path,
-        _args: &[&str],
-        _timeout: Duration,
-    ) -> Result<SandboxResult> {
+    pub fn execute(&self, _path: &Path, _args: &[&str], _timeout: Duration) -> Result<SandboxResult> {
         anyhow::bail!(
             "EnhancedSandbox is only supported on Linux. \
              Current platform does not have namespace/seccomp support."
@@ -148,11 +146,7 @@ impl EnhancedSandbox {
         let limits: Vec<(libc::__rlimit_resource_t, libc::rlim_t, &str)> = vec![
             (RLIMIT_AS, config.memory_limit_mb * 1024 * 1024, "RLIMIT_AS"),
             (RLIMIT_CPU, config.cpu_time_limit_secs, "RLIMIT_CPU"),
-            (
-                RLIMIT_NPROC,
-                u64::from(config.max_processes),
-                "RLIMIT_NPROC",
-            ),
+            (RLIMIT_NPROC, u64::from(config.max_processes), "RLIMIT_NPROC"),
             (RLIMIT_NOFILE, 256, "RLIMIT_NOFILE"),
             (RLIMIT_FSIZE, 64 * 1024 * 1024, "RLIMIT_FSIZE"),
         ];
@@ -165,7 +159,7 @@ impl EnhancedSandbox {
             // SAFETY: setrlimit is a standard POSIX call. The rlimit struct is
             // properly initialised with cur == max (hard limit). The resource
             // constants are valid libc-defined values.
-            let ret = unsafe { setrlimit(*resource, &rlim) };
+            let ret = unsafe { setrlimit(*resource, &raw const rlim) };
             if ret != 0 {
                 return Err(std::io::Error::last_os_error())
                     .with_context(|| format!("failed to set {name} to {value}"));

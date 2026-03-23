@@ -5,6 +5,37 @@
 //! that the imported hashes are queryable and that the engine detects files
 //! whose hashes match.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::format_push_string
+)]
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
@@ -73,10 +104,8 @@ fn import_synthetic_cvd_then_lookup_detects() {
     let sample_a = b"cvd_test_malware_content_alpha";
     let sample_b = b"cvd_test_malware_content_bravo";
 
-    let (cvd_bytes, _entries) = build_synthetic_cvd(&[
-        (sample_a, "ClamAV.Test.Alpha"),
-        (sample_b, "ClamAV.Test.Bravo"),
-    ]);
+    let (cvd_bytes, _entries) =
+        build_synthetic_cvd(&[(sample_a, "ClamAV.Test.Alpha"), (sample_b, "ClamAV.Test.Bravo")]);
 
     let stats = import_cvd_bytes(&cvd_bytes, &db).expect("import CVD");
     assert_eq!(stats.md5_imported, 2, "should import 2 MD5 entries");

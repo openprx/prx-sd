@@ -1,6 +1,6 @@
-//! VirusTotal API v3 client for hash-based cloud lookups.
+//! `VirusTotal` API v3 client for hash-based cloud lookups.
 //!
-//! Queries the free VirusTotal API (500 requests/day) when a file hash is
+//! Queries the free `VirusTotal` API (500 requests/day) when a file hash is
 //! not found in the local signature database. Results are cached in LMDB so
 //! the same file is never queried twice.
 
@@ -11,7 +11,7 @@ use anyhow::{bail, Context, Result};
 use prx_sd_signatures::SignatureDatabase;
 use serde::Deserialize;
 
-/// VirusTotal cloud lookup client.
+/// `VirusTotal` cloud lookup client.
 pub struct VtClient {
     api_key: String,
     http: reqwest::Client,
@@ -57,13 +57,16 @@ struct VtThreatClassification {
     suggested_threat_label: Option<String>,
 }
 
-/// Result of a VirusTotal lookup.
+/// Result of a `VirusTotal` lookup.
 #[derive(Debug, Clone)]
 pub enum VtVerdict {
     /// Known malicious by VT consensus.
     Malicious {
+        /// The threat classification name.
         threat_name: String,
+        /// Number of engines that detected the threat.
         detections: u32,
+        /// Total number of engines that scanned the file.
         total: u32,
     },
     /// Not enough detections to classify as malicious.
@@ -75,7 +78,7 @@ pub enum VtVerdict {
 }
 
 impl VtClient {
-    /// Create a new VirusTotal client. Returns `None` if `api_key` is empty.
+    /// Create a new `VirusTotal` client. Returns `None` if `api_key` is empty.
     pub fn new(api_key: &str, db: Arc<SignatureDatabase>) -> Option<Self> {
         let key = api_key.trim();
         if key.is_empty() {
@@ -100,23 +103,17 @@ impl VtClient {
     ///
     /// If the hash is found to be malicious, the result is cached in LMDB
     /// so future scans of the same file are instant.
+    #[allow(clippy::similar_names)] // `stats` vs `status` are semantically distinct
     pub async fn lookup_sha256(&self, sha256_hex: &str) -> Result<VtVerdict> {
         // Rate-limit check.
         let count = self.requests_today.fetch_add(1, Ordering::Relaxed);
         if count >= self.daily_limit {
             self.requests_today.fetch_sub(1, Ordering::Relaxed);
-            tracing::warn!(
-                count,
-                limit = self.daily_limit,
-                "VirusTotal daily rate limit reached"
-            );
+            tracing::warn!(count, limit = self.daily_limit, "VirusTotal daily rate limit reached");
             return Ok(VtVerdict::RateLimited);
         }
 
-        let url = format!(
-            "https://www.virustotal.com/api/v3/files/{}",
-            sha256_hex.to_lowercase()
-        );
+        let url = format!("https://www.virustotal.com/api/v3/files/{}", sha256_hex.to_lowercase());
 
         let resp = self
             .http
@@ -142,14 +139,12 @@ impl VtClient {
 
         let body: VtResponse = resp.json().await.context("failed to parse VT response")?;
 
-        let data = match body.data {
-            Some(d) => d,
-            None => return Ok(VtVerdict::NotFound),
+        let Some(data) = body.data else {
+            return Ok(VtVerdict::NotFound);
         };
 
-        let attrs = match data.attributes {
-            Some(a) => a,
-            None => return Ok(VtVerdict::NotFound),
+        let Some(attrs) = data.attributes else {
+            return Ok(VtVerdict::NotFound);
         };
 
         let stats = &attrs.last_analysis_stats;
@@ -195,13 +190,15 @@ fn hex_decode(hex: &str) -> Option<Vec<u8>> {
     }
     let mut bytes = Vec::with_capacity(hex.len() / 2);
     for i in (0..hex.len()).step_by(2) {
-        let byte = u8::from_str_radix(&hex[i..i + 2], 16).ok()?;
+        let byte_str = hex.get(i..i + 2)?;
+        let byte = u8::from_str_radix(byte_str, 16).ok()?;
         bytes.push(byte);
     }
     Some(bytes)
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -214,16 +211,16 @@ mod tests {
 
     #[test]
     fn test_vt_client_none_for_empty_key() {
-        let dir = tempfile::tempdir().unwrap();
-        let db = Arc::new(SignatureDatabase::open(dir.path()).unwrap());
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let db = Arc::new(SignatureDatabase::open(dir.path()).expect("db open"));
         assert!(VtClient::new("", db.clone()).is_none());
         assert!(VtClient::new("   ", db).is_none());
     }
 
     #[test]
     fn test_vt_client_some_for_valid_key() {
-        let dir = tempfile::tempdir().unwrap();
-        let db = Arc::new(SignatureDatabase::open(dir.path()).unwrap());
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let db = Arc::new(SignatureDatabase::open(dir.path()).expect("db open"));
         assert!(VtClient::new("test_api_key_123", db).is_some());
     }
 }

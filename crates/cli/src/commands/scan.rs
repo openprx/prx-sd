@@ -44,8 +44,7 @@ fn build_config(data_dir: &Path, threads: Option<usize>, exclude: Vec<String>) -
 /// Quarantine a single file using the real AES-256-GCM encrypted vault.
 fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()> {
     let vault_dir = data_dir.join("quarantine");
-    let quarantine =
-        prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?;
+    let quarantine = prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?;
     let id = quarantine
         .quarantine(path, threat_name)
         .with_context(|| format!("failed to quarantine {}", path.display()))?;
@@ -57,9 +56,7 @@ fn quarantine_file(path: &Path, threat_name: &str, data_dir: &Path) -> Result<()
 async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()> {
     let threats: Vec<&ScanResult> = results
         .iter()
-        .filter(|r| {
-            r.threat_level == ThreatLevel::Malicious || r.threat_level == ThreatLevel::Suspicious
-        })
+        .filter(|r| r.threat_level == ThreatLevel::Malicious || r.threat_level == ThreatLevel::Suspicious)
         .collect();
 
     if threats.is_empty() {
@@ -70,10 +67,7 @@ async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()
     let policy_path = data_dir.join("remediation_policy.json");
     let policy = if policy_path.exists() {
         RemediationPolicy::load(&policy_path).unwrap_or_else(|e| {
-            eprintln!(
-                "  {} failed to load policy: {e}, using defaults",
-                "warning:".yellow()
-            );
+            eprintln!("  {} failed to load policy: {e}, using defaults", "warning:".yellow());
             RemediationPolicy::default()
         })
     } else {
@@ -81,32 +75,26 @@ async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()
     };
 
     let vault_dir = data_dir.join("quarantine");
-    let quarantine = Arc::new(
-        prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?,
-    );
+    let quarantine =
+        Arc::new(prx_sd_quarantine::Quarantine::new(vault_dir).context("failed to open quarantine vault")?);
 
     let audit_dir = data_dir.join("audit");
-    let engine = RemediationEngine::new(policy, quarantine, audit_dir)
-        .context("failed to initialise remediation engine")?;
+    let engine =
+        RemediationEngine::new(policy, quarantine, audit_dir).context("failed to initialise remediation engine")?;
 
-    println!(
-        "\n{} remediating {} threat(s)...",
-        ">>>".yellow().bold(),
-        threats.len()
-    );
+    println!("\n{} remediating {} threat(s)...", ">>>".yellow().bold(), threats.len());
 
     for r in threats {
         let threat_name = r.threat_name.as_deref().unwrap_or("Unknown");
         let threat_level = match r.threat_level {
             ThreatLevel::Malicious => "malicious",
             ThreatLevel::Suspicious => "suspicious",
-            _ => "clean",
+            ThreatLevel::Clean => "clean",
         };
         let detection_type = r
             .detection_type
             .as_ref()
-            .map(|d| format!("{d:?}"))
-            .unwrap_or_else(|| "Unknown".to_string());
+            .map_or_else(|| "Unknown".to_string(), |d| format!("{d:?}"));
 
         let actions = engine
             .handle_threat(&r.path, threat_name, threat_level, &detection_type)
@@ -132,7 +120,12 @@ async fn remediate_threats(results: &[ScanResult], data_dir: &Path) -> Result<()
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::fn_params_excessive_bools,
+    clippy::similar_names,
+    clippy::cast_precision_loss
+)]
 pub async fn run(
     path: PathBuf,
     recursive: bool,
@@ -162,31 +155,23 @@ pub async fn run(
             let entries: Vec<PathBuf> = WalkDir::new(&path)
                 .follow_links(false)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .filter(|e| e.file_type().is_file())
-                .map(|e| e.into_path())
+                .map(walkdir::DirEntry::into_path)
                 .collect();
 
             let total = entries.len() as u64;
 
             if !json_output {
-                println!(
-                    "{} {} ({} files)",
-                    "Scanning".cyan().bold(),
-                    path.display(),
-                    total
-                );
+                println!("{} {} ({} files)", "Scanning".cyan().bold(), path.display(), total);
             }
 
             let pb = if !json_output && total > 0 {
                 let pb = ProgressBar::new(total);
                 pb.set_style(
-                    match ProgressStyle::with_template(
+                    ProgressStyle::with_template(
                         "{spinner:.green} [{elapsed_precise}] [{bar:30.cyan/blue}] {pos}/{len} | {per_sec} | ETA {eta} | {msg}",
-                    ) {
-                        Ok(style) => style.progress_chars("#>-"),
-                        Err(_) => ProgressStyle::default_bar(),
-                    },
+                    ).map_or_else(|_| ProgressStyle::default_bar(), |style| style.progress_chars("#>-")),
                 );
                 pb.set_message("scanning...");
                 Some(pb)
@@ -205,7 +190,7 @@ pub async fn run(
         } else {
             // Non-recursive: scan only direct children.
             let entries: Vec<PathBuf> = std::fs::read_dir(&path)?
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .map(|e| e.path())
                 .filter(|p| p.is_file())
                 .collect();
@@ -234,6 +219,7 @@ pub async fn run(
         anyhow::bail!("path does not exist: {}", path.display());
     };
 
+    #[allow(clippy::cast_possible_truncation)] // Scan duration won't exceed u64::MAX ms.
     let elapsed_ms = start.elapsed().as_millis() as u64;
 
     // Print results.
@@ -255,7 +241,9 @@ pub async fn run(
                 .iter()
                 .map(|r| std::fs::metadata(&r.path).map(|m| m.len()).unwrap_or(0))
                 .sum();
+            #[allow(clippy::cast_precision_loss)] // Acceptable for display stats.
             let mb = total_bytes as f64 / (1024.0 * 1024.0);
+            #[allow(clippy::cast_precision_loss)] // Acceptable for display stats.
             let secs = elapsed_ms as f64 / 1000.0;
             println!(
                 "  Speed: {:.1} MB/s ({:.0} files/sec)",
@@ -267,8 +255,7 @@ pub async fn run(
 
     // Generate HTML report if requested.
     if let Some(report_path) = &report {
-        let html =
-            super::report::generate_html_report(&results, &path.display().to_string(), elapsed_ms);
+        let html = super::report::generate_html_report(&results, &path.display().to_string(), elapsed_ms);
         super::report::write_report(report_path, &html)?;
         println!("Report saved to {}", report_path.display());
     }

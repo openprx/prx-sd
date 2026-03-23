@@ -139,7 +139,7 @@ pub struct ProtectedDirsEnforcer {
 
 impl ProtectedDirsEnforcer {
     /// Create a new enforcer with the given config.
-    pub fn new(config: ProtectedDirsConfig) -> Self {
+    pub const fn new(config: ProtectedDirsConfig) -> Self {
         Self { config }
     }
 

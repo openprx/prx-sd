@@ -58,8 +58,7 @@ impl Quarantine {
         let meta_dir = vault_dir.join("meta");
         fs::create_dir_all(&vault_dir)
             .with_context(|| format!("failed to create vault dir: {}", vault_dir.display()))?;
-        fs::create_dir_all(&meta_dir)
-            .with_context(|| format!("failed to create meta dir: {}", meta_dir.display()))?;
+        fs::create_dir_all(&meta_dir).with_context(|| format!("failed to create meta dir: {}", meta_dir.display()))?;
 
         let key = load_or_create_key(&vault_dir)?;
 
@@ -75,8 +74,7 @@ impl Quarantine {
     /// Returns the unique [`QuarantineId`] assigned to the quarantined file.
     pub fn quarantine(&self, path: &Path, threat_name: &str) -> Result<QuarantineId> {
         let id = Uuid::new_v4();
-        let data =
-            fs::read(path).with_context(|| format!("failed to read file: {}", path.display()))?;
+        let data = fs::read(path).with_context(|| format!("failed to read file: {}", path.display()))?;
 
         // Compute SHA-256 of original contents.
         let mut hasher = Sha256::new();
@@ -91,20 +89,15 @@ impl Quarantine {
         let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt the file contents.
-        let cipher =
-            Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
+        let cipher = Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
         let ciphertext = cipher
             .encrypt(&nonce, data.as_ref())
             .map_err(|e| anyhow::anyhow!("encryption failed: {e}"))?;
 
         // Write encrypted data.
         let encrypted_path = self.vault_dir.join(format!("{id}.enc"));
-        fs::write(&encrypted_path, &ciphertext).with_context(|| {
-            format!(
-                "failed to write encrypted file: {}",
-                encrypted_path.display()
-            )
-        })?;
+        fs::write(&encrypted_path, &ciphertext)
+            .with_context(|| format!("failed to write encrypted file: {}", encrypted_path.display()))?;
 
         // Write metadata.
         let meta = QuarantineMeta {
@@ -117,14 +110,12 @@ impl Quarantine {
         };
 
         let meta_path = self.meta_dir.join(format!("{id}.json"));
-        let meta_json = serde_json::to_string_pretty(&meta)
-            .context("failed to serialize quarantine metadata")?;
+        let meta_json = serde_json::to_string_pretty(&meta).context("failed to serialize quarantine metadata")?;
         fs::write(&meta_path, meta_json)
             .with_context(|| format!("failed to write metadata: {}", meta_path.display()))?;
 
         // Delete the original file.
-        fs::remove_file(path)
-            .with_context(|| format!("failed to delete original file: {}", path.display()))?;
+        fs::remove_file(path).with_context(|| format!("failed to delete original file: {}", path.display()))?;
 
         tracing::info!(
             id = %id,
@@ -158,14 +149,13 @@ impl Quarantine {
         // Resolve symlinks to prevent bypass via symbolic links.
         // If the path doesn't exist yet, canonicalize the parent directory.
         let resolved = if to.exists() {
-            to.canonicalize().with_context(|| {
-                format!("failed to resolve restore path: {}", to.display())
-            })?
+            to.canonicalize()
+                .with_context(|| format!("failed to resolve restore path: {}", to.display()))?
         } else if let Some(parent) = to.parent() {
             if parent.exists() {
-                let resolved_parent = parent.canonicalize().with_context(|| {
-                    format!("failed to resolve parent of restore path: {}", parent.display())
-                })?;
+                let resolved_parent = parent
+                    .canonicalize()
+                    .with_context(|| format!("failed to resolve parent of restore path: {}", parent.display()))?;
                 resolved_parent.join(to.file_name().unwrap_or_default())
             } else {
                 to.to_path_buf()
@@ -176,46 +166,46 @@ impl Quarantine {
 
         // Deny restoring to system-critical directories (check resolved path).
         let denied_prefixes: &[&str] = &[
-            "/etc", "/usr", "/bin", "/sbin", "/boot", "/proc", "/sys",
-            "/lib", "/lib64", "/dev", "/run/systemd",
+            "/etc",
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/boot",
+            "/proc",
+            "/sys",
+            "/lib",
+            "/lib64",
+            "/dev",
+            "/run/systemd",
         ];
         let path_str = resolved.to_string_lossy();
         for prefix in denied_prefixes {
             if path_str.starts_with(prefix) {
-                anyhow::bail!(
-                    "restoring to system directory is denied: {}",
-                    resolved.display()
-                );
+                anyhow::bail!("restoring to system directory is denied: {}", resolved.display());
             }
         }
 
         let meta = self.load_meta(id)?;
 
         let encrypted_path = self.vault_dir.join(format!("{id}.enc"));
-        let ciphertext = fs::read(&encrypted_path).with_context(|| {
-            format!(
-                "failed to read encrypted file: {}",
-                encrypted_path.display()
-            )
-        })?;
+        let ciphertext = fs::read(&encrypted_path)
+            .with_context(|| format!("failed to read encrypted file: {}", encrypted_path.display()))?;
 
         let nonce = Nonce::from(meta.nonce);
-        let cipher =
-            Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
+        let cipher = Aes256Gcm::new_from_slice(&self.key).context("failed to create AES-256-GCM cipher")?;
         let plaintext = cipher
             .decrypt(&nonce, ciphertext.as_ref())
             .map_err(|e| anyhow::anyhow!("decryption failed: {e}"))?;
 
-        // Ensure parent directory exists.
-        if let Some(parent) = to.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create parent dir: {}", parent.display()))?;
+        // Ensure parent directory exists (use resolved path to prevent symlink bypass).
+        if let Some(parent) = resolved.parent() {
+            fs::create_dir_all(parent).with_context(|| format!("failed to create parent dir: {}", parent.display()))?;
         }
 
-        fs::write(to, &plaintext)
-            .with_context(|| format!("failed to write restored file: {}", to.display()))?;
+        fs::write(&resolved, &plaintext)
+            .with_context(|| format!("failed to write restored file: {}", resolved.display()))?;
 
-        tracing::info!(id = %id, to = %to.display(), "file restored from quarantine");
+        tracing::info!(id = %id, to = %resolved.display(), "file restored from quarantine");
         Ok(())
     }
 
@@ -230,8 +220,7 @@ impl Quarantine {
         }
 
         if meta_path.exists() {
-            fs::remove_file(&meta_path)
-                .with_context(|| format!("failed to delete: {}", meta_path.display()))?;
+            fs::remove_file(&meta_path).with_context(|| format!("failed to delete: {}", meta_path.display()))?;
         }
 
         tracing::info!(id = %id, "quarantine entry deleted");
@@ -250,9 +239,8 @@ impl Quarantine {
                 continue;
             }
 
-            let stem = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(s) => s,
-                None => continue,
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
             };
 
             let id: QuarantineId = match stem.parse() {
@@ -286,8 +274,7 @@ impl Quarantine {
         let meta_path = self.meta_dir.join(format!("{id}.json"));
         let data = fs::read_to_string(&meta_path)
             .with_context(|| format!("failed to read metadata: {}", meta_path.display()))?;
-        let meta: QuarantineMeta =
-            serde_json::from_str(&data).context("failed to parse quarantine metadata")?;
+        let meta: QuarantineMeta = serde_json::from_str(&data).context("failed to parse quarantine metadata")?;
         Ok(meta)
     }
 }
@@ -305,10 +292,7 @@ fn load_or_create_key(vault_dir: &Path) -> Result<[u8; 32]> {
     match fs::read(&key_path) {
         Ok(data) => {
             if data.len() != 32 {
-                anyhow::bail!(
-                    "invalid vault key length: expected 32 bytes, got {}",
-                    data.len()
-                );
+                anyhow::bail!("invalid vault key length: expected 32 bytes, got {}", data.len());
             }
             let mut key = [0u8; 32];
             key.copy_from_slice(&data);
@@ -334,18 +318,14 @@ fn load_or_create_key(vault_dir: &Path) -> Result<[u8; 32]> {
                 }
                 #[cfg(not(unix))]
                 {
-                    fs::OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(&key_path)
+                    fs::OpenOptions::new().write(true).create_new(true).open(&key_path)
                 }
             };
 
             match open_result {
                 Ok(mut file) => {
                     file.write_all(&key).context("failed to write vault key")?;
-                    file.sync_all()
-                        .context("failed to sync vault key to disk")?;
+                    file.sync_all().context("failed to sync vault key to disk")?;
                     tracing::info!("generated new vault encryption key");
                     Ok(key)
                 }
@@ -354,10 +334,7 @@ fn load_or_create_key(vault_dir: &Path) -> Result<[u8; 32]> {
                     // and our create attempt -- read the key it wrote.
                     let data = fs::read(&key_path).context("failed to read vault key")?;
                     if data.len() != 32 {
-                        anyhow::bail!(
-                            "invalid vault key length: expected 32 bytes, got {}",
-                            data.len()
-                        );
+                        anyhow::bail!("invalid vault key length: expected 32 bytes, got {}", data.len());
                     }
                     let mut existing = [0u8; 32];
                     existing.copy_from_slice(&data);

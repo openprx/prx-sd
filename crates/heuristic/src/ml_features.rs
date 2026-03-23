@@ -3,6 +3,15 @@
 //! Extracts a fixed-size numerical feature vector suitable for
 //! gradient-boosted decision tree or neural network classifiers.
 
+// ML feature extraction intentionally casts integer counts/sizes to floats.
+// Precision loss is acceptable: features are normalised to [0,1] anyway.
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless
+)]
+
 use prx_sd_parsers::elf::ElfInfo;
 use prx_sd_parsers::pe::PeInfo;
 
@@ -19,6 +28,8 @@ pub const ELF_FEATURE_DIM: usize = 48;
 /// The feature layout is documented in the module-level specification.
 /// All values are normalised to roughly `[0.0, 1.0]` (or small positive
 /// range) for compatibility with gradient-boosted or neural classifiers.
+#[allow(clippy::indexing_slicing)] // All indices are compile-time constants within PE_FEATURE_DIM (64)
+#[allow(clippy::items_after_statements)] // PE section flag constants are co-located with their usage for clarity
 pub fn extract_pe_features(info: &PeInfo, data: &[u8]) -> [f32; PE_FEATURE_DIM] {
     let mut f = [0.0f32; PE_FEATURE_DIM];
     let file_size = data.len().max(1) as f64;
@@ -79,8 +90,7 @@ pub fn extract_pe_features(info: &PeInfo, data: &[u8]) -> [f32; PE_FEATURE_DIM] 
     const IMAGE_SCN_MEM_WRITE: u32 = 0x8000_0000;
     const IMAGE_SCN_CNT_CODE: u32 = 0x0000_0020;
     f[13] = if info.sections.iter().any(|s| {
-        let is_code = s.characteristics & IMAGE_SCN_CNT_CODE != 0
-            || s.characteristics & IMAGE_SCN_MEM_EXECUTE != 0;
+        let is_code = s.characteristics & IMAGE_SCN_CNT_CODE != 0 || s.characteristics & IMAGE_SCN_MEM_EXECUTE != 0;
         let is_write = s.characteristics & IMAGE_SCN_MEM_WRITE != 0;
         is_code && is_write
     }) {
@@ -131,6 +141,7 @@ pub fn extract_pe_features(info: &PeInfo, data: &[u8]) -> [f32; PE_FEATURE_DIM] 
 }
 
 /// Extract a fixed-size feature vector from a parsed ELF file.
+#[allow(clippy::indexing_slicing)] // All indices are compile-time constants within ELF_FEATURE_DIM (48)
 pub fn extract_elf_features(info: &ElfInfo, data: &[u8]) -> [f32; ELF_FEATURE_DIM] {
     let mut f = [0.0f32; ELF_FEATURE_DIM];
     let file_size = data.len().max(1) as f64;
@@ -181,14 +192,7 @@ pub fn extract_elf_features(info: &ElfInfo, data: &[u8]) -> [f32; ELF_FEATURE_DI
     }
 
     // [11-16] suspicious Linux API counts
-    let linux_apis: [&str; 6] = [
-        "ptrace",
-        "mprotect",
-        "memfd_create",
-        "execveat",
-        "socket",
-        "connect",
-    ];
+    let linux_apis: [&str; 6] = ["ptrace", "mprotect", "memfd_create", "execveat", "socket", "connect"];
     for (idx, api) in linux_apis.iter().enumerate() {
         f[11 + idx] = info.symbols.iter().filter(|s| s.contains(api)).count() as f32;
     }
@@ -214,14 +218,8 @@ pub fn extract_elf_features(info: &ElfInfo, data: &[u8]) -> [f32; ELF_FEATURE_DI
     };
 
     // [44] has_crypto_symbols
-    let crypto_names = [
-        "AES", "aes_", "SHA256", "sha256", "EVP_", "crypto_", "CRYPTO_",
-    ];
-    f[44] = if info
-        .symbols
-        .iter()
-        .any(|s| crypto_names.iter().any(|c| s.contains(c)))
-    {
+    let crypto_names = ["AES", "aes_", "SHA256", "sha256", "EVP_", "crypto_", "CRYPTO_"];
+    f[44] = if info.symbols.iter().any(|s| crypto_names.iter().any(|c| s.contains(c))) {
         1.0
     } else {
         0.0
@@ -240,6 +238,7 @@ pub fn extract_elf_features(info: &ElfInfo, data: &[u8]) -> [f32; ELF_FEATURE_DI
 /// - Recent (2015-2030) → 1.0 (likely legitimate)
 /// - Old (2000-2014) → 0.5
 /// - Very old (<2000) → 0.2
+#[allow(clippy::missing_const_for_fn)] // Cannot be const: u64::from() is not const-stable
 fn normalise_timestamp(ts: u32) -> f32 {
     if ts == 0 {
         return 0.0;
@@ -273,7 +272,12 @@ fn count_suspicious_api_categories(info: &PeInfo) -> [u32; 7] {
                         ApiCategory::Privilege => 5,
                         ApiCategory::FileSystem => 6,
                     };
-                    counts[idx] += 1;
+                    // SAFETY: idx is always 0..=6 from the exhaustive match above,
+                    // which is within bounds of the 7-element array.
+                    #[allow(clippy::indexing_slicing)]
+                    {
+                        counts[idx] += 1;
+                    }
                     break;
                 }
             }
@@ -286,19 +290,18 @@ fn count_suspicious_api_categories(info: &PeInfo) -> [u32; 7] {
 ///
 /// Bins span `[0, 8)` evenly. Each section increments its corresponding bin.
 /// The histogram is normalised by section count (so values are in `[0, 1]`).
-fn fill_entropy_histogram(
-    sections: &[prx_sd_parsers::pe::SectionInfo],
-    out: &mut [f32],
-    num_bins: usize,
-) {
+fn fill_entropy_histogram(sections: &[prx_sd_parsers::pe::SectionInfo], out: &mut [f32], num_bins: usize) {
     debug_assert_eq!(out.len(), num_bins);
-    if sections.is_empty() {
+    if sections.is_empty() || num_bins == 0 {
         return;
     }
     let bin_width = 8.0 / num_bins as f64;
     for s in sections {
         let bin = ((s.entropy / bin_width) as usize).min(num_bins - 1);
-        out[bin] += 1.0;
+        // SAFETY: `bin` is clamped to `num_bins - 1` which equals `out.len() - 1`.
+        if let Some(slot) = out.get_mut(bin) {
+            *slot += 1.0;
+        }
     }
     let count = sections.len() as f32;
     for val in out.iter_mut() {
@@ -313,13 +316,14 @@ fn imphash_to_f32(imphash: &str) -> f32 {
     if imphash.len() < 4 {
         return 0.0;
     }
-    match u16::from_str_radix(&imphash[..4], 16) {
-        Ok(v) => v as f32 / 65535.0,
-        Err(_) => 0.0,
-    }
+    imphash
+        .get(..4)
+        .and_then(|s| u16::from_str_radix(s, 16).ok())
+        .map_or(0.0, |v| f32::from(v) / 65535.0)
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::float_cmp, clippy::unreadable_literal)]
 mod tests {
     use super::*;
     use prx_sd_parsers::elf::ElfInfo;
@@ -378,11 +382,7 @@ mod tests {
                     characteristics: 0,
                 },
             ],
-            symbols: vec![
-                "main".to_string(),
-                "ptrace".to_string(),
-                "socket".to_string(),
-            ],
+            symbols: vec!["main".to_string(), "ptrace".to_string(), "socket".to_string()],
             dynamic_libs: vec!["libc.so.6".to_string()],
             interpreter: Some("/lib64/ld-linux-x86-64.so.2".to_string()),
         }
@@ -476,10 +476,7 @@ mod tests {
         let mut hist = [0.0f32; 32];
         fill_entropy_histogram(&sections, &mut hist, 32);
         let sum: f32 = hist.iter().sum();
-        assert!(
-            (sum - 1.0).abs() < 0.01,
-            "histogram should sum to ~1.0, got {sum}"
-        );
+        assert!((sum - 1.0).abs() < 0.01, "histogram should sum to ~1.0, got {sum}");
     }
 
     #[test]

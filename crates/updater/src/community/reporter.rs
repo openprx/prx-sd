@@ -25,7 +25,7 @@ pub struct ThreatSignal {
     pub file_sha256: String,
     /// Threat level string: "Suspicious" or "Malicious".
     pub threat_level: String,
-    /// Detection method: "Hash", "YaraRule", "Heuristic", "Behavioral".
+    /// Detection method: "Hash", "`YaraRule`", "Heuristic", "Behavioral".
     pub detection_type: String,
     /// Human-readable threat name.
     pub threat_name: String,
@@ -49,10 +49,12 @@ pub struct ThreatSignal {
     pub confidence: f64,
 }
 
-fn is_zero_i64(v: &i64) -> bool {
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_zero_i64(v: &i64) -> bool {
     *v == 0
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_zero_f64(v: &f64) -> bool {
     *v == 0.0
 }
@@ -127,10 +129,7 @@ impl SdCommunityReporter {
             None => bail!("cannot flush signals: no api_key configured"),
         };
 
-        let url = format!(
-            "{}/api/v1/sd/signals",
-            self.config.server_url.trim_end_matches('/')
-        );
+        let url = format!("{}/api/v1/sd/signals", self.config.server_url.trim_end_matches('/'));
 
         let batch = SignalBatch { signals };
 
@@ -171,7 +170,7 @@ impl SdCommunityReporter {
                         warn!(error = %e, "periodic signal flush failed");
                     }
                 }
-                _ = cancel_notified(&cancel) => {
+                () = cancel_notified(&cancel) => {
                     // Final flush before shutdown.
                     if let Err(e) = self.flush().await {
                         warn!(error = %e, "final signal flush on shutdown failed");

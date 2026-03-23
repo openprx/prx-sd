@@ -9,7 +9,7 @@ use prx_sd_updater::community::config::CommunityConfig;
 use prx_sd_updater::community::enroll;
 
 /// `sd community status` -- display current community config and enrollment.
-pub async fn run_status(data_dir: &Path) -> Result<()> {
+pub fn run_status(data_dir: &Path) -> Result<()> {
     let cfg = CommunityConfig::load(data_dir)?;
 
     println!("{}", "Community Threat Intelligence".cyan().bold());
@@ -41,16 +41,8 @@ pub async fn run_status(data_dir: &Path) -> Result<()> {
         }
     );
     println!("  {:<20} {}", "Batch size:".bold(), cfg.batch_size);
-    println!(
-        "  {:<20} {} s",
-        "Flush interval:".bold(),
-        cfg.flush_interval_secs
-    );
-    println!(
-        "  {:<20} {} s",
-        "Sync interval:".bold(),
-        cfg.sync_interval_secs
-    );
+    println!("  {:<20} {} s", "Flush interval:".bold(), cfg.flush_interval_secs);
+    println!("  {:<20} {} s", "Sync interval:".bold(), cfg.sync_interval_secs);
 
     Ok(())
 }
@@ -92,7 +84,7 @@ pub async fn run_enroll(data_dir: &Path) -> Result<()> {
 }
 
 /// `sd community disable` -- turn off community sharing.
-pub async fn run_disable(data_dir: &Path) -> Result<()> {
+pub fn run_disable(data_dir: &Path) -> Result<()> {
     let mut cfg = CommunityConfig::load(data_dir)?;
 
     if !cfg.enabled {

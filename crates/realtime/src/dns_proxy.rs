@@ -58,7 +58,7 @@ struct QueryLogEntry {
 
 // ── DNS proxy ────────────────────────────────────────────────────────────────
 
-/// Local DNS proxy that wires together adblock, dns_filter, and ioc_filter.
+/// Local DNS proxy that wires together adblock, `dns_filter`, and `ioc_filter`.
 pub struct DnsProxy {
     config: DnsProxyConfig,
     adblock: Option<AdblockFilterManager>,
@@ -146,13 +146,12 @@ impl DnsProxy {
                 }
             };
 
-            let query = &buf[..len];
+            let Some(query) = buf.get(..len) else {
+                continue;
+            };
             let domain = extract_domain_from_query(query);
 
-            let (blocked, reason) = match &domain {
-                Some(d) => self.check_domain(d),
-                None => (false, None),
-            };
+            let (blocked, reason) = domain.as_ref().map_or((false, None), |d| self.check_domain(d));
 
             let response = if blocked {
                 build_blocked_response(query)
@@ -224,10 +223,8 @@ pub fn extract_domain_from_query(packet: &[u8]) -> Option<String> {
     let mut labels: Vec<String> = Vec::new();
 
     loop {
-        if pos >= packet.len() {
-            return None;
-        }
-        let len = packet[pos] as usize;
+        let &len_byte = packet.get(pos)?;
+        let len = len_byte as usize;
         if len == 0 {
             break;
         }
@@ -237,10 +234,8 @@ pub fn extract_domain_from_query(packet: &[u8]) -> Option<String> {
             break;
         }
         pos += 1;
-        if pos + len > packet.len() {
-            return None;
-        }
-        labels.push(String::from_utf8_lossy(&packet[pos..pos + len]).to_string());
+        let label_slice = packet.get(pos..pos + len)?;
+        labels.push(String::from_utf8_lossy(label_slice).to_string());
         pos += len;
     }
 
@@ -260,13 +255,17 @@ pub fn build_blocked_response(query: &[u8]) -> Vec<u8> {
         return Vec::new();
     }
     let mut resp = query.to_vec();
-    // Set response flags: QR=1, RD=1
-    resp[2] = 0x81;
-    // RA=1, RCODE=0 (no error)
-    resp[3] = 0x80;
-    // Set ANCOUNT = 1
-    resp[6] = 0x00;
-    resp[7] = 0x01;
+    // Indices 2,3,6,7 are guaranteed in-bounds: resp.len() >= 12 from the guard above.
+    #[allow(clippy::indexing_slicing)]
+    {
+        // Set response flags: QR=1, RD=1
+        resp[2] = 0x81;
+        // RA=1, RCODE=0 (no error)
+        resp[3] = 0x80;
+        // Set ANCOUNT = 1
+        resp[6] = 0x00;
+        resp[7] = 0x01;
+    }
     // Answer section: name pointer to QNAME at offset 12
     resp.extend_from_slice(&[0xC0, 0x0C]); // name pointer
     resp.extend_from_slice(&[0x00, 0x01]); // type A
@@ -283,10 +282,14 @@ fn build_servfail_response(query: &[u8]) -> Vec<u8> {
         return Vec::new();
     }
     let mut resp = query.to_vec();
-    // QR=1, RD=1
-    resp[2] = 0x81;
-    // RA=1, RCODE=2 (SERVFAIL)
-    resp[3] = 0x82;
+    // Indices 2,3 are guaranteed in-bounds: resp.len() >= 12 from the guard above.
+    #[allow(clippy::indexing_slicing)]
+    {
+        // QR=1, RD=1
+        resp[2] = 0x81;
+        // RA=1, RCODE=2 (SERVFAIL)
+        resp[3] = 0x82;
+    }
     resp
 }
 
@@ -302,17 +305,16 @@ fn forward_to_upstream(query: &[u8], upstream: SocketAddr) -> Result<Vec<u8>> {
     let (len, _) = sock
         .recv_from(&mut buf)
         .context("upstream DNS did not respond in time")?;
-    Ok(buf[..len].to_vec())
+    Ok(buf
+        .get(..len)
+        .context("upstream DNS response length exceeds buffer")?
+        .to_vec())
 }
 
 /// Write a JSONL log entry for a DNS query.
-fn log_query(
-    domain: &str,
-    blocked: bool,
-    reason: Option<BlockReason>,
-    client: &SocketAddr,
-    log_path: &Path,
-) {
+fn log_query(domain: &str, blocked: bool, reason: Option<BlockReason>, client: &SocketAddr, log_path: &Path) {
+    use std::io::Write;
+
     let entry = QueryLogEntry {
         timestamp: chrono::Utc::now().to_rfc3339(),
         domain: domain.to_owned(),
@@ -329,11 +331,7 @@ fn log_query(
         }
     };
 
-    use std::io::Write;
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path);
+    let file = std::fs::OpenOptions::new().create(true).append(true).open(log_path);
 
     match file {
         Ok(mut f) => {
@@ -351,6 +349,12 @@ fn log_query(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::cast_possible_truncation
+    )]
     use super::*;
 
     /// Build a minimal DNS query packet for the given domain.

@@ -17,11 +17,7 @@ pub enum FileEvent {
     /// A file was closed after being written to.
     CloseWrite { path: PathBuf },
     /// A file was renamed.
-    Rename {
-        from: PathBuf,
-        to: PathBuf,
-        pid: u32,
-    },
+    Rename { from: PathBuf, to: PathBuf, pid: u32 },
 }
 
 /// Action to take in response to a file event (for blocking monitors).
@@ -35,24 +31,22 @@ pub enum FileEventAction {
 
 impl FileEvent {
     /// Returns the path associated with this event.
-    pub fn path(&self) -> &PathBuf {
+    pub const fn path(&self) -> &PathBuf {
         match self {
-            FileEvent::Open { path, .. } => path,
-            FileEvent::Create { path } => path,
-            FileEvent::Modify { path } => path,
-            FileEvent::Delete { path } => path,
-            FileEvent::Execute { path, .. } => path,
-            FileEvent::CloseWrite { path } => path,
-            FileEvent::Rename { to, .. } => to,
+            Self::Open { path, .. }
+            | Self::Create { path }
+            | Self::Modify { path }
+            | Self::Delete { path }
+            | Self::Execute { path, .. }
+            | Self::CloseWrite { path } => path,
+            Self::Rename { to, .. } => to,
         }
     }
 
     /// Returns the PID associated with this event, if any.
-    pub fn pid(&self) -> Option<u32> {
+    pub const fn pid(&self) -> Option<u32> {
         match self {
-            FileEvent::Open { pid, .. } => Some(*pid),
-            FileEvent::Execute { pid, .. } => Some(*pid),
-            FileEvent::Rename { pid, .. } => Some(*pid),
+            Self::Open { pid, .. } | Self::Execute { pid, .. } | Self::Rename { pid, .. } => Some(*pid),
             _ => None,
         }
     }

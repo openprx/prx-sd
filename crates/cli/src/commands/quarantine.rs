@@ -15,7 +15,7 @@ fn open_quarantine(data_dir: &Path) -> Result<prx_sd_quarantine::Quarantine> {
 
 /// Prompt the user for a yes/no confirmation. Returns `true` for yes.
 fn confirm(prompt: &str) -> bool {
-    print!("{} [y/N] ", prompt);
+    print!("{prompt} [y/N] ");
     io::stdout().flush().ok();
     let mut input = String::new();
     if io::stdin().read_line(&mut input).is_err() {
@@ -24,7 +24,7 @@ fn confirm(prompt: &str) -> bool {
     matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
 }
 
-pub async fn run(action: QuarantineAction, data_dir: &Path) -> Result<()> {
+pub fn run(action: QuarantineAction, data_dir: &Path) -> Result<()> {
     match action {
         QuarantineAction::List => cmd_list(data_dir),
         QuarantineAction::Restore { id, to } => cmd_restore(data_dir, &id, to.as_deref()),
@@ -71,9 +71,7 @@ fn cmd_restore(data_dir: &Path, id: &str, dest: Option<&Path>) -> Result<()> {
         .find(|(eid, _)| eid.to_string().starts_with(id))
         .with_context(|| format!("no quarantine entry matching id '{id}'"))?;
 
-    let restore_to = dest
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| meta.original_path.clone());
+    let restore_to = dest.map_or_else(|| meta.original_path.clone(), std::path::Path::to_path_buf);
 
     // Security: reject restore to sensitive system paths
     let blocked_prefixes = ["/etc/", "/usr/", "/bin/", "/sbin/", "/boot/", "/root/.ssh/"];
@@ -92,17 +90,12 @@ fn cmd_restore(data_dir: &Path, id: &str, dest: Option<&Path>) -> Result<()> {
     }
 
     q.restore(*full_id, &restore_to)
-        .with_context(|| format!("failed to restore {}", full_id))?;
+        .with_context(|| format!("failed to restore {full_id}"))?;
 
     // Delete from quarantine after successful restore
     q.delete(*full_id).ok();
 
-    println!(
-        "{} Restored {} -> {}",
-        "OK".green().bold(),
-        id,
-        restore_to.display()
-    );
+    println!("{} Restored {} -> {}", "OK".green().bold(), id, restore_to.display());
     Ok(())
 }
 
@@ -155,11 +148,7 @@ fn cmd_delete_all(data_dir: &Path, skip_confirm: bool) -> Result<()> {
         }
     }
 
-    println!(
-        "{} Deleted {} quarantine entries",
-        "OK".green().bold(),
-        deleted
-    );
+    println!("{} Deleted {} quarantine entries", "OK".green().bold(), deleted);
     Ok(())
 }
 

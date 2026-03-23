@@ -139,12 +139,8 @@ impl AdblockFilterManager {
     /// 3. If stale or missing, download from URL and save to disk
     /// 4. Build the adblock engine from all cached lists
     pub fn init(cache_dir: &Path) -> Result<Self> {
-        std::fs::create_dir_all(cache_dir).with_context(|| {
-            format!(
-                "failed to create adblock cache dir: {}",
-                cache_dir.display()
-            )
-        })?;
+        std::fs::create_dir_all(cache_dir)
+            .with_context(|| format!("failed to create adblock cache dir: {}", cache_dir.display()))?;
 
         let lists_dir = cache_dir.join("lists");
         std::fs::create_dir_all(&lists_dir)?;
@@ -152,16 +148,14 @@ impl AdblockFilterManager {
         // Load or create config
         let config_path = cache_dir.join("adblock_config.json");
         let config = if config_path.exists() {
-            let data =
-                std::fs::read_to_string(&config_path).context("failed to read adblock config")?;
+            let data = std::fs::read_to_string(&config_path).context("failed to read adblock config")?;
             serde_json::from_str(&data).unwrap_or_else(|_| {
                 tracing::warn!("corrupt adblock config, using defaults");
                 AdblockConfig::default()
             })
         } else {
             let config = AdblockConfig::default();
-            let json = serde_json::to_string_pretty(&config)
-                .context("failed to serialize adblock config")?;
+            let json = serde_json::to_string_pretty(&config).context("failed to serialize adblock config")?;
             std::fs::write(&config_path, json).ok();
             config
         };
@@ -234,7 +228,7 @@ impl AdblockFilterManager {
                     let t = l.trim();
                     !t.is_empty() && !t.starts_with('!')
                 })
-                .map(|l| l.to_string())
+                .map(std::string::ToString::to_string)
                 .collect();
 
             let count = rules.len();
@@ -271,8 +265,7 @@ impl AdblockFilterManager {
             let cached = lists_dir.join(sanitize_filename(&source.name));
             match download_list(&source.url) {
                 Ok(content) => {
-                    std::fs::write(&cached, &content)
-                        .with_context(|| format!("failed to cache {}", source.name))?;
+                    std::fs::write(&cached, &content).with_context(|| format!("failed to cache {}", source.name))?;
                     downloaded += 1;
                 }
                 Err(e) => {
@@ -282,7 +275,7 @@ impl AdblockFilterManager {
         }
 
         // Rebuild engine
-        self.rebuild_engine()?;
+        self.rebuild_engine();
 
         let sync_path = self.cache_dir.join("last_sync");
         let now = chrono::Utc::now().to_rfc3339();
@@ -292,7 +285,7 @@ impl AdblockFilterManager {
     }
 
     /// Rebuild the engine from local cache (no network).
-    fn rebuild_engine(&mut self) -> Result<()> {
+    fn rebuild_engine(&mut self) {
         let lists_dir = self.cache_dir.join("lists");
         let mut filter_set = FilterSet::new(false);
         let mut loaded = Vec::new();
@@ -309,7 +302,7 @@ impl AdblockFilterManager {
                         let t = l.trim();
                         !t.is_empty() && !t.starts_with('!')
                     })
-                    .map(|l| l.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect();
                 let count = rules.len();
                 filter_set.add_filters(&rules, ParseOptions::default());
@@ -319,16 +312,10 @@ impl AdblockFilterManager {
 
         self.engine = Engine::from_filter_set(filter_set, true);
         self.loaded_lists = loaded;
-        Ok(())
     }
 
     /// Add a custom filter list source and immediately download+cache it.
-    pub fn add_source(
-        &mut self,
-        name: &str,
-        url: &str,
-        category: AdblockCategory,
-    ) -> Result<usize> {
+    pub fn add_source(&mut self, name: &str, url: &str, category: AdblockCategory) -> Result<usize> {
         self.config.sources.push(FilterListSource {
             name: name.to_string(),
             url: url.to_string(),
@@ -342,14 +329,13 @@ impl AdblockFilterManager {
         let content = download_list(url)?;
         std::fs::write(&cached, &content)?;
 
-        self.rebuild_engine()?;
+        self.rebuild_engine();
 
         let count = self
             .loaded_lists
             .iter()
             .find(|(n, _, _)| n == name)
-            .map(|(_, _, c)| *c)
-            .unwrap_or(0);
+            .map_or(0, |(_, _, c)| *c);
         Ok(count)
     }
 
@@ -361,41 +347,33 @@ impl AdblockFilterManager {
         let cached = self.cache_dir.join("lists").join(sanitize_filename(name));
         std::fs::remove_file(&cached).ok();
 
-        self.rebuild_engine()?;
+        self.rebuild_engine();
         Ok(())
     }
 
     /// Check if a URL should be blocked.
     pub fn check_url(&self, url: &str, source_url: &str, request_type: &str) -> AdblockResult {
-        let request = match Request::new(url, source_url, request_type) {
-            Ok(r) => r,
-            Err(_) => {
-                return AdblockResult {
-                    blocked: false,
-                    filter_name: String::new(),
-                    matched_rule: None,
-                    important: false,
-                    category: AdblockCategory::Unknown,
-                };
-            }
+        let Ok(request) = Request::new(url, source_url, request_type) else {
+            return AdblockResult {
+                blocked: false,
+                filter_name: String::new(),
+                matched_rule: None,
+                important: false,
+                category: AdblockCategory::Unknown,
+            };
         };
 
         let result = self.engine.check_network_request(&request);
 
         AdblockResult {
             blocked: result.matched,
-            filter_name: result
-                .filter
-                .as_ref()
-                .map(|f| format!("{f:?}"))
-                .unwrap_or_default(),
+            filter_name: result.filter.as_ref().map(|f| format!("{f:?}")).unwrap_or_default(),
             matched_rule: result.filter.map(|f| format!("{f:?}")),
             important: result.important,
             category: if result.matched {
                 self.loaded_lists
                     .last()
-                    .map(|(_, c, _)| c.clone())
-                    .unwrap_or(AdblockCategory::Unknown)
+                    .map_or(AdblockCategory::Unknown, |(_, c, _)| c.clone())
             } else {
                 AdblockCategory::Unknown
             },
@@ -415,11 +393,7 @@ impl AdblockFilterManager {
 
         AdblockStats {
             list_count: self.loaded_lists.len(),
-            list_names: self
-                .loaded_lists
-                .iter()
-                .map(|(n, _, _)| n.clone())
-                .collect(),
+            list_names: self.loaded_lists.iter().map(|(n, _, _)| n.clone()).collect(),
             total_rules: self.loaded_lists.iter().map(|(_, _, c)| c).sum(),
             cache_dir: self.cache_dir.display().to_string(),
             last_sync: sync_time,
@@ -427,7 +401,7 @@ impl AdblockFilterManager {
     }
 
     /// Get the current config.
-    pub fn config(&self) -> &AdblockConfig {
+    pub const fn config(&self) -> &AdblockConfig {
         &self.config
     }
 
@@ -460,12 +434,7 @@ fn is_fresh(path: &Path, max_age: Duration) -> bool {
     path.exists()
         && std::fs::metadata(path)
             .and_then(|m| m.modified())
-            .map(|modified| {
-                SystemTime::now()
-                    .duration_since(modified)
-                    .unwrap_or(Duration::MAX)
-                    < max_age
-            })
+            .map(|modified| SystemTime::now().duration_since(modified).unwrap_or(Duration::MAX) < max_age)
             .unwrap_or(false)
 }
 
@@ -485,14 +454,19 @@ fn download_list(url: &str) -> Result<String> {
         anyhow::bail!("HTTP {} for {url}", resp.status());
     }
 
-    resp.text()
-        .with_context(|| format!("failed to read body from {url}"))
+    resp.text().with_context(|| format!("failed to read body from {url}"))
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::unreadable_literal
+    )]
     use super::*;
 
     fn test_cache_dir() -> tempfile::TempDir {
@@ -507,10 +481,9 @@ mod tests {
         if let Ok(mgr) = mgr {
             assert!(dir.path().join("lists").is_dir());
             assert!(dir.path().join("adblock_config.json").exists());
-            let config: AdblockConfig = serde_json::from_str(
-                &std::fs::read_to_string(dir.path().join("adblock_config.json")).unwrap(),
-            )
-            .unwrap();
+            let config: AdblockConfig =
+                serde_json::from_str(&std::fs::read_to_string(dir.path().join("adblock_config.json")).unwrap())
+                    .unwrap();
             assert!(config.enabled);
             assert_eq!(config.sources.len(), 5);
             let _ = mgr.stats();
@@ -540,11 +513,7 @@ mod tests {
         std::fs::create_dir_all(&lists_dir).unwrap();
 
         // Pre-populate cache with a tiny list
-        std::fs::write(
-            lists_dir.join("TestList.txt"),
-            "||evil.ads.com^\n||tracker.bad.org^\n",
-        )
-        .unwrap();
+        std::fs::write(lists_dir.join("TestList.txt"), "||evil.ads.com^\n||tracker.bad.org^\n").unwrap();
 
         let config = AdblockConfig {
             sources: vec![FilterListSource {
@@ -570,19 +539,13 @@ mod tests {
     #[test]
     fn sanitize_filename_works() {
         assert_eq!(sanitize_filename("EasyList"), "EasyList.txt");
-        assert_eq!(
-            sanitize_filename("Peter Lowe's List"),
-            "Peter_Lowe_s_List.txt"
-        );
+        assert_eq!(sanitize_filename("Peter Lowe's List"), "Peter_Lowe_s_List.txt");
         assert_eq!(sanitize_filename("a/b\\c:d"), "a_b_c_d.txt");
     }
 
     #[test]
     fn is_fresh_nonexistent() {
-        assert!(!is_fresh(
-            Path::new("/nonexistent"),
-            Duration::from_secs(3600)
-        ));
+        assert!(!is_fresh(Path::new("/nonexistent"), Duration::from_secs(3600)));
     }
 
     #[test]

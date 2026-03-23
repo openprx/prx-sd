@@ -42,39 +42,40 @@ pub fn parse_elf(data: &[u8]) -> Result<ElfInfo> {
         .map(|sh| {
             let name = elf.shdr_strtab.get_at(sh.sh_name).unwrap_or("").to_string();
 
+            #[allow(clippy::cast_possible_truncation)]
             let offset = sh.sh_offset as usize;
+            #[allow(clippy::cast_possible_truncation)]
             let size = sh.sh_size as usize;
-            let section_data = if sh.sh_type != goblin::elf::section_header::SHT_NOBITS {
-                data.get(offset..offset.saturating_add(size)).unwrap_or(&[])
-            } else {
+            let is_nobits = sh.sh_type == goblin::elf::section_header::SHT_NOBITS;
+            let section_data = if is_nobits {
                 &[]
+            } else {
+                data.get(offset..offset.saturating_add(size)).unwrap_or(&[])
             };
             let entropy = shannon_entropy(section_data);
 
+            #[allow(clippy::cast_possible_truncation)]
+            let characteristics = sh.sh_flags as u32;
             SectionInfo {
                 name,
                 virtual_size: sh.sh_size,
-                raw_size: if sh.sh_type != goblin::elf::section_header::SHT_NOBITS {
-                    sh.sh_size
-                } else {
-                    0
-                },
+                raw_size: if is_nobits { 0 } else { sh.sh_size },
                 entropy,
-                characteristics: sh.sh_flags as u32,
+                characteristics,
             }
         })
         .collect();
 
     // Symbols (both static and dynamic)
     let mut symbols: Vec<String> = Vec::new();
-    for sym in elf.syms.iter() {
+    for sym in &elf.syms {
         if let Some(name) = elf.strtab.get_at(sym.st_name) {
             if !name.is_empty() {
                 symbols.push(name.to_string());
             }
         }
     }
-    for sym in elf.dynsyms.iter() {
+    for sym in &elf.dynsyms {
         if let Some(name) = elf.dynstrtab.get_at(sym.st_name) {
             if !name.is_empty() {
                 symbols.push(name.to_string());
@@ -85,10 +86,10 @@ pub fn parse_elf(data: &[u8]) -> Result<ElfInfo> {
     symbols.dedup();
 
     // Dynamic libraries (DT_NEEDED entries)
-    let dynamic_libs: Vec<String> = elf.libraries.iter().map(|lib| lib.to_string()).collect();
+    let dynamic_libs: Vec<String> = elf.libraries.iter().map(std::string::ToString::to_string).collect();
 
     // Interpreter (e.g. /lib64/ld-linux-x86-64.so.2)
-    let interpreter = elf.interpreter.map(|s| s.to_string());
+    let interpreter = elf.interpreter.map(std::string::ToString::to_string);
 
     debug!(
         is_64bit,
@@ -112,6 +113,7 @@ pub fn parse_elf(data: &[u8]) -> Result<ElfInfo> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::unreadable_literal)]
 mod tests {
     use super::*;
 

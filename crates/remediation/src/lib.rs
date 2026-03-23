@@ -118,6 +118,7 @@ pub struct ThreatAuditRecord {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -132,8 +133,7 @@ mod tests {
 
     #[test]
     fn remediation_result_failure_has_error_field_set() {
-        let result =
-            RemediationResult::failure(RemediationAction::Deleted, "permission denied".to_string());
+        let result = RemediationResult::failure(RemediationAction::Deleted, "permission denied".to_string());
         assert!(!result.success);
         assert_eq!(result.error.as_deref(), Some("permission denied"));
         assert!(!result.requires_reboot);
@@ -206,10 +206,7 @@ mod tests {
         assert_eq!(deserialized.actions_taken.len(), 2);
         assert!(deserialized.actions_taken[0].success);
         assert!(!deserialized.actions_taken[1].success);
-        assert_eq!(
-            deserialized.actions_taken[1].error.as_deref(),
-            Some("no such process")
-        );
+        assert_eq!(deserialized.actions_taken[1].error.as_deref(), Some("no such process"));
     }
 
     #[test]

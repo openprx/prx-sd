@@ -12,10 +12,7 @@ fn show_policy(data_dir: &Path) -> Result<()> {
     let policy = if policy_path.exists() {
         RemediationPolicy::load(&policy_path)?
     } else {
-        println!(
-            "{} no custom policy found, showing defaults",
-            "info:".cyan().bold()
-        );
+        println!("{} no custom policy found, showing defaults", "info:".cyan().bold());
         RemediationPolicy::default()
     };
 
@@ -67,20 +64,14 @@ fn set_policy(data_dir: &Path, key: &str, value: &str) -> Result<()> {
         }
         _ => {
             anyhow::bail!(
-                "unknown policy key '{}'. Valid keys: on_malicious, on_suspicious, \
-                 kill_processes, clean_persistence, network_isolation, audit_logging",
-                key
+                "unknown policy key '{key}'. Valid keys: on_malicious, on_suspicious, \
+                 kill_processes, clean_persistence, network_isolation, audit_logging"
             );
         }
     }
 
     policy.save(&policy_path)?;
-    println!(
-        "{} policy updated: {} = {}",
-        "success:".green().bold(),
-        key,
-        value
-    );
+    println!("{} policy updated: {} = {}", "success:".green().bold(), key, value);
     Ok(())
 }
 
@@ -100,8 +91,7 @@ fn parse_action_list(value: &str) -> Result<Vec<prx_sd_remediation::policy::Acti
             "isolate" | "networkisolate" | "network_isolate" => ActionType::NetworkIsolate,
             "blocklist" | "addtoblocklist" | "add_to_blocklist" => ActionType::AddToBlocklist,
             other => anyhow::bail!(
-                "unknown action '{}'. Valid: report, quarantine, block, kill, clean, delete, isolate, blocklist",
-                other
+                "unknown action '{other}'. Valid: report, quarantine, block, kill, clean, delete, isolate, blocklist"
             ),
         };
         actions.push(action);
@@ -109,12 +99,7 @@ fn parse_action_list(value: &str) -> Result<Vec<prx_sd_remediation::policy::Acti
     Ok(actions)
 }
 
-pub async fn run(
-    action: &str,
-    key: Option<&str>,
-    value: Option<&str>,
-    data_dir: &Path,
-) -> Result<()> {
+pub fn run(action: &str, key: Option<&str>, value: Option<&str>, data_dir: &Path) -> Result<()> {
     match action {
         "show" => show_policy(data_dir),
         "reset" => reset_policy(data_dir),
@@ -123,6 +108,6 @@ pub async fn run(
             let v = value.context("missing value for 'policy set'")?;
             set_policy(data_dir, k, v)
         }
-        other => anyhow::bail!("unknown policy action '{}'. Use: show, set, reset", other),
+        other => anyhow::bail!("unknown policy action '{other}'. Use: show, set, reset"),
     }
 }

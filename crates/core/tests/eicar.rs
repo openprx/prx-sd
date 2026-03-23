@@ -5,6 +5,36 @@
 //! detection pipeline correctly identifies the EICAR string and that clean
 //! files pass without false positives.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::unreadable_literal,
+    clippy::redundant_closure_for_method_calls,
+    clippy::format_collect,
+    clippy::int_plus_one,
+    clippy::needless_collect,
+    clippy::if_not_else,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    clippy::similar_names,
+    clippy::used_underscore_binding,
+    clippy::unnecessary_wraps,
+    clippy::bool_assert_comparison,
+    clippy::vec_init_then_push,
+    clippy::print_stderr,
+    clippy::write_with_newline,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::return_self_not_must_use,
+    clippy::must_use_candidate,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
@@ -105,11 +135,7 @@ async fn test_clean_file_passes() {
 
     let result = engine.scan_file(&clean_path).await.expect("scan failed");
 
-    assert_eq!(
-        result.threat_level,
-        ThreatLevel::Clean,
-        "benign file should be Clean"
-    );
+    assert_eq!(result.threat_level, ThreatLevel::Clean, "benign file should be Clean");
     assert!(!result.is_threat());
 }
 

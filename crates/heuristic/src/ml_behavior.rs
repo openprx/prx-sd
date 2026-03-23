@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 /// A pre-defined attack chain expressed as an ordered sequence of syscall names.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttackPattern {
-    /// Human-readable name of the attack pattern (e.g. "reverse_shell").
+    /// Human-readable name of the attack pattern (e.g. "`reverse_shell`").
     pub name: String,
     /// Ordered syscall names that must appear (in order, not necessarily
     /// contiguous) for the pattern to match.
@@ -58,7 +58,7 @@ fn is_subsequence(haystack: &[&str], needle: &[String]) -> bool {
     for n in needle {
         let mut found = false;
         while hi < haystack.len() {
-            if haystack[hi] == n.as_str() {
+            if haystack.get(hi).is_some_and(|h| *h == n.as_str()) {
                 hi += 1;
                 found = true;
                 break;
@@ -107,7 +107,10 @@ impl BehaviorClassifier {
         let confidence = if self.patterns.is_empty() {
             0.0
         } else {
-            (matched.len() as f32 / self.patterns.len() as f32).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            {
+                (matched.len() as f32 / self.patterns.len() as f32).min(1.0)
+            }
         };
 
         BehaviorPrediction {
@@ -125,7 +128,7 @@ impl BehaviorClassifier {
     /// via the [`SyscallName`] trait.  For convenience the most common path is
     /// to call [`classify_from_names`](Self::classify_from_names) directly.
     pub fn classify<T: SyscallName>(&self, syscalls: &[T]) -> BehaviorPrediction {
-        let names: Vec<&str> = syscalls.iter().map(|s| s.syscall_name()).collect();
+        let names: Vec<&str> = syscalls.iter().map(SyscallName::syscall_name).collect();
         self.classify_from_names(&names)
     }
 
@@ -136,12 +139,7 @@ impl BehaviorClassifier {
             // 1. Reverse shell: socket → connect → dup2 → execve
             AttackPattern {
                 name: "reverse_shell".into(),
-                syscall_sequence: vec![
-                    "socket".into(),
-                    "connect".into(),
-                    "dup2".into(),
-                    "execve".into(),
-                ],
+                syscall_sequence: vec!["socket".into(), "connect".into(), "dup2".into(), "execve".into()],
                 category: "execution".into(),
                 score: 90,
             },
@@ -156,24 +154,14 @@ impl BehaviorClassifier {
             //    (targeting /etc/shadow or similar)
             AttackPattern {
                 name: "credential_theft".into(),
-                syscall_sequence: vec![
-                    "open".into(),
-                    "read".into(),
-                    "socket".into(),
-                    "connect".into(),
-                ],
+                syscall_sequence: vec!["open".into(), "read".into(), "socket".into(), "connect".into()],
                 category: "credential_access".into(),
                 score: 85,
             },
             // 3b. Credential theft via openat (modern kernels)
             AttackPattern {
                 name: "credential_theft_openat".into(),
-                syscall_sequence: vec![
-                    "openat".into(),
-                    "read".into(),
-                    "socket".into(),
-                    "connect".into(),
-                ],
+                syscall_sequence: vec!["openat".into(), "read".into(), "socket".into(), "connect".into()],
                 category: "credential_access".into(),
                 score: 85,
             },
@@ -251,7 +239,7 @@ impl SyscallName for &str {
 
 /// Return the set of well-known mining pool ports for external callers
 /// (e.g. the sandbox behavior analyzer).
-pub fn mining_pool_ports() -> &'static [u16] {
+pub const fn mining_pool_ports() -> &'static [u16] {
     MINING_POOL_PORTS
 }
 
@@ -285,9 +273,7 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         let trace = &["open", "read", "socket", "connect"];
         let pred = classifier.classify_from_names(trace);
-        assert!(pred
-            .matched_patterns
-            .contains(&"credential_theft".to_string()));
+        assert!(pred.matched_patterns.contains(&"credential_theft".to_string()));
     }
 
     #[test]
@@ -295,9 +281,7 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         let trace = &["setuid", "execve"];
         let pred = classifier.classify_from_names(trace);
-        assert!(pred
-            .matched_patterns
-            .contains(&"privilege_escalation".to_string()));
+        assert!(pred.matched_patterns.contains(&"privilege_escalation".to_string()));
     }
 
     #[test]
@@ -305,9 +289,7 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         let trace = &["getdents64", "open", "read", "socket", "sendto"];
         let pred = classifier.classify_from_names(trace);
-        assert!(pred
-            .matched_patterns
-            .contains(&"data_exfiltration".to_string()));
+        assert!(pred.matched_patterns.contains(&"data_exfiltration".to_string()));
     }
 
     #[test]
@@ -335,8 +317,7 @@ mod tests {
         let classifier = BehaviorClassifier::new();
         // Reverse shell syscalls separated by unrelated calls.
         let trace = &[
-            "brk", "mmap", "socket", "read", "write", "connect", "close", "dup2", "mprotect",
-            "execve",
+            "brk", "mmap", "socket", "read", "write", "connect", "close", "dup2", "mprotect", "execve",
         ];
         let pred = classifier.classify_from_names(trace);
         assert!(pred.matched_patterns.contains(&"reverse_shell".to_string()));
@@ -379,13 +360,7 @@ mod tests {
 
     #[test]
     fn is_subsequence_basic() {
-        assert!(super::is_subsequence(
-            &["a", "b", "c"],
-            &["a".into(), "c".into()]
-        ));
-        assert!(!super::is_subsequence(
-            &["a", "b", "c"],
-            &["c".into(), "a".into()]
-        ));
+        assert!(super::is_subsequence(&["a", "b", "c"], &["a".into(), "c".into()]));
+        assert!(!super::is_subsequence(&["a", "b", "c"], &["c".into(), "a".into()]));
     }
 }

@@ -182,35 +182,38 @@ pub struct SyscallEvent {
 
 /// Extract the syscall number from ptrace registers.
 #[cfg(target_arch = "x86_64")]
-fn get_syscall_nr(regs: &libc::user_regs_struct) -> u64 {
+const fn get_syscall_nr(regs: &libc::user_regs_struct) -> u64 {
     regs.orig_rax
 }
 
 #[cfg(target_arch = "aarch64")]
-fn get_syscall_nr(regs: &libc::user_regs_struct) -> u64 {
+#[allow(clippy::indexing_slicing)] // fixed register index 8 is always in bounds
+const fn get_syscall_nr(regs: &libc::user_regs_struct) -> u64 {
     // On aarch64, x8 holds the syscall number.
     regs.regs[8]
 }
 
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-fn get_syscall_nr(_regs: &libc::user_regs_struct) -> u64 {
+const fn get_syscall_nr(_regs: &libc::user_regs_struct) -> u64 {
     0
 }
 
 /// Extract the syscall return value from ptrace registers.
 #[cfg(target_arch = "x86_64")]
-fn get_syscall_ret(regs: &libc::user_regs_struct) -> i64 {
+#[allow(clippy::cast_possible_wrap)] // rax holds the return value which may be negative errno
+const fn get_syscall_ret(regs: &libc::user_regs_struct) -> i64 {
     regs.rax as i64
 }
 
 #[cfg(target_arch = "aarch64")]
-fn get_syscall_ret(regs: &libc::user_regs_struct) -> i64 {
+#[allow(clippy::indexing_slicing, clippy::cast_possible_wrap)] // fixed register index 0
+const fn get_syscall_ret(regs: &libc::user_regs_struct) -> i64 {
     // On aarch64, x0 holds the return value.
     regs.regs[0] as i64
 }
 
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-fn get_syscall_ret(_regs: &libc::user_regs_struct) -> i64 {
+const fn get_syscall_ret(_regs: &libc::user_regs_struct) -> i64 {
     -1
 }
 
@@ -234,14 +237,15 @@ impl PtraceTracer {
     /// * `timeout` - Maximum wall-clock time before the child is killed.
     ///
     /// Returns a list of all system calls that were observed.
+    #[allow(clippy::similar_names)] // `c_args` and `args` are semantically distinct
     pub fn trace_child(cmd: &Path, args: &[&str], timeout: Duration) -> Result<Vec<SyscallEvent>> {
         let c_cmd = CString::new(cmd.as_os_str().as_bytes()).context("invalid command path")?;
 
-        // Build the full argv: [cmd, args...]
-        let mut argv: Vec<CString> = Vec::with_capacity(args.len() + 1);
-        argv.push(c_cmd.clone());
+        // Build the full c_args: [cmd, args...]
+        let mut c_args: Vec<CString> = Vec::with_capacity(args.len() + 1);
+        c_args.push(c_cmd.clone());
         for arg in args {
-            argv.push(CString::new(*arg).context("invalid argument")?);
+            c_args.push(CString::new(*arg).context("invalid argument")?);
         }
 
         let start = Instant::now();
@@ -263,7 +267,7 @@ impl PtraceTracer {
                 }
 
                 // Execute the target binary with PATH lookup and the provided arguments.
-                let Err(e) = execvp(&c_cmd, &argv);
+                let Err(e) = execvp(&c_cmd, &c_args);
                 tracing::error!("execvp failed: {e}");
                 std::process::exit(127);
             }
@@ -305,10 +309,24 @@ impl PtraceTracer {
             }
 
             match waitpid(child, None) {
-                Ok(WaitStatus::Exited(_, _)) => break,
-                Ok(WaitStatus::Signaled(_, _, _)) => break,
+                Ok(WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _)) => break,
                 Ok(WaitStatus::PtraceSyscall(_)) => {
-                    if !in_syscall {
+                    if in_syscall {
+                        // Syscall exit: read the return value.
+                        let return_value = ptrace::getregs(child).map_or(-1, |regs| get_syscall_ret(&regs));
+
+                        let elapsed = start.elapsed();
+                        #[allow(clippy::cast_possible_truncation)] // nanos within u64 for practical durations
+                        let ts_ns = elapsed.as_nanos() as u64;
+                        events.push(SyscallEvent {
+                            number: current_nr,
+                            name: syscall_name(current_nr),
+                            return_value,
+                            timestamp_ns: ts_ns,
+                        });
+
+                        in_syscall = false;
+                    } else {
                         // Syscall entry: read the syscall number from registers.
                         match ptrace::getregs(child) {
                             Ok(regs) => {
@@ -320,22 +338,6 @@ impl PtraceTracer {
                                 break;
                             }
                         }
-                    } else {
-                        // Syscall exit: read the return value.
-                        let return_value = match ptrace::getregs(child) {
-                            Ok(regs) => get_syscall_ret(&regs),
-                            Err(_) => -1,
-                        };
-
-                        let elapsed = start.elapsed();
-                        events.push(SyscallEvent {
-                            number: current_nr,
-                            name: syscall_name(current_nr),
-                            return_value,
-                            timestamp_ns: elapsed.as_nanos() as u64,
-                        });
-
-                        in_syscall = false;
                     }
 
                     // Continue tracing.

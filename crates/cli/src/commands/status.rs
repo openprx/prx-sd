@@ -20,7 +20,7 @@ fn is_process_running(pid: u32) -> bool {
     // Check /proc/<pid> on Linux, or use `kill -0` via command on other Unix.
     #[cfg(target_os = "linux")]
     {
-        std::path::Path::new(&format!("/proc/{}", pid)).exists()
+        std::path::Path::new(&format!("/proc/{pid}")).exists()
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
@@ -42,7 +42,8 @@ fn is_process_running(pid: u32) -> bool {
     }
 }
 
-pub async fn run(data_dir: &Path) -> Result<()> {
+#[allow(clippy::unnecessary_wraps)]
+pub fn run(data_dir: &Path) -> Result<()> {
     println!("{}", "PRX-SD Daemon Status".cyan().bold());
     println!();
 
@@ -51,26 +52,22 @@ pub async fn run(data_dir: &Path) -> Result<()> {
         Some(pid) => {
             let running = is_process_running(pid);
             if running {
-                println!(
-                    "  {:<22} {} (PID {})",
-                    "Status:".bold(),
-                    "RUNNING".green().bold(),
-                    pid
-                );
+                println!("  {:<22} {} (PID {})", "Status:".bold(), "RUNNING".green().bold(), pid);
 
                 // Try to get uptime from /proc on Linux.
                 #[cfg(target_os = "linux")]
                 {
-                    let pid_path = data_dir.join("prx-sd.pid");
-                    if let Ok(metadata) = std::fs::metadata(&pid_path) {
-                        if let Ok(modified) = metadata.modified() {
-                            if let Ok(elapsed) = modified.elapsed() {
-                                let secs = elapsed.as_secs();
-                                let hours = secs / 3600;
-                                let mins = (secs % 3600) / 60;
-                                println!("  {:<22} {}h {}m", "Uptime:".bold(), hours, mins);
-                            }
-                        }
+                    let uptime = data_dir
+                        .join("prx-sd.pid")
+                        .metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.elapsed().ok());
+                    if let Some(elapsed) = uptime {
+                        let secs = elapsed.as_secs();
+                        let hours = secs / 3600;
+                        let mins = (secs % 3600) / 60;
+                        println!("  {:<22} {hours}h {mins}m", "Uptime:".bold());
                     }
                 }
             } else {
@@ -83,11 +80,7 @@ pub async fn run(data_dir: &Path) -> Result<()> {
             }
         }
         None => {
-            println!(
-                "  {:<22} {} (no PID file)",
-                "Status:".bold(),
-                "STOPPED".yellow()
-            );
+            println!("  {:<22} {} (no PID file)", "Status:".bold(), "STOPPED".yellow());
         }
     }
 
@@ -102,29 +95,18 @@ pub async fn run(data_dir: &Path) -> Result<()> {
 
                     if let Some(ts) = stats.last_update {
                         let dt = chrono::DateTime::from_timestamp(ts, 0)
-                            .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-                            .unwrap_or_else(|| ts.to_string());
+                            .map_or_else(|| ts.to_string(), |d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string());
                         println!("  {:<22} {}", "Last update:".bold(), dt);
                     } else {
                         println!("  {:<22} {}", "Last update:".bold(), "never".dimmed());
                     }
                 }
                 Err(e) => {
-                    println!(
-                        "  {:<22} {} ({})",
-                        "Signatures:".bold(),
-                        "error reading stats".red(),
-                        e
-                    );
+                    println!("  {:<22} {} ({})", "Signatures:".bold(), "error reading stats".red(), e);
                 }
             },
             Err(e) => {
-                println!(
-                    "  {:<22} {} ({})",
-                    "Signatures:".bold(),
-                    "not initialised".yellow(),
-                    e
-                );
+                println!("  {:<22} {} ({})", "Signatures:".bold(), "not initialised".yellow(), e);
             }
         }
     } else {

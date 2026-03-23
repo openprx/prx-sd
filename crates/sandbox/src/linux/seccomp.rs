@@ -26,8 +26,20 @@ const BPF_JEQ: u16 = 0x10;
 const BPF_K: u16 = 0x00;
 const BPF_RET: u16 = 0x06;
 
-/// Offset of `nr` (syscall number) in `struct seccomp_data` on x86_64.
+/// Offset of `nr` (syscall number) in `struct seccomp_data`.
 const SECCOMP_DATA_NR_OFFSET: u32 = 0;
+
+/// Offset of `arch` in `struct seccomp_data`.
+const SECCOMP_DATA_ARCH_OFFSET: u32 = 4;
+
+/// Expected `seccomp_data.arch` value for the current architecture.
+/// Rejecting unexpected architectures prevents x32 ABI bypass on `x86_64`
+/// (where x32 syscall numbers are OR'd with `0x4000_0000`).
+#[cfg(target_arch = "x86_64")]
+const EXPECTED_AUDIT_ARCH: u32 = 0xC000_003E; // AUDIT_ARCH_X86_64
+
+#[cfg(target_arch = "aarch64")]
+const EXPECTED_AUDIT_ARCH: u32 = 0xC000_00B7; // AUDIT_ARCH_AARCH64
 
 /// BPF instruction.
 #[repr(C)]
@@ -50,7 +62,7 @@ struct SockFprog {
 
 /// System call numbers — architecture-specific.
 ///
-/// x86_64 and aarch64 use completely different numbering schemes.
+/// `x86_64` and aarch64 use completely different numbering schemes.
 /// Adding a new architecture requires a new `#[cfg]` block here.
 mod syscall_nr {
     #[cfg(target_arch = "x86_64")]
@@ -140,7 +152,7 @@ fn default_allowed_syscalls() -> BTreeSet<i64> {
 /// A seccomp BPF filter that restricts the system calls a process can make.
 ///
 /// By default, only a minimal set of syscalls is allowed (read, write, open,
-/// close, stat, fstat, mmap, mprotect, munmap, brk, exit, exit_group).
+/// close, stat, fstat, mmap, mprotect, munmap, brk, exit, `exit_group`).
 /// Additional syscalls can be added with [`allow_syscall`].
 pub struct SeccompFilter {
     allowed: BTreeSet<i64>,
@@ -160,9 +172,41 @@ impl SeccompFilter {
     }
 
     /// Build the BPF filter program from the allowed syscall set.
+    ///
+    /// The program first validates `seccomp_data.arch` to reject unexpected
+    /// architectures (e.g. x32 on `x86_64` which could bypass the filter),
+    /// then checks the syscall number against the allowed set.
     fn build_bpf_program(&self) -> Vec<SockFilterInsn> {
         let mut insns = Vec::new();
         let num_allowed = self.allowed.len();
+
+        // ── Architecture validation (x32 bypass prevention) ──────────
+
+        // Load architecture: LD [seccomp_data.arch]
+        insns.push(SockFilterInsn {
+            code: BPF_LD | BPF_W | BPF_ABS,
+            jt: 0,
+            jf: 0,
+            k: SECCOMP_DATA_ARCH_OFFSET,
+        });
+
+        // JEQ expected_arch: if match, skip KILL (jt=1); else fall through to KILL (jf=0).
+        insns.push(SockFilterInsn {
+            code: BPF_JMP | BPF_JEQ | BPF_K,
+            jt: 1,
+            jf: 0,
+            k: EXPECTED_AUDIT_ARCH,
+        });
+
+        // KILL: wrong architecture (x32 ABI, i386 compat, etc.)
+        insns.push(SockFilterInsn {
+            code: BPF_RET | BPF_K,
+            jt: 0,
+            jf: 0,
+            k: SECCOMP_RET_KILL_PROCESS,
+        });
+
+        // ── Syscall number validation ────────────────────────────────
 
         // Load the syscall number: LD [seccomp_data.nr]
         insns.push(SockFilterInsn {
@@ -177,13 +221,18 @@ impl SeccompFilter {
         // If JEQ fails (jf), fall through to the next check.
         for (i, &nr) in self.allowed.iter().enumerate() {
             let remaining = num_allowed - i - 1;
-            // jt = jump over remaining JEQs + KILL → land on ALLOW
+            // jt = jump over remaining JEQs + KILL -> land on ALLOW
             // jf = 0 (fall through to next JEQ)
+            // BPF jump offsets are u8 (max 255 allowed syscalls), syscall numbers fit u32.
+            #[allow(clippy::cast_possible_truncation)]
+            let jt = (remaining + 1) as u8;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let k = nr as u32;
             insns.push(SockFilterInsn {
                 code: BPF_JMP | BPF_JEQ | BPF_K,
-                jt: (remaining + 1) as u8, // skip remaining JEQs + KILL → land on ALLOW
+                jt,
                 jf: 0,
-                k: nr as u32,
+                k,
             });
         }
 
@@ -218,6 +267,8 @@ impl SeccompFilter {
     pub fn apply(&self) -> Result<()> {
         let insns = self.build_bpf_program();
 
+        // BPF programs are limited to 4096 instructions; u16 is sufficient.
+        #[allow(clippy::cast_possible_truncation)]
         let prog = SockFprog {
             len: insns.len() as u16,
             filter: insns.as_ptr(),
@@ -227,8 +278,7 @@ impl SeccompFilter {
         // ability to gain new privileges. No pointers are dereferenced.
         let ret = unsafe { libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) };
         if ret != 0 {
-            return Err(std::io::Error::last_os_error())
-                .context("prctl(PR_SET_NO_NEW_PRIVS) failed");
+            return Err(std::io::Error::last_os_error()).context("prctl(PR_SET_NO_NEW_PRIVS) failed");
         }
 
         // SAFETY: prog points to a valid SockFprog with a valid filter array.
@@ -238,7 +288,7 @@ impl SeccompFilter {
                 libc::SYS_seccomp,
                 SECCOMP_SET_MODE_FILTER,
                 0u64, // flags
-                &prog as *const SockFprog,
+                &raw const prog,
             )
         };
         if ret != 0 {
@@ -258,6 +308,7 @@ impl Default for SeccompFilter {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -313,8 +364,9 @@ mod tests {
         let filter = SeccompFilter::new();
         let program = filter.build_bpf_program();
 
-        // Expected: 1 (load nr) + N (one JEQ per allowed syscall) + 1 (KILL) + 1 (ALLOW)
-        let expected_len = 1 + filter.allowed.len() + 2;
+        // Expected: 3 (arch check: LD arch + JEQ + KILL)
+        //         + 1 (load nr) + N (one JEQ per allowed syscall) + 1 (KILL) + 1 (ALLOW)
+        let expected_len = 3 + 1 + filter.allowed.len() + 2;
         assert_eq!(
             program.len(),
             expected_len,
@@ -325,13 +377,27 @@ mod tests {
     }
 
     #[test]
-    fn test_build_bpf_program_starts_with_load() {
+    fn test_build_bpf_program_starts_with_arch_check() {
         let filter = SeccompFilter::new();
         let program = filter.build_bpf_program();
 
-        // First instruction: load seccomp_data.nr
+        // First instruction: load seccomp_data.arch
         assert_eq!(program[0].code, BPF_LD | BPF_W | BPF_ABS);
-        assert_eq!(program[0].k, SECCOMP_DATA_NR_OFFSET);
+        assert_eq!(program[0].k, SECCOMP_DATA_ARCH_OFFSET);
+
+        // Second instruction: JEQ expected architecture
+        assert_eq!(program[1].code, BPF_JMP | BPF_JEQ | BPF_K);
+        assert_eq!(program[1].k, EXPECTED_AUDIT_ARCH);
+        assert_eq!(program[1].jt, 1); // skip KILL
+        assert_eq!(program[1].jf, 0); // fall through to KILL
+
+        // Third instruction: KILL on wrong architecture
+        assert_eq!(program[2].code, BPF_RET | BPF_K);
+        assert_eq!(program[2].k, SECCOMP_RET_KILL_PROCESS);
+
+        // Fourth instruction: load seccomp_data.nr
+        assert_eq!(program[3].code, BPF_LD | BPF_W | BPF_ABS);
+        assert_eq!(program[3].k, SECCOMP_DATA_NR_OFFSET);
     }
 
     #[test]

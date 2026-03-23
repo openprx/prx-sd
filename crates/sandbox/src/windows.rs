@@ -22,9 +22,7 @@ pub struct WindowsSandbox {
 impl WindowsSandbox {
     /// Create a new Windows sandbox with the given configuration.
     pub fn new(config: &SandboxConfig) -> Self {
-        Self {
-            config: config.clone(),
-        }
+        Self { config: config.clone() }
     }
 
     /// Execute a command in the Windows sandbox.
