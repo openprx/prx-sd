@@ -55,7 +55,9 @@ help_smoke_test!(help_schedule, "schedule");
 help_smoke_test!(help_policy, "policy");
 help_smoke_test!(help_daemon, "daemon");
 help_smoke_test!(help_scan_usb, "scan-usb");
+#[cfg(target_os = "linux")]
 help_smoke_test!(help_scan_memory, "scan-memory");
+#[cfg(target_os = "linux")]
 help_smoke_test!(help_check_rootkit, "check-rootkit");
 help_smoke_test!(help_webhook, "webhook");
 help_smoke_test!(help_email_alert, "email-alert");
