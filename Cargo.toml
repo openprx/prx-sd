@@ -18,7 +18,7 @@ exclude = ["gui/src-tauri"]
 
 [workspace.package]
 authors = ["g1e2x87"]
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Open-source antivirus engine with hash, YARA, and heuristic detection"
