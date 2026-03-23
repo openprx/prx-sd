@@ -31,6 +31,9 @@ notify = { workspace = true }
 reqwest = { workspace = true }
 sha2 = { workspace = true }
 lettre = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
+tempfile = "3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.29", features = ["signal"] }
@@ -40,13 +43,10 @@ default = []
 ebpf = ["prx-sd-realtime/ebpf"]
 
 [dev-dependencies]
-tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
 sha2 = { workspace = true }
 serde_json = { workspace = true }
-flate2 = { workspace = true }
-tar = { workspace = true }
 
 [lints]
 workspace = true

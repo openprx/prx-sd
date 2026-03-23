@@ -196,7 +196,7 @@ fi
 
 # --- Download / locate binary ------------------------------------------------
 
-GITHUB_REPO="prx-sd/prx-sd"
+GITHUB_REPO="openprx/prx-sd"
 DOWNLOAD_BASE="https://github.com/${GITHUB_REPO}/releases"
 
 resolve_artifact_name() {
@@ -295,7 +295,7 @@ install_systemd_service() {
 [Unit]
 Description=PRX-SD Antivirus Real-time Protection
 After=network.target
-Documentation=https://github.com/prx-sd/prx-sd
+Documentation=https://github.com/openprx/prx-sd
 
 [Service]
 Type=simple

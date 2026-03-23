@@ -171,10 +171,11 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0);
 
-    // Read server URL from config, falling back to default.
+    // Read server URL from config. If not configured, skip auto-update
+    // (users should run `sd update` manually or set up a custom server).
     let server_url = {
         let config_path = data_dir.join("config.json");
-        std::fs::read_to_string(&config_path)
+        if let Some(url) = std::fs::read_to_string(&config_path)
             .ok()
             .and_then(|data| serde_json::from_str::<serde_json::Value>(&data).ok())
             .and_then(|val| {
@@ -182,7 +183,12 @@ async fn auto_update_signatures(data_dir: &Path) -> Result<bool> {
                     .and_then(|v| v.as_str())
                     .map(std::string::ToString::to_string)
             })
-            .unwrap_or_else(|| "https://update.prx-sd.dev/v1".to_string())
+        {
+            url
+        } else {
+            tracing::debug!("no custom update_server_url configured, skipping daemon auto-update");
+            return Ok(false);
+        }
     };
 
     let manifest_url = format!("{}/manifest.json", server_url.trim_end_matches('/'));
