@@ -321,21 +321,36 @@ fn apt_multi_stage_credential_lateral_persistence() {
     );
 
     // ── Phase 3: ProtectedDirsEnforcer (realtime) ──────────────────────
-    let enforcer = ProtectedDirsEnforcer::new(ProtectedDirsConfig::default());
+    // Protected-path enforcement is platform-specific (Linux: /home, /etc/cron.d;
+    // macOS: /Users, /Library/LaunchDaemons). Only assert on supported platforms.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        let enforcer = ProtectedDirsEnforcer::new(ProtectedDirsConfig::default());
 
-    // Check access to SSH key -- should be blocked for unknown PID 9999.
-    let ssh_verdict = enforcer.check_access(std::path::Path::new("/home/user/.ssh/id_rsa"), 9999);
-    assert!(
-        matches!(ssh_verdict, ProtectionVerdict::Blocked { .. }),
-        "SSH key access should be Blocked for unknown process, got: {ssh_verdict:?}"
-    );
+        // Check access to SSH key -- should be blocked for unknown PID 9999.
+        #[cfg(target_os = "linux")]
+        let ssh_path = "/home/user/.ssh/id_rsa";
+        #[cfg(target_os = "macos")]
+        let ssh_path = "/Users/user/.ssh/id_rsa";
 
-    // Check access to cron backdoor -- should be blocked for unknown PID 9999.
-    let cron_verdict = enforcer.check_access(std::path::Path::new("/etc/cron.d/backdoor"), 9999);
-    assert!(
-        matches!(cron_verdict, ProtectionVerdict::Blocked { .. }),
-        "cron.d access should be Blocked for unknown process, got: {cron_verdict:?}"
-    );
+        let ssh_verdict = enforcer.check_access(std::path::Path::new(ssh_path), 9999);
+        assert!(
+            matches!(ssh_verdict, ProtectionVerdict::Blocked { .. }),
+            "SSH key access should be Blocked for unknown process, got: {ssh_verdict:?}"
+        );
+
+        // Check access to persistence path -- should be blocked for unknown PID 9999.
+        #[cfg(target_os = "linux")]
+        let persist_path = "/etc/cron.d/backdoor";
+        #[cfg(target_os = "macos")]
+        let persist_path = "/Library/LaunchDaemons/com.backdoor.plist";
+
+        let cron_verdict = enforcer.check_access(std::path::Path::new(persist_path), 9999);
+        assert!(
+            matches!(cron_verdict, ProtectionVerdict::Blocked { .. }),
+            "persistence path access should be Blocked for unknown process, got: {cron_verdict:?}"
+        );
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
