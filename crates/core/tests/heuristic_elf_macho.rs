@@ -37,7 +37,7 @@
     clippy::cast_possible_wrap
 )]
 use prx_sd_heuristic::{Finding, HeuristicEngine, ThreatLevel};
-use prx_sd_parsers::{elf::ElfInfo, macho::MachOInfo, pe::SectionInfo, FileType, ParsedFile};
+use prx_sd_parsers::{FileType, ParsedFile, elf::ElfInfo, macho::MachOInfo, pe::SectionInfo};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

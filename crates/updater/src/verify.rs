@@ -3,7 +3,7 @@
 //! Payload wire format: `[64 bytes Ed25519 signature][data]`.
 //! The signature covers exactly the `data` portion that follows it.
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 
 /// Size of an Ed25519 signature in bytes.

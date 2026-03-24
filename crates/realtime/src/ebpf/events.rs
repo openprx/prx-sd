@@ -255,7 +255,7 @@ mod tests {
         buf.extend_from_slice(&42u64.to_ne_bytes()); // cgroup_id
         buf.extend_from_slice(&7u64.to_ne_bytes()); // mnt_ns
         buf.extend_from_slice(&8u64.to_ne_bytes()); // pid_ns
-                                                    // comm: 16 bytes, null-padded
+        // comm: 16 bytes, null-padded
         let mut comm_buf = [0u8; 16];
         let comm_bytes = comm.as_bytes();
         let len = comm_bytes.len().min(15);

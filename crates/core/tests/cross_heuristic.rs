@@ -34,11 +34,11 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap
 )]
-use prx_sd_heuristic::scoring::{aggregate_score, aggregate_score_with_weights, ScoringWeights};
+use prx_sd_heuristic::scoring::{ScoringWeights, aggregate_score, aggregate_score_with_weights};
 use prx_sd_heuristic::{Finding, HeuristicEngine, ThreatLevel};
 use prx_sd_parsers::{
-    pe::{ImportInfo, PeInfo, SectionInfo},
     ParsedFile,
+    pe::{ImportInfo, PeInfo, SectionInfo},
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────

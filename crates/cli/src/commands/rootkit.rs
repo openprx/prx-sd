@@ -5,8 +5,8 @@ use std::path::Path;
 use anyhow::Result;
 use colored::Colorize;
 
-use prx_sd_core::rootkit::{self, RootkitScanResult};
 use prx_sd_core::ThreatLevel;
+use prx_sd_core::rootkit::{self, RootkitScanResult};
 
 /// Run the rootkit check command.
 pub fn run(json: bool, _data_dir: &Path) -> Result<()> {

@@ -11,7 +11,7 @@
 //! object graph. It scans raw bytes for known suspicious keywords and structural
 //! patterns.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -561,10 +561,12 @@ mod tests {
         assert!(analysis.has_javascript);
         assert!(analysis.javascript_count >= 1);
         assert!(analysis.threat_score >= 30);
-        assert!(analysis
-            .suspicious_patterns
-            .iter()
-            .any(|p| p.pattern_name == "JavaScript"));
+        assert!(
+            analysis
+                .suspicious_patterns
+                .iter()
+                .any(|p| p.pattern_name == "JavaScript")
+        );
     }
 
     #[test]
@@ -573,10 +575,12 @@ mod tests {
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
         assert!(analysis.has_launch_action);
         assert!(analysis.threat_score >= 40);
-        assert!(analysis
-            .suspicious_patterns
-            .iter()
-            .any(|p| p.pattern_name == "LaunchAction"));
+        assert!(
+            analysis
+                .suspicious_patterns
+                .iter()
+                .any(|p| p.pattern_name == "LaunchAction")
+        );
     }
 
     #[test]
@@ -597,10 +601,12 @@ mod tests {
         let mut data = make_pdf("4 0 obj\n<< /Type /OLE >>\nendobj\n");
         data.extend_from_slice(b"Equation.3");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
-        assert!(analysis
-            .suspicious_patterns
-            .iter()
-            .any(|p| p.pattern_name == "CVE-2017-11882"));
+        assert!(
+            analysis
+                .suspicious_patterns
+                .iter()
+                .any(|p| p.pattern_name == "CVE-2017-11882")
+        );
         assert!(analysis.threat_score >= 60);
     }
 
@@ -609,20 +615,24 @@ mod tests {
         // #4A#61#76#61 = Java (4 hex-encoded chars => qualifies)
         let data = make_pdf("4 0 obj\n<< /#4A#61#76#61Script (x) /#4A#61#76#61 (y) /#4A#61#76#61 (z) >>\nendobj");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
-        assert!(analysis
-            .suspicious_patterns
-            .iter()
-            .any(|p| p.pattern_name == "HexObfuscation"));
+        assert!(
+            analysis
+                .suspicious_patterns
+                .iter()
+                .any(|p| p.pattern_name == "HexObfuscation")
+        );
     }
 
     #[test]
     fn detect_heap_spray_pattern() {
         let data = make_pdf("stream\n%u0c0c%u0c0c%u0c0c\nendstream");
         let analysis = analyze_pdf(&data).expect("analysis should succeed");
-        assert!(analysis
-            .suspicious_patterns
-            .iter()
-            .any(|p| p.pattern_name == "HeapSprayShellcode"));
+        assert!(
+            analysis
+                .suspicious_patterns
+                .iter()
+                .any(|p| p.pattern_name == "HeapSprayShellcode")
+        );
     }
 
     #[test]

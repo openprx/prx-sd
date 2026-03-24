@@ -11,7 +11,7 @@
 //! - **Offset**: `*` (any), absolute number, `EP+n`/`EP-n`, `EOF-n`, `SE<section>`.
 //! - **`HexSignature`**: hex-encoded byte pattern.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 /// A parsed NDB hex signature.
 #[derive(Debug, Clone)]

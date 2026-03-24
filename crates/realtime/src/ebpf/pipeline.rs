@@ -338,8 +338,8 @@ mod tests {
         use super::super::super::policy::PolicyAction;
         use async_trait::async_trait;
         use std::path::Path;
-        use std::sync::atomic::{AtomicU32, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicU32, Ordering};
 
         pub struct MockExecutor {
             pub scan_count: AtomicU32,

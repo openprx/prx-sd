@@ -40,9 +40,9 @@ use std::sync::Arc;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_quarantine::Quarantine;
+use prx_sd_remediation::RemediationAction;
 use prx_sd_remediation::actions::RemediationEngine;
 use prx_sd_remediation::policy::{ActionType, RemediationPolicy};
-use prx_sd_remediation::RemediationAction;
 use prx_sd_signatures::SignatureDatabase;
 
 // ---------------------------------------------------------------------------

@@ -667,8 +667,8 @@ fn info_command_shows_database_stats() {
 /// 13. Import `ClamAV` synthetic CVD file (512-byte header + tar.gz with .hdb).
 #[test]
 fn import_clamav_with_synthetic_cvd() {
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
 
     let data_dir = setup_data_dir();
 

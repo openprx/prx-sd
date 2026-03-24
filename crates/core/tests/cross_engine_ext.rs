@@ -37,9 +37,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use prx_sd_core::magic::{detect_magic, FileType};
-use prx_sd_core::result::{DetectionType, ScanResult, ThreatLevel};
 use prx_sd_core::ScanConfig;
+use prx_sd_core::magic::{FileType, detect_magic};
+use prx_sd_core::result::{DetectionType, ScanResult, ThreatLevel};
 use prx_sd_signatures::SignatureDatabase;
 
 // ---------------------------------------------------------------------------

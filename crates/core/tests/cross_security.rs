@@ -40,8 +40,8 @@
 use std::fs;
 
 use prx_sd_heuristic::{Finding, HeuristicEngine};
-use prx_sd_parsers::pe::{ImportInfo, PeInfo, SectionInfo};
 use prx_sd_parsers::ParsedFile;
+use prx_sd_parsers::pe::{ImportInfo, PeInfo, SectionInfo};
 use prx_sd_quarantine::Quarantine;
 
 // ---------------------------------------------------------------------------

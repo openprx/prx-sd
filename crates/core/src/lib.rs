@@ -37,5 +37,5 @@ pub mod virustotal;
 // Re-export the primary public API at the crate root for convenience.
 pub use config::ScanConfig;
 pub use engine::ScanEngine;
-pub use magic::{detect_magic, FileType};
+pub use magic::{FileType, detect_magic};
 pub use result::{DetectionType, ScanResult, ThreatLevel};

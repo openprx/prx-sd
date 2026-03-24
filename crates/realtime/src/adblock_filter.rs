@@ -17,9 +17,9 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use adblock::Engine;
 use adblock::lists::{FilterSet, ParseOptions};
 use adblock::request::Request;
-use adblock::Engine;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 

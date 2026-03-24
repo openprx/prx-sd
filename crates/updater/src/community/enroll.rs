@@ -3,7 +3,7 @@
 //! Calls `POST /api/v1/machines/enroll` and returns credentials that are
 //! persisted in [`CommunityConfig`].
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 

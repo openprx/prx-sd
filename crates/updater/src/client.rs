@@ -4,11 +4,11 @@
 //! delta patches, verifies their Ed25519 signatures, and applies them to the
 //! local signature database.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use ed25519_dalek::VerifyingKey;
 use tracing::info;
 
-use crate::delta::{decode_delta, DeltaPatch};
+use crate::delta::{DeltaPatch, decode_delta};
 use crate::verify::verify_payload;
 
 /// HTTP client for the prx-sd signature update protocol.

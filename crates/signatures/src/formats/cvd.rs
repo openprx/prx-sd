@@ -7,7 +7,7 @@
 //! ClamAV-VDB:build_time:version:num_sigs:func_level:md5:builder:stime:...
 //! ```
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 /// The fixed size of a CVD file header in bytes.
 const CVD_HEADER_SIZE: usize = 512;

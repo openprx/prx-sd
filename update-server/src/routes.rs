@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use ed25519_dalek::SigningKey;
 use serde::Serialize;
 use tracing::{error, info, warn};

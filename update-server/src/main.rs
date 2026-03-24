@@ -21,9 +21,9 @@ use std::sync::Arc;
 
 use anyhow::Context;
 
+use axum::Router;
 use axum::http::header;
 use axum::routing::{get, post};
-use axum::Router;
 use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;

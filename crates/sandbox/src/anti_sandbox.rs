@@ -420,20 +420,24 @@ mod tests {
         let data = b"checking VMware\x00VBoxService.exe\x00\x00normal text";
         let result = detect_evasion(data);
         assert!(result.is_evasive);
-        assert!(result
-            .techniques
-            .iter()
-            .any(|t| t.category == EvasionCategory::VmDetection));
+        assert!(
+            result
+                .techniques
+                .iter()
+                .any(|t| t.category == EvasionCategory::VmDetection)
+        );
     }
 
     #[test]
     fn test_debugger_detection() {
         let data = b"call IsDebuggerPresent\x00CheckRemoteDebuggerPresent\x00";
         let result = detect_evasion(data);
-        assert!(result
-            .techniques
-            .iter()
-            .any(|t| t.category == EvasionCategory::DebuggerDetection));
+        assert!(
+            result
+                .techniques
+                .iter()
+                .any(|t| t.category == EvasionCategory::DebuggerDetection)
+        );
     }
 
     #[test]
@@ -460,10 +464,12 @@ mod tests {
     fn test_environment_fingerprinting() {
         let data = b"GetComputerNameA\x00GetUserNameW\x00NUMBER_OF_PROCESSORS\x00GetDiskFreeSpace\x00";
         let result = detect_evasion(data);
-        assert!(result
-            .techniques
-            .iter()
-            .any(|t| t.category == EvasionCategory::EnvironmentCheck));
+        assert!(
+            result
+                .techniques
+                .iter()
+                .any(|t| t.category == EvasionCategory::EnvironmentCheck)
+        );
         // Should detect "multiple environment checks"
         assert!(result.techniques.iter().any(|t| t.name.contains("Multiple")));
     }
