@@ -44,7 +44,7 @@ use rand::rngs::OsRng;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_signatures::SignatureDatabase;
-use prx_sd_updater::delta::{decode_delta, encode_delta, DeltaPatch, RuleAction, YaraRuleEntry};
+use prx_sd_updater::delta::{DeltaPatch, RuleAction, YaraRuleEntry, decode_delta, encode_delta};
 use prx_sd_updater::verify::{sign_payload, verify_payload};
 
 // ---------------------------------------------------------------------------

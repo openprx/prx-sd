@@ -4,10 +4,10 @@
 //! not found in the local signature database. Results are cached in LMDB so
 //! the same file is never queried twice.
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use prx_sd_signatures::SignatureDatabase;
 use serde::Deserialize;
 

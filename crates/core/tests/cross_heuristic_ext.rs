@@ -35,10 +35,10 @@
 )]
 use prx_sd_heuristic::scoring::aggregate_score;
 use prx_sd_heuristic::{Finding, HeuristicEngine, ThreatLevel};
+use prx_sd_parsers::ParsedFile;
 use prx_sd_parsers::elf::ElfInfo;
 use prx_sd_parsers::macho::MachOInfo;
 use prx_sd_parsers::pe::{ImportInfo, PeInfo, SectionInfo};
-use prx_sd_parsers::ParsedFile;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

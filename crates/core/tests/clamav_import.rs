@@ -39,7 +39,7 @@
 use std::fs;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
-use prx_sd_signatures::{import_cvd_bytes, SignatureDatabase};
+use prx_sd_signatures::{SignatureDatabase, import_cvd_bytes};
 
 /// Build a minimal CVD byte blob with a single `.hdb` (MD5) entry.
 ///
@@ -171,11 +171,13 @@ async fn import_cvd_then_scan_with_sha256_fallback() {
     let result = engine.scan_file(&evil_path).await.expect("scan");
     assert_eq!(result.threat_level, ThreatLevel::Malicious);
     assert_eq!(result.detection_type, Some(DetectionType::Hash));
-    assert!(result
-        .threat_name
-        .as_deref()
-        .unwrap_or("")
-        .contains("ClamAV.Test.Payload"),);
+    assert!(
+        result
+            .threat_name
+            .as_deref()
+            .unwrap_or("")
+            .contains("ClamAV.Test.Payload"),
+    );
 }
 
 #[test]

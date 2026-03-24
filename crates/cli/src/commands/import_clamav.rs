@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use colored::Colorize;
 
 pub fn run(paths: &[std::path::PathBuf], data_dir: &Path) -> Result<()> {

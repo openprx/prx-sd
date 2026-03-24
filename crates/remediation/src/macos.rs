@@ -21,7 +21,7 @@ fn escape_applescript(s: &str) -> String {
 
 /// Kill a process by PID using SIGKILL.
 pub fn kill_process(pid: u32) -> Result<()> {
-    use nix::sys::signal::{kill, Signal};
+    use nix::sys::signal::{Signal, kill};
     use nix::unistd::Pid;
 
     let nix_pid = Pid::from_raw(pid as i32);

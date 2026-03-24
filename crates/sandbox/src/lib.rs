@@ -27,7 +27,7 @@ pub mod behavior;
 pub mod enhanced;
 pub mod yara_gen;
 
-pub use yara_gen::{generate_rules, GeneratedRule};
+pub use yara_gen::{GeneratedRule, generate_rules};
 
 #[cfg(target_os = "linux")]
 pub mod linux;

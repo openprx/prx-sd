@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -139,7 +139,7 @@ mod tests {
     )]
     use super::*;
     use std::fs;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     #[test]
     fn test_notify_monitor_new_creates_successfully() {

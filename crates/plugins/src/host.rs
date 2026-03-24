@@ -15,8 +15,8 @@ use std::path::Path;
 mod inner {
     use super::*;
     use wasmtime::*;
-    use wasmtime_wasi::p1::WasiP1Ctx;
     use wasmtime_wasi::WasiCtxBuilder;
+    use wasmtime_wasi::p1::WasiP1Ctx;
 
     /// Per-instance state that host functions read/write.
     struct PluginState {

@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use colored::Colorize;
 
 fn decode_hex(s: &str) -> Result<Vec<u8>> {

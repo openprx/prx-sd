@@ -14,6 +14,6 @@ pub mod formats;
 pub mod hash;
 pub mod yara;
 
-pub use clamav::{import_cvd, import_cvd_bytes, import_hash_file, ClamavImportStats};
+pub use clamav::{ClamavImportStats, import_cvd, import_cvd_bytes, import_hash_file};
 pub use database::{DbStats, SignatureDatabase};
 pub use yara::{YaraEngine, YaraMatch};

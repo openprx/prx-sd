@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};

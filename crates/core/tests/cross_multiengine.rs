@@ -40,7 +40,7 @@ use std::path::PathBuf;
 
 use prx_sd_core::{DetectionType, ScanConfig, ScanEngine, ThreatLevel};
 use prx_sd_heuristic::{Finding, HeuristicEngine};
-use prx_sd_parsers::{elf::ElfInfo, macho::MachOInfo, pe::SectionInfo, ParsedFile};
+use prx_sd_parsers::{ParsedFile, elf::ElfInfo, macho::MachOInfo, pe::SectionInfo};
 use prx_sd_signatures::SignatureDatabase;
 
 // ---------------------------------------------------------------------------

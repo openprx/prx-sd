@@ -7,7 +7,7 @@
 
 use std::fs;
 
-use prx_sd_quarantine::{batch_delete, batch_restore, cleanup_expired, Quarantine, QuarantineId};
+use prx_sd_quarantine::{Quarantine, QuarantineId, batch_delete, batch_restore, cleanup_expired};
 
 /// Create a fresh quarantine vault in a temp directory.
 fn setup_vault() -> (tempfile::TempDir, Quarantine) {

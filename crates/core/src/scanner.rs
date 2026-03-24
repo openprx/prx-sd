@@ -363,11 +363,13 @@ mod tests {
         assert_eq!(result.threat_level, ThreatLevel::Malicious);
         assert!(result.is_threat());
         assert_eq!(result.detection_type, Some(DetectionType::Hash));
-        assert!(result
-            .threat_name
-            .as_deref()
-            .unwrap_or("")
-            .contains("Test.Malware.FakePayload"));
+        assert!(
+            result
+                .threat_name
+                .as_deref()
+                .unwrap_or("")
+                .contains("Test.Malware.FakePayload")
+        );
     }
 
     #[test]

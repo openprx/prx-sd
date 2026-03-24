@@ -140,8 +140,8 @@ impl EnhancedSandbox {
     /// - `RLIMIT_FSIZE` — maximum file size the process may create (64 MiB).
     #[cfg(target_os = "linux")]
     fn set_resource_limits(config: &EnhancedSandboxConfig) -> Result<()> {
-        use libc::{rlimit, setrlimit};
         use libc::{RLIMIT_AS, RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_NOFILE, RLIMIT_NPROC};
+        use libc::{rlimit, setrlimit};
 
         let limits: Vec<(libc::__rlimit_resource_t, libc::rlim_t, &str)> = vec![
             (RLIMIT_AS, config.memory_limit_mb * 1024 * 1024, "RLIMIT_AS"),

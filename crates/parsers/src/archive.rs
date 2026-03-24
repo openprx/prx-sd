@@ -1,6 +1,6 @@
 use std::io::{Cursor, Read};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -370,8 +370,8 @@ mod tests {
 
     /// Build a minimal gzip-compressed payload.
     fn make_minimal_gzip(content: &[u8]) -> Vec<u8> {
-        use flate2::write::GzEncoder;
         use flate2::Compression;
+        use flate2::write::GzEncoder;
         use std::io::Write;
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(content).expect("write gzip");

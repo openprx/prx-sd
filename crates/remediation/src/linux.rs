@@ -13,7 +13,7 @@ use crate::PersistenceType;
 
 /// Kill a process by PID using SIGKILL.
 pub fn kill_process(pid: u32) -> Result<()> {
-    use nix::sys::signal::{kill, Signal};
+    use nix::sys::signal::{Signal, kill};
     use nix::unistd::Pid;
 
     #[allow(clippy::cast_possible_wrap)]

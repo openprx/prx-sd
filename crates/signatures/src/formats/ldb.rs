@@ -10,7 +10,7 @@
 //! - **`LogicalExpression`**: e.g., `0&1`, `0|1&2`, `0&1|2`.
 //! - **`SubSigN`**: hex patterns or other subsignature specifiers.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 /// A parsed LDB logical signature.
 #[derive(Debug, Clone)]

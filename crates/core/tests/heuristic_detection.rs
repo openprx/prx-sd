@@ -88,10 +88,10 @@ fn make_suspicious_pe(apis: &[&str], high_entropy: bool) -> Vec<u8> {
     pe[0x94..0x96].copy_from_slice(&0xF0u16.to_le_bytes()); // OptionalHeader size
     pe[0x96..0x98].copy_from_slice(&0x22u16.to_le_bytes()); // characteristics
     pe[0x98..0x9A].copy_from_slice(&0x20Bu16.to_le_bytes()); // PE32+
-                                                             // Section header at 0x188
+    // Section header at 0x188
     pe[0x188..0x190].copy_from_slice(b".text\x00\x00\x00");
     pe[0x1C4..0x1C8].copy_from_slice(&0xE0000020u32.to_le_bytes()); // R+W+X
-                                                                    // Write APIs
+    // Write APIs
     let mut off = 0x200;
     for api in apis {
         let bytes = api.as_bytes();

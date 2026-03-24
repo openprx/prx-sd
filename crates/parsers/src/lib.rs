@@ -16,8 +16,8 @@ pub mod pe;
 pub use archive::{ArchiveEntry, ArchiveFormat, ArchiveInfo};
 pub use elf::ElfInfo;
 pub use macho::MachOInfo;
-pub use office::{analyze_office, MacroSuspiciousCall, MacroThreatCategory, OfficeAnalysis, OfficeFormat, OfficeInfo};
-pub use pdf::{analyze_pdf, PdfAnalysis, PdfInfo, PdfSuspiciousPattern};
+pub use office::{MacroSuspiciousCall, MacroThreatCategory, OfficeAnalysis, OfficeFormat, OfficeInfo, analyze_office};
+pub use pdf::{PdfAnalysis, PdfInfo, PdfSuspiciousPattern, analyze_pdf};
 pub use pe::{ImportInfo, PeInfo, SectionInfo};
 
 use anyhow::Result;

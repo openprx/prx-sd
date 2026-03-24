@@ -14,11 +14,11 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use ed25519_dalek::SigningKey;
 use tracing::info;
 
-use prx_sd_updater::delta::{encode_delta, DeltaPatch};
+use prx_sd_updater::delta::{DeltaPatch, encode_delta};
 
 /// Manages on-disk storage of signed delta patches and full snapshots.
 pub struct SignatureStorage {

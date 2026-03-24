@@ -38,9 +38,9 @@
 )]
 use prx_sd_heuristic::{Finding, HeuristicEngine, ThreatLevel};
 use prx_sd_parsers::{
+    FileType, ParsedFile,
     elf::ElfInfo,
     pe::{ImportInfo, PeInfo, SectionInfo},
-    FileType, ParsedFile,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────

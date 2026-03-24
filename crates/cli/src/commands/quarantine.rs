@@ -4,8 +4,8 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-use crate::output;
 use crate::QuarantineAction;
+use crate::output;
 
 /// Open the real AES-256-GCM quarantine vault.
 fn open_quarantine(data_dir: &Path) -> Result<prx_sd_quarantine::Quarantine> {

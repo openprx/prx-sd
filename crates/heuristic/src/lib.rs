@@ -21,7 +21,7 @@ use prx_sd_parsers::ParsedFile;
 use crate::entropy::shannon_entropy;
 use crate::packer::{check_entry_point_anomaly, detect_packer};
 use crate::scoring::aggregate_score;
-use crate::suspicious_api::{check_suspicious_imports, ApiCategory};
+use crate::suspicious_api::{ApiCategory, check_suspicious_imports};
 
 // ─── Public types ────────────────────────────────────────────────────────────
 

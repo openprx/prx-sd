@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use nix::sys::ptrace;
 use nix::sys::signal::Signal;
-use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{execvp, fork, ForkResult, Pid};
+use nix::sys::wait::{WaitStatus, waitpid};
+use nix::unistd::{ForkResult, Pid, execvp, fork};
 use serde::{Deserialize, Serialize};
 
 // ── Syscall name table (architecture-specific) ──────────────────────────────

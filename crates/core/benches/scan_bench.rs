@@ -33,9 +33,9 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap
 )]
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
-use prx_sd_core::{detect_magic, ScanConfig, ScanEngine};
+use prx_sd_core::{ScanConfig, ScanEngine, detect_magic};
 use prx_sd_heuristic::entropy::shannon_entropy;
 use prx_sd_signatures::SignatureDatabase;
 
